@@ -1,0 +1,34 @@
+import { NextRequest, NextResponse } from "next/server";
+import mysql from "mysql2/promise";
+import { getDb, setupDatabase } from "@/lib/db";
+
+const VALID_STATUSES = ["New", "Acknowledged", "Under Review", "Will Fix", "Will Not Implement", "Completed"] as const;
+type SupportStatus = typeof VALID_STATUSES[number];
+
+// PATCH /api/support/[id] — update status
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    await setupDatabase();
+    const { status } = await req.json() as { status?: string };
+
+    if (!status || !VALID_STATUSES.includes(status as SupportStatus))
+      return NextResponse.json({ error: "Invalid status." }, { status: 400 });
+
+    const db = getDb();
+    const [rows] = await db.execute<mysql.RowDataPacket[]>(
+      "SELECT id FROM support_requests WHERE id = ? LIMIT 1", [params.id]
+    );
+    if (!(rows as mysql.RowDataPacket[])[0])
+      return NextResponse.json({ error: "Request not found." }, { status: 404 });
+
+    await db.execute("UPDATE support_requests SET status = ? WHERE id = ?", [status, params.id]);
+
+    return NextResponse.json({ success: true });
+  } catch (err) {
+    console.error("[PATCH /api/support/:id]", err);
+    return NextResponse.json({ error: "Failed to update status." }, { status: 500 });
+  }
+}
