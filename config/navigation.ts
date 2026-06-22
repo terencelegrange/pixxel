@@ -14,11 +14,6 @@ export const navigationConfig: NavGroup[] = [
         href: "/dashboard",
         icon: "LayoutDashboard",
       },
-      {
-        label: "Profile",
-        href: "/profile",
-        icon: "UserCircle",
-      },
     ],
   },
   {
