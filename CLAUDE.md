@@ -1,4 +1,4 @@
-# Origin Halo — Enterprise Architecture Repository Platform
+# Pixel — Enterprise Architecture Repository Platform
 
 ## Purpose
 

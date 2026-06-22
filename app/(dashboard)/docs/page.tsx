@@ -175,7 +175,7 @@ export default async function DocsPage() {
         <div className="mb-6 rounded-xl border border-slate-200 bg-white px-8 py-6 shadow-sm">
           <h1 className="text-2xl font-bold text-slate-900">Platform Documentation</h1>
           <p className="mt-1 text-sm text-slate-500">
-            Technical reference for the Origin Halo Enterprise Architecture Repository.
+            Technical reference for the Pixel Enterprise Architecture Repository.
           </p>
         </div>
 

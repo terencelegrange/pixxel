@@ -368,7 +368,7 @@ function StepApplication({
           id="app-name"
           value={form.appName}
           onChange={(v) => onChange({ appName: v })}
-          placeholder="e.g. Origin Halo"
+          placeholder="e.g. Pixel"
           hint="Displayed in the header and page titles."
           error={errors.appName}
         />
