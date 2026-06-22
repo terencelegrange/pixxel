@@ -2,8 +2,9 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import Link from "next/link";
-import { Bell, Menu, Search, UserCircle, LogOut, MessageSquare } from "lucide-react";
+import { Bell, Menu, Moon, Search, Sun, UserCircle, LogOut, MessageSquare } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import { useTheme } from "@/context/ThemeContext";
 
 interface HeaderProps {
   onMenuToggle: () => void;
@@ -12,6 +13,7 @@ interface HeaderProps {
 export default function Header({ onMenuToggle }: HeaderProps) {
   const { user, logout } = useAuth();
   const isAdmin = user?.role === "Admin";
+  const { theme, toggleTheme } = useTheme();
 
   // Avatar dropdown
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -146,6 +148,18 @@ export default function Header({ onMenuToggle }: HeaderProps) {
             )}
           </div>
         )}
+
+        {/* Theme toggle */}
+        <button
+          onClick={toggleTheme}
+          className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
+          aria-label="Toggle theme"
+        >
+          {theme === "dark"
+            ? <Sun className="h-5 w-5" />
+            : <Moon className="h-5 w-5" />
+          }
+        </button>
 
         {/* Avatar + dropdown */}
         <div ref={dropdownRef} className="relative">
