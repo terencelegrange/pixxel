@@ -6,7 +6,7 @@ import dynamic from "next/dynamic";
 import Link from "next/link";
 import {
   ArrowLeft, Save, History, Search, Plus, RotateCcw,
-  Check, Loader2,
+  Check, Loader2, Grid3x3,
 } from "lucide-react";
 import { Asset } from "@/types";
 import { STENCIL_GROUPS, type StencilItem } from "./stencils";
@@ -62,6 +62,9 @@ export default function DiagramEditor({
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
   const [saveSuccess, setSaveSuccess] = useState(false);
+
+  // ── Grid toggle ───────────────────────────────────────────────────────────
+  const [gridEnabled, setGridEnabled] = useState(true);
 
   // ── Excalidraw API ref ───────────────────────────────────────────────────
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -130,6 +133,16 @@ export default function DiagramEditor({
   const onCanvasChange = useCallback(() => {
     setHasChanges(true);
   }, []);
+
+  // ── Grid toggle ───────────────────────────────────────────────────────────
+  const handleGridToggle = useCallback(() => {
+    if (!excalidrawAPI) return;
+    const next = !gridEnabled;
+    setGridEnabled(next);
+    excalidrawAPI.updateScene({
+      appState: { gridSize: next ? GRID : null },
+    });
+  }, [excalidrawAPI, gridEnabled]);
 
   // ── Place an asset node on canvas ─────────────────────────────────────────
   const placeAsset = useCallback(
@@ -382,6 +395,20 @@ export default function DiagramEditor({
         </span>
 
         <div className="flex-1" />
+
+        <button
+          onClick={handleGridToggle}
+          disabled={!excalidrawAPI}
+          title={gridEnabled ? "Disable grid snap" : "Enable grid snap"}
+          className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
+            gridEnabled
+              ? "bg-slate-100 text-slate-800 ring-1 ring-slate-300"
+              : "text-slate-500 hover:bg-slate-50"
+          }`}
+        >
+          <Grid3x3 className="h-4 w-4" />
+          Grid
+        </button>
 
         {saveError && (
           <span className="text-xs text-red-600">{saveError}</span>
