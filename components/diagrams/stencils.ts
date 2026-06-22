@@ -320,4 +320,354 @@ export const STENCIL_GROUPS: StencilGroup[] = [
       },
     ],
   },
+
+  // ── People & Roles ───────────────────────────────────────────────────────
+  {
+    title: "People & Roles",
+    items: [
+      {
+        id: "person",
+        label: "Person",
+        emoji: "👤",
+        createElement: (x, y) =>
+          labeledShape("ellipse", x, y, 100, 100, "Person", "#e67700", "#fff9db"),
+      },
+      {
+        id: "team",
+        label: "Team",
+        emoji: "👥",
+        createElement: (x, y) =>
+          labeledShape("rectangle", x, y, 180, 80, "Team", "#e67700", "#fff9db", {
+            roundness: { type: 3, value: 8 },
+          }),
+      },
+      {
+        id: "executive",
+        label: "Executive",
+        emoji: "🧑‍💼",
+        createElement: (x, y) =>
+          labeledShape("rectangle", x, y, 160, 80, "Executive", "#d9480f", "#fff4e6", {
+            roundness: { type: 3, value: 8 },
+          }),
+      },
+      {
+        id: "external-user",
+        label: "External User",
+        emoji: "🧑‍🤝‍🧑",
+        createElement: (x, y) =>
+          labeledShape("ellipse", x, y, 100, 100, "External User", "#868e96", "#f8f9fa"),
+      },
+      {
+        id: "admin",
+        label: "Admin / Operator",
+        emoji: "🛡️",
+        createElement: (x, y) =>
+          labeledShape("diamond", x, y, 140, 80, "Admin", "#c92a2a", "#fff5f5"),
+      },
+      {
+        id: "customer",
+        label: "Customer",
+        emoji: "🤝",
+        createElement: (x, y) =>
+          labeledShape("ellipse", x, y, 100, 100, "Customer", "#2f9e44", "#ebfbee"),
+      },
+    ],
+  },
+
+  // ── Buildings & Places ───────────────────────────────────────────────────
+  {
+    title: "Buildings & Places",
+    items: [
+      {
+        id: "office",
+        label: "Office / HQ",
+        emoji: "🏢",
+        createElement: (x, y) =>
+          labeledShape("rectangle", x, y, 180, 100, "Office / HQ", "#0c8599", "#e3fafc", {
+            roundness: { type: 3, value: 8 },
+          }),
+      },
+      {
+        id: "data-centre",
+        label: "Data Centre",
+        emoji: "🏭",
+        createElement: (x, y) =>
+          labeledShape("rectangle", x, y, 200, 100, "Data Centre", "#1971c2", "#e7f5ff", {
+            roundness: { type: 3, value: 4 },
+          }),
+      },
+      {
+        id: "factory",
+        label: "Factory",
+        emoji: "🏗️",
+        createElement: (x, y) =>
+          labeledShape("rectangle", x, y, 200, 100, "Factory", "#495057", "#f8f9fa", {
+            roundness: { type: 3, value: 4 },
+          }),
+      },
+      {
+        id: "hospital",
+        label: "Hospital",
+        emoji: "🏥",
+        createElement: (x, y) =>
+          labeledShape("rectangle", x, y, 180, 100, "Hospital", "#c92a2a", "#fff5f5", {
+            roundness: { type: 3, value: 8 },
+          }),
+      },
+      {
+        id: "store",
+        label: "Store / Retail",
+        emoji: "🏪",
+        createElement: (x, y) =>
+          labeledShape("rectangle", x, y, 160, 80, "Store / Retail", "#2f9e44", "#ebfbee", {
+            roundness: { type: 3, value: 8 },
+          }),
+      },
+      {
+        id: "branch-office",
+        label: "Branch Office",
+        emoji: "🏬",
+        createElement: (x, y) =>
+          labeledShape("rectangle", x, y, 160, 80, "Branch Office", "#0c8599", "#e3fafc", {
+            roundness: { type: 3, value: 8 },
+          }),
+      },
+    ],
+  },
+
+  // ── Organisation ─────────────────────────────────────────────────────────
+  {
+    title: "Organisation",
+    items: [
+      {
+        id: "department",
+        label: "Department",
+        emoji: "🗂️",
+        createElement: (x, y) =>
+          labeledShape("rectangle", x, y, 200, 100, "Department", "#7950f2", "#f3f0ff", {
+            roundness: { type: 3, value: 8 },
+          }),
+      },
+      {
+        id: "business-unit",
+        label: "Business Unit",
+        emoji: "🏛️",
+        createElement: (x, y) =>
+          labeledShape("rectangle", x, y, 200, 100, "Business Unit", "#6741d9", "#f3f0ff", {
+            roundness: { type: 3, value: 8 },
+          }),
+      },
+      {
+        id: "subsidiary",
+        label: "Subsidiary",
+        emoji: "🔗",
+        createElement: (x, y) =>
+          labeledShape("rectangle", x, y, 180, 80, "Subsidiary", "#862e9c", "#f8f0fc", {
+            roundness: { type: 3, value: 8 },
+          }),
+      },
+      {
+        id: "group-boundary",
+        label: "Group Boundary",
+        emoji: "⬜",
+        createElement: (x, y) =>
+          labeledShape("rectangle", x, y, 300, 200, "Group", "#7950f2", "transparent", {
+            strokeStyle: "dashed",
+            strokeWidth: 1,
+          }),
+      },
+      {
+        id: "cost-centre",
+        label: "Cost Centre",
+        emoji: "💰",
+        createElement: (x, y) =>
+          labeledShape("diamond", x, y, 160, 80, "Cost Centre", "#7950f2", "#f3f0ff"),
+      },
+      {
+        id: "third-party",
+        label: "Third Party",
+        emoji: "🤝",
+        createElement: (x, y) =>
+          labeledShape("rectangle", x, y, 180, 80, "Third Party", "#868e96", "#f8f9fa", {
+            strokeStyle: "dashed",
+            roundness: { type: 3, value: 8 },
+          }),
+      },
+    ],
+  },
+
+  // ── Devices ──────────────────────────────────────────────────────────────
+  {
+    title: "Devices",
+    items: [
+      {
+        id: "laptop",
+        label: "Laptop",
+        emoji: "💻",
+        createElement: (x, y) =>
+          labeledShape("rectangle", x, y, 160, 80, "Laptop", "#364fc7", "#edf2ff", {
+            roundness: { type: 3, value: 4 },
+          }),
+      },
+      {
+        id: "mobile",
+        label: "Mobile / Phone",
+        emoji: "📱",
+        createElement: (x, y) =>
+          labeledShape("rectangle", x, y, 80, 140, "Mobile", "#364fc7", "#edf2ff", {
+            roundness: { type: 3, value: 8 },
+          }),
+      },
+      {
+        id: "tablet",
+        label: "Tablet",
+        emoji: "📲",
+        createElement: (x, y) =>
+          labeledShape("rectangle", x, y, 120, 160, "Tablet", "#364fc7", "#edf2ff", {
+            roundness: { type: 3, value: 8 },
+          }),
+      },
+      {
+        id: "printer",
+        label: "Printer",
+        emoji: "🖨️",
+        createElement: (x, y) =>
+          labeledShape("rectangle", x, y, 140, 80, "Printer", "#495057", "#f8f9fa", {
+            roundness: { type: 3, value: 4 },
+          }),
+      },
+      {
+        id: "iot-device",
+        label: "IoT Device",
+        emoji: "📡",
+        createElement: (x, y) =>
+          labeledShape("ellipse", x, y, 100, 80, "IoT Device", "#0c8599", "#e3fafc"),
+      },
+      {
+        id: "workstation",
+        label: "Workstation",
+        emoji: "🖥️",
+        createElement: (x, y) =>
+          labeledShape("rectangle", x, y, 160, 100, "Workstation", "#495057", "#f8f9fa", {
+            roundness: { type: 3, value: 4 },
+          }),
+      },
+    ],
+  },
+
+  // ── Network ───────────────────────────────────────────────────────────────
+  {
+    title: "Network",
+    items: [
+      {
+        id: "router",
+        label: "Router",
+        emoji: "📶",
+        createElement: (x, y) =>
+          labeledShape("diamond", x, y, 140, 80, "Router", "#2f9e44", "#ebfbee"),
+      },
+      {
+        id: "switch",
+        label: "Switch",
+        emoji: "🔀",
+        createElement: (x, y) =>
+          labeledShape("rectangle", x, y, 160, 60, "Switch", "#2f9e44", "#ebfbee", {
+            roundness: { type: 3, value: 4 },
+          }),
+      },
+      {
+        id: "proxy",
+        label: "Proxy",
+        emoji: "🔄",
+        createElement: (x, y) =>
+          labeledShape("rectangle", x, y, 160, 60, "Proxy", "#0c8599", "#e3fafc", {
+            roundness: { type: 3, value: 4 },
+          }),
+      },
+      {
+        id: "vpn-gateway",
+        label: "VPN Gateway",
+        emoji: "🔒",
+        createElement: (x, y) =>
+          labeledShape("rectangle", x, y, 160, 60, "VPN Gateway", "#1971c2", "#e7f5ff", {
+            roundness: { type: 3, value: 4 },
+          }),
+      },
+      {
+        id: "wifi-ap",
+        label: "Wi-Fi AP",
+        emoji: "📡",
+        createElement: (x, y) =>
+          labeledShape("ellipse", x, y, 100, 80, "Wi-Fi AP", "#2f9e44", "#ebfbee"),
+      },
+      {
+        id: "dns",
+        label: "DNS",
+        emoji: "🌐",
+        createElement: (x, y) =>
+          labeledShape("rectangle", x, y, 140, 60, "DNS", "#495057", "#f8f9fa", {
+            roundness: { type: 3, value: 4 },
+          }),
+      },
+    ],
+  },
+
+  // ── Security ──────────────────────────────────────────────────────────────
+  {
+    title: "Security",
+    items: [
+      {
+        id: "idp",
+        label: "Identity Provider",
+        emoji: "🪪",
+        createElement: (x, y) =>
+          labeledShape("rectangle", x, y, 180, 80, "Identity Provider", "#c92a2a", "#fff5f5", {
+            roundness: { type: 3, value: 8 },
+          }),
+      },
+      {
+        id: "auth-server",
+        label: "Auth Server",
+        emoji: "🔑",
+        createElement: (x, y) =>
+          labeledShape("rectangle", x, y, 160, 80, "Auth Server", "#c92a2a", "#fff5f5", {
+            roundness: { type: 3, value: 8 },
+          }),
+      },
+      {
+        id: "waf",
+        label: "WAF",
+        emoji: "🛡️",
+        createElement: (x, y) =>
+          labeledShape("diamond", x, y, 160, 80, "WAF", "#c92a2a", "#fff5f5"),
+      },
+      {
+        id: "secrets-vault",
+        label: "Secrets Vault",
+        emoji: "🔐",
+        createElement: (x, y) =>
+          labeledShape("rectangle", x, y, 140, 80, "Secrets Vault", "#862e9c", "#f8f0fc", {
+            roundness: { type: 3, value: 8 },
+          }),
+      },
+      {
+        id: "cert-authority",
+        label: "Cert Authority",
+        emoji: "📜",
+        createElement: (x, y) =>
+          labeledShape("rectangle", x, y, 160, 80, "Cert Authority", "#495057", "#f8f9fa", {
+            roundness: { type: 3, value: 8 },
+          }),
+      },
+      {
+        id: "siem",
+        label: "SIEM",
+        emoji: "🔍",
+        createElement: (x, y) =>
+          labeledShape("rectangle", x, y, 160, 80, "SIEM", "#c92a2a", "#fff5f5", {
+            roundness: { type: 3, value: 8 },
+          }),
+      },
+    ],
+  },
 ];
