@@ -18,7 +18,27 @@ import path from "path";
 // Credential resolution
 // ---------------------------------------------------------------------------
 function getDbCredentials(): { host: string; port: number; user: string; password: string; database: string } | null {
-  // Prefer env vars when DB_HOST is explicitly set (normal production/dev flow)
+  // Prefer site.config.json when it has been written by the setup wizard.
+  // This ensures credentials entered in the UI always take effect, even when
+  // stale env vars from a previous config are still loaded in the process.
+  try {
+    const raw = fs.readFileSync(path.join(process.cwd(), "site.config.json"), "utf-8");
+    const config = JSON.parse(raw);
+    if (config?.db?.host) {
+      return {
+        host: config.db.host,
+        port: Number(config.db.port ?? 3306),
+        user: config.db.user ?? "root",
+        password: config.db.password ?? "",
+        database: config.db.name ?? "saas_app",
+      };
+    }
+  } catch {
+    // site.config.json not present — fall through to env vars
+  }
+
+  // Fall back to environment variables (useful for Docker / CI deployments
+  // that don't use the setup wizard)
   if (process.env.DB_HOST !== undefined) {
     return {
       host: process.env.DB_HOST || "localhost",
@@ -27,23 +47,6 @@ function getDbCredentials(): { host: string; port: number; user: string; passwor
       password: process.env.DB_PASSWORD ?? "",
       database: process.env.DB_NAME ?? "saas_app",
     };
-  }
-
-  // Fall back to site.config.json (written by /setup wizard, before server restart)
-  try {
-    const raw = fs.readFileSync(path.join(process.cwd(), "site.config.json"), "utf-8");
-    const config = JSON.parse(raw);
-    if (config?.db) {
-      return {
-        host: config.db.host || "localhost",
-        port: Number(config.db.port ?? 3306),
-        user: config.db.user ?? "root",
-        password: config.db.password ?? "",
-        database: config.db.name ?? "saas_app",
-      };
-    }
-  } catch {
-    // site.config.json not present — setup has not been run yet
   }
 
   return null;
@@ -77,6 +80,11 @@ function getPool(): Pool {
 
 export function getDb(): Pool {
   return getPool();
+}
+
+export function resetPool(): void {
+  pool = null;
+  initPromise = null;
 }
 
 // ---------------------------------------------------------------------------
@@ -588,5 +596,23 @@ async function runSetup(): Promise<void> {
       [id, name, description, sortOrder]
     );
   }
+
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS changelog (
+      id              CHAR(36)                                               NOT NULL,
+      version         VARCHAR(50)                                            NOT NULL,
+      title           VARCHAR(500)                                           NOT NULL,
+      description     TEXT                                                   NULL,
+      type            ENUM('feature','fix','improvement','breaking')         NOT NULL DEFAULT 'feature',
+      released_at     DATE                                                   NOT NULL,
+      created_by_id   CHAR(36)                                              NOT NULL,
+      created_by_name VARCHAR(255)                                           NOT NULL,
+      created_at      DATETIME                                               NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at      DATETIME                                               NOT NULL DEFAULT CURRENT_TIMESTAMP
+                                                                             ON UPDATE CURRENT_TIMESTAMP,
+      PRIMARY KEY (id),
+      KEY idx_changelog_released_at (released_at)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  `);
 
 }

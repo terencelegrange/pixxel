@@ -263,6 +263,21 @@ export interface IndustrySector {
   updatedAt: string;
 }
 
+export type ChangelogType = 'feature' | 'fix' | 'improvement' | 'breaking';
+
+export interface ChangelogEntry {
+  id: string;
+  version: string;
+  title: string;
+  description: string | null;
+  type: ChangelogType;
+  releasedAt: string;
+  createdById: string;
+  createdByName: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface BusinessCapability {
   id: string;
   name: string;

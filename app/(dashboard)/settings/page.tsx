@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Settings, Bell, Lock, Globe, ShieldCheck, MessageSquare, ChevronRight, Layers, GitBranch, Gauge, Building2, Network, Target, Package2, BarChart2 } from "lucide-react";
+import { Settings, Bell, Lock, Globe, ShieldCheck, MessageSquare, ChevronRight, Layers, GitBranch, Gauge, Building2, Network, Target, Package2, BarChart2, ScrollText } from "lucide-react";
 
 // ---------------------------------------------------------------------------
 // Clickable settings tile
@@ -113,6 +113,13 @@ export default function SettingsPage() {
           iconBg="bg-sky-500"
           title="Feedback"
           description="View and manage user feedback submissions."
+        />
+        <SettingsTile
+          href="/settings/changelog"
+          icon={ScrollText}
+          iconBg="bg-emerald-500"
+          title="Changelog"
+          description="Record and publish what has changed in each platform release."
         />
         <SettingsTile
           href="/settings/industry-sectors"
