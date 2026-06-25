@@ -708,4 +708,25 @@ async function runSetup(): Promise<void> {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
   `);
 
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS asset_dependencies (
+      id              CHAR(36)     NOT NULL,
+      source_asset_id CHAR(36)     NOT NULL,
+      target_asset_id CHAR(36)     NOT NULL,
+      type            ENUM('API','Database','File Transfer','Event / Message','UI Embed','Other')
+                                   NOT NULL DEFAULT 'API',
+      direction       ENUM('outbound','bidirectional')
+                                   NOT NULL DEFAULT 'outbound',
+      notes           TEXT         NULL,
+      created_by_id   CHAR(36)     NOT NULL,
+      created_by_name VARCHAR(255) NOT NULL,
+      created_at      DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at      DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      PRIMARY KEY (id),
+      UNIQUE KEY uq_dep_pair (source_asset_id, target_asset_id),
+      KEY idx_dep_source (source_asset_id),
+      KEY idx_dep_target (target_asset_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  `);
+
 }

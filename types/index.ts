@@ -328,3 +328,35 @@ export interface RoadmapDomainGroup {
   domainName: string;
   assets: RoadmapAsset[];
 }
+
+// ---------------------------------------------------------------------------
+// Asset Dependencies
+// ---------------------------------------------------------------------------
+export type DependencyConnectionType =
+  | 'API'
+  | 'Database'
+  | 'File Transfer'
+  | 'Event / Message'
+  | 'UI Embed'
+  | 'Other';
+
+export type DependencyDirection = 'outbound' | 'bidirectional';
+
+export interface AssetDependency {
+  id: string;
+  sourceAssetId: string;
+  sourceAssetName: string;
+  sourceAssetIcon: string | null;
+  sourceAssetDomain: string | null;
+  targetAssetId: string;
+  targetAssetName: string;
+  targetAssetIcon: string | null;
+  targetAssetDomain: string | null;
+  type: DependencyConnectionType;
+  direction: DependencyDirection;
+  notes: string | null;
+  createdById: string;
+  createdByName: string;
+  createdAt: string;
+  updatedAt: string;
+}
