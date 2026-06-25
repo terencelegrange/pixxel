@@ -7,8 +7,14 @@ import {
   ArrowLeft, ExternalLink, Pencil, Trash2,
   AlertTriangle, ChevronDown, ChevronUp,
   FolderKanban, ArrowDownToLine, ArrowUpFromLine,
-  GitBranch, CloudUpload, FileCode2,
+  GitBranch, CloudUpload, FileCode2, Network, Plus,
 } from "lucide-react";
+import ReactFlow, { Node, Edge, NodeTypes, EdgeTypes, Background, useNodesState, useEdgesState } from "reactflow";
+import "reactflow/dist/style.css";
+import { AssetDependency } from "@/types";
+import DependencyNode, { DependencyNodeData } from "@/components/dependencies/DependencyNode";
+import DependencyEdge, { DependencyEdgeData } from "@/components/dependencies/DependencyEdge";
+import AddDependencyModal from "@/components/dependencies/AddDependencyModal";
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
@@ -185,6 +191,12 @@ function AuditRow({ entry }: { entry: AuditLog }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// React Flow node / edge type registries — must be module-level (not in render)
+// ─────────────────────────────────────────────────────────────────────────────
+const DEP_NODE_TYPES: NodeTypes = { dependencyNode: DependencyNode };
+const DEP_EDGE_TYPES: EdgeTypes = { dependencyEdge: DependencyEdge };
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Page
 // ─────────────────────────────────────────────────────────────────────────────
 export default function AssetDetailPage() {
@@ -212,6 +224,15 @@ export default function AssetDetailPage() {
   const [assetPlantUMLDiagrams, setAssetPlantUMLDiagrams] = useState<{
     id: string; name: string; updatedAt: string; latestVersion: number; matchedOn: string;
   }[]>([]);
+  const [depData, setDepData] = useState<{ downstream: AssetDependency[]; upstream: AssetDependency[] }>({
+    downstream: [], upstream: [],
+  });
+  const [depNodes, setDepNodes, onDepNodesChange] = useNodesState<DependencyNodeData>([]);
+  const [depEdges, setDepEdges, onDepEdgesChange] = useEdgesState<DependencyEdgeData>([]);
+  const [depAddOpen, setDepAddOpen] = useState(false);
+  const [depDeleteId, setDepDeleteId] = useState<string | null>(null);
+  const [isDeletingDep, setIsDeletingDep] = useState(false);
+  const [allAssets, setAllAssets] = useState<Pick<Asset, "id" | "name" | "shortCode">[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -233,7 +254,7 @@ export default function AssetDetailPage() {
     setIsLoading(true);
     setError(null);
     try {
-      const [assetRes, historyRes, deptsRes, strategiesRes, complexitiesRes, domainsRes, tiersRes, vendorsRes, usersRes, projectsRes, capsRes, sectorsRes, diagramsRes, plantumlDiagramsRes] = await Promise.all([
+      const [assetRes, historyRes, deptsRes, strategiesRes, complexitiesRes, domainsRes, tiersRes, vendorsRes, usersRes, projectsRes, capsRes, sectorsRes, diagramsRes, plantumlDiagramsRes, depRes, allAssetsRes] = await Promise.all([
         fetch(`/api/assets/${id}`),
         fetch(`/api/assets/${id}/history`),
         fetch("/api/organisations"),
@@ -248,12 +269,14 @@ export default function AssetDetailPage() {
         fetch("/api/industry-sectors"),
         fetch(`/api/assets/${id}/diagrams`),
         fetch(`/api/assets/${id}/plantuml-diagrams`),
+        fetch(`/api/assets/${id}/dependencies`),
+        fetch("/api/assets"),
       ]);
       if (!assetRes.ok) {
         const d = await assetRes.json();
         throw new Error(d.error ?? "Asset not found.");
       }
-      const [assetData, historyData, deptsData, strategiesData, complexitiesData, domainsData, tiersData, vendorsData, usersData, projectsData, capsData, sectorsData, diagramsData, plantumlDiagramsData] = await Promise.all([
+      const [assetData, historyData, deptsData, strategiesData, complexitiesData, domainsData, tiersData, vendorsData, usersData, projectsData, capsData, sectorsData, diagramsData, plantumlDiagramsData, depDataResult, allAssetsData] = await Promise.all([
         assetRes.json(),
         historyRes.json(),
         deptsRes.json(),
@@ -268,6 +291,8 @@ export default function AssetDetailPage() {
         sectorsRes.json(),
         diagramsRes.json(),
         plantumlDiagramsRes.json(),
+        depRes.json(),
+        allAssetsRes.json(),
       ]);
       setAsset(assetData.asset);
       setHistory(historyData.history ?? []);
@@ -283,6 +308,11 @@ export default function AssetDetailPage() {
       setSectors(sectorsData.sectors ?? []);
       setAssetDiagrams(diagramsData.diagrams ?? []);
       setAssetPlantUMLDiagrams(plantumlDiagramsData.diagrams ?? []);
+      const downstream: AssetDependency[] = depDataResult.downstream ?? [];
+      const upstream: AssetDependency[] = depDataResult.upstream ?? [];
+      setDepData({ downstream, upstream });
+      setAllAssets(allAssetsData.assets ?? []);
+      buildDepMiniMap(downstream, upstream, id, assetData.asset);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load.");
     } finally {
@@ -291,6 +321,100 @@ export default function AssetDetailPage() {
   }, [id]);
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
+
+  // ── Dependency mini-map builder ───────────────────────────────────────────
+  function buildDepMiniMap(
+    downstream: AssetDependency[],
+    upstream: AssetDependency[],
+    currentId: string,
+    currentAsset: { name: string; icon: string | null; shortCode: string | null; lifecycleStatus: string; domainName: string | null }
+  ) {
+    const miniNodes: Node<DependencyNodeData>[] = [];
+    const miniEdges: Edge<DependencyEdgeData>[] = [];
+    const seenIds = new Set<string>();
+    const upstreamX = -240;
+    const centerX = 0;
+    const downstreamX = 240;
+
+    miniNodes.push({
+      id: currentId,
+      type: "dependencyNode",
+      position: { x: centerX - 95, y: 0 },
+      data: {
+        name: currentAsset.name,
+        shortCode: currentAsset.shortCode,
+        icon: currentAsset.icon,
+        domain: currentAsset.domainName ?? null,
+        lifecycleStatus: currentAsset.lifecycleStatus,
+        isCenter: true,
+      },
+    });
+    seenIds.add(currentId);
+
+    const downstreamUniq = downstream.filter((d) => {
+      const otherId = d.sourceAssetId === currentId ? d.targetAssetId : d.sourceAssetId;
+      return !seenIds.has(otherId);
+    });
+    downstreamUniq.forEach((d, i) => {
+      const otherId = d.sourceAssetId === currentId ? d.targetAssetId : d.sourceAssetId;
+      const otherName = d.sourceAssetId === currentId ? d.targetAssetName : d.sourceAssetName;
+      const otherIcon = d.sourceAssetId === currentId ? d.targetAssetIcon : d.sourceAssetIcon;
+      const otherDomain = d.sourceAssetId === currentId ? d.targetAssetDomain : d.sourceAssetDomain;
+      seenIds.add(otherId);
+      miniNodes.push({
+        id: otherId, type: "dependencyNode",
+        position: { x: downstreamX - 95, y: i * 80 - ((downstreamUniq.length - 1) * 80) / 2 },
+        data: { name: otherName, shortCode: null, icon: otherIcon, domain: otherDomain, lifecycleStatus: null },
+      });
+      miniEdges.push({
+        id: `down-${d.id}`, source: currentId, target: otherId, type: "dependencyEdge",
+        data: { type: d.type, direction: d.direction, notes: d.notes, dependencyId: d.id },
+      });
+    });
+
+    const upstreamUniq = upstream.filter((d) => {
+      const otherId = d.targetAssetId === currentId ? d.sourceAssetId : d.targetAssetId;
+      return !seenIds.has(otherId);
+    });
+    upstreamUniq.forEach((d, i) => {
+      const otherId = d.targetAssetId === currentId ? d.sourceAssetId : d.targetAssetId;
+      const otherName = d.targetAssetId === currentId ? d.sourceAssetName : d.targetAssetName;
+      const otherIcon = d.targetAssetId === currentId ? d.sourceAssetIcon : d.targetAssetIcon;
+      const otherDomain = d.targetAssetId === currentId ? d.sourceAssetDomain : d.targetAssetDomain;
+      seenIds.add(otherId);
+      miniNodes.push({
+        id: otherId, type: "dependencyNode",
+        position: { x: upstreamX - 95, y: i * 80 - ((upstreamUniq.length - 1) * 80) / 2 },
+        data: { name: otherName, shortCode: null, icon: otherIcon, domain: otherDomain, lifecycleStatus: null },
+      });
+      miniEdges.push({
+        id: `up-${d.id}`, source: otherId, target: currentId, type: "dependencyEdge",
+        data: { type: d.type, direction: d.direction, notes: d.notes, dependencyId: d.id },
+      });
+    });
+
+    setDepNodes(miniNodes);
+    setDepEdges(miniEdges);
+  }
+
+  // ── Delete dependency ─────────────────────────────────────────────────────
+  async function handleDeleteDep(depId: string) {
+    if (!user) return;
+    setIsDeletingDep(true);
+    try {
+      const res = await fetch(`/api/dependencies/${depId}`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: user.id, userName: user.name }),
+      });
+      if (res.ok) {
+        setDepDeleteId(null);
+        await fetchAll();
+      }
+    } finally {
+      setIsDeletingDep(false);
+    }
+  }
 
   // ── Save (edit) ───────────────────────────────────────────────────────────
   async function handleSave(form: AssetFormState) {
@@ -661,6 +785,143 @@ export default function AssetDetailPage() {
             </table>
           </div>
         </div>
+      )}
+
+      {/* ── Dependencies ───────────────────────────────────────────────────── */}
+      <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden dark:border-slate-700 dark:bg-slate-900">
+        <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 px-5 py-3">
+          <div className="flex items-center gap-2">
+            <Network className="h-4 w-4 text-slate-400 dark:text-slate-500" />
+            <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+              Dependencies
+            </h2>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="rounded-full bg-slate-200 dark:bg-slate-700 px-2 py-0.5 text-xs font-medium text-slate-600 dark:text-slate-300">
+              {depData.downstream.length + depData.upstream.length} connection{depData.downstream.length + depData.upstream.length !== 1 ? "s" : ""}
+            </span>
+            {user && (
+              <button
+                onClick={() => setDepAddOpen(true)}
+                className="flex items-center gap-1 rounded-lg bg-brand-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-brand-700"
+              >
+                <Plus className="h-3 w-3" /> Add
+              </button>
+            )}
+          </div>
+        </div>
+
+        {(depData.downstream.length > 0 || depData.upstream.length > 0) && (
+          <div className="border-b border-slate-100 dark:border-slate-800" style={{ height: 240 }}>
+            <ReactFlow
+              nodes={depNodes}
+              edges={depEdges}
+              nodeTypes={DEP_NODE_TYPES}
+              edgeTypes={DEP_EDGE_TYPES}
+              onNodesChange={onDepNodesChange}
+              onEdgesChange={onDepEdgesChange}
+              nodesDraggable={false}
+              nodesConnectable={false}
+              elementsSelectable={false}
+              fitView
+              fitViewOptions={{ padding: 0.3 }}
+              onNodeClick={(_e, node) => router.push(`/assets/${node.id}`)}
+              className="bg-slate-50 dark:bg-slate-950"
+            >
+              <Background color="#e2e8f0" className="dark:[&_line]:stroke-slate-800" />
+            </ReactFlow>
+          </div>
+        )}
+
+        {depData.downstream.length > 0 && (
+          <div>
+            <div className="px-5 py-2 bg-slate-50/50 dark:bg-slate-800/30 border-b border-slate-100 dark:border-slate-800">
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                Downstream - We depend on
+              </span>
+            </div>
+            <div className="divide-y divide-slate-100 dark:divide-slate-800">
+              {depData.downstream.map((d) => {
+                const otherId = d.sourceAssetId === id ? d.targetAssetId : d.sourceAssetId;
+                const otherName = d.sourceAssetId === id ? d.targetAssetName : d.sourceAssetName;
+                return (
+                  <div key={d.id} className="flex items-center gap-3 px-5 py-3 hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                    <Link href={`/assets/${otherId}`} className="flex-1 text-sm font-medium text-slate-800 dark:text-slate-100 hover:text-brand-600 dark:hover:text-brand-400 truncate">
+                      {otherName}
+                    </Link>
+                    <span className="text-xs text-slate-400 dark:text-slate-500">{d.type}</span>
+                    <span className="text-xs text-slate-300 dark:text-slate-600">{d.direction}</span>
+                    {d.notes && <span className="text-xs text-slate-400 dark:text-slate-500 truncate max-w-[120px]" title={d.notes}>{d.notes}</span>}
+                    {user && (
+                      depDeleteId === d.id ? (
+                        <div className="flex items-center gap-1">
+                          <span className="text-xs text-slate-500 dark:text-slate-400">Delete?</span>
+                          <button onClick={() => handleDeleteDep(d.id)} disabled={isDeletingDep} className="text-xs text-red-600 hover:underline dark:text-red-400 disabled:opacity-50">Yes</button>
+                          <button onClick={() => setDepDeleteId(null)} className="text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">No</button>
+                        </div>
+                      ) : (
+                        <button onClick={() => setDepDeleteId(d.id)} className="text-slate-300 hover:text-red-500 dark:text-slate-600 dark:hover:text-red-400">
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      )
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {depData.upstream.length > 0 && (
+          <div>
+            <div className="px-5 py-2 bg-slate-50/50 dark:bg-slate-800/30 border-b border-slate-100 dark:border-slate-800">
+              <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                Upstream - Depends on us
+              </span>
+            </div>
+            <div className="divide-y divide-slate-100 dark:divide-slate-800">
+              {depData.upstream.map((d) => {
+                const otherId = d.targetAssetId === id ? d.sourceAssetId : d.targetAssetId;
+                const otherName = d.targetAssetId === id ? d.sourceAssetName : d.targetAssetName;
+                return (
+                  <div key={d.id} className="flex items-center gap-3 px-5 py-3 hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                    <Link href={`/assets/${otherId}`} className="flex-1 text-sm font-medium text-slate-800 dark:text-slate-100 hover:text-brand-600 dark:hover:text-brand-400 truncate">
+                      {otherName}
+                    </Link>
+                    <span className="text-xs text-slate-400 dark:text-slate-500">{d.type}</span>
+                    <span className="text-xs text-slate-300 dark:text-slate-600">{d.direction}</span>
+                    {d.notes && <span className="text-xs text-slate-400 dark:text-slate-500 truncate max-w-[120px]" title={d.notes}>{d.notes}</span>}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {depData.downstream.length === 0 && depData.upstream.length === 0 && (
+          <div className="flex flex-col items-center justify-center gap-2 py-10 text-slate-400 dark:text-slate-500">
+            <Network className="h-8 w-8 text-slate-300 dark:text-slate-600" />
+            <p className="text-sm">No dependencies recorded yet</p>
+            {user && (
+              <button onClick={() => setDepAddOpen(true)} className="text-xs text-brand-600 hover:underline dark:text-brand-400">
+                Add first dependency
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+
+      {user && (
+        <AddDependencyModal
+          open={depAddOpen}
+          onClose={() => setDepAddOpen(false)}
+          onCreated={fetchAll}
+          allAssets={allAssets}
+          lockedSourceAssetId={id}
+          lockedSourceAssetName={asset.name}
+          userId={user.id}
+          userName={user.name}
+        />
       )}
 
       {/* ── Audit History ──────────────────────────────────────────────────── */}
