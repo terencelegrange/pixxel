@@ -205,7 +205,8 @@ export default function DashboardPage() {
                     ))}
                   </Pie>
                   <Tooltip
-                    formatter={(value: number, name: string) => [`${value} asset${value !== 1 ? "s" : ""}`, name]}
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    formatter={(value: any, name: any) => [`${value ?? 0} asset${Number(value) !== 1 ? "s" : ""}`, name]}
                     contentStyle={ct.tooltip}
                   />
                   <Legend
@@ -235,7 +236,8 @@ export default function DashboardPage() {
                     <XAxis dataKey="tier" tick={false} axisLine={false} tickLine={false} />
                     <YAxis tick={{ fontSize: 11, fill: ct.tick }} tickLine={false} axisLine={false} allowDecimals={false} />
                     <Tooltip
-                      formatter={(value: number) => [`${value} asset${value !== 1 ? "s" : ""}`, "Count"]}
+                      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                      formatter={(value: any) => [`${value ?? 0} asset${Number(value) !== 1 ? "s" : ""}`, "Count"]}
                       contentStyle={ct.tooltip}
                     />
                     <Bar dataKey="count" radius={[4, 4, 0, 0]}>
@@ -325,7 +327,8 @@ export default function DashboardPage() {
                     ))}
                   </Pie>
                   <Tooltip
-                    formatter={(value: number, name: string) => [`${value} asset${value !== 1 ? "s" : ""}`, name]}
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    formatter={(value: any, name: any) => [`${value ?? 0} asset${Number(value) !== 1 ? "s" : ""}`, name]}
                     contentStyle={ct.tooltip}
                   />
                   <Legend

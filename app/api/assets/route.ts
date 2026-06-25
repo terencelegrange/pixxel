@@ -42,7 +42,6 @@ function rowToAsset(row: mysql.RowDataPacket): Asset {
     vendorName: row.vendor_name ?? null,
     businessOwner: row.business_owner ?? null,
     technicalOwner: row.technical_owner ?? null,
-    vendor: row.vendor ?? null,
     slaAvailability: row.sla_availability ?? null,
     slaRto: row.sla_rto ?? null,
     slaRpo: row.sla_rpo ?? null,

@@ -23,7 +23,7 @@ export async function GET(req: NextRequest) {
     const performer = searchParams.get("performer") ?? "";
 
     const conditions: string[] = [];
-    const params: unknown[]    = [];
+    const params: string[]     = [];
 
     if (table)     { conditions.push("table_name = ?");             params.push(table); }
     if (action)    { conditions.push("action = ?");                 params.push(action); }

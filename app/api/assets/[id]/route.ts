@@ -74,7 +74,7 @@ export async function GET(
       vendorId:   row.vendor_id   ?? null,
       vendorName: row.vendor_name ?? null,
       businessOwner: row.business_owner ?? null, technicalOwner: row.technical_owner ?? null,
-      vendor: row.vendor ?? null, slaAvailability: row.sla_availability ?? null,
+      slaAvailability: row.sla_availability ?? null,
       slaRto: row.sla_rto ?? null, slaRpo: row.sla_rpo ?? null,
       goLiveDate: toDate(row.go_live_date), retirementDate: toDate(row.retirement_date),
       appUrl: row.app_url ?? null,
