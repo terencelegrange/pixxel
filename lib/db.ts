@@ -682,7 +682,7 @@ async function runSetup(): Promise<void> {
   await db.execute(`
     INSERT INTO investment_classifications (id, name, color, sort_order, created_by_id, created_by_name)
     SELECT * FROM (
-      SELECT UUID(), 'Invest',       '#22c55e', 1, 'system', 'System' UNION ALL
+      SELECT UUID() AS id, 'Invest' AS name, '#22c55e' AS color, 1 AS sort_order, 'system' AS created_by_id, 'System' AS created_by_name UNION ALL
       SELECT UUID(), 'Experiment',   '#3b82f6', 2, 'system', 'System' UNION ALL
       SELECT UUID(), 'Contain',      '#eab308', 3, 'system', 'System' UNION ALL
       SELECT UUID(), 'Decommission', '#ef4444', 4, 'system', 'System'
