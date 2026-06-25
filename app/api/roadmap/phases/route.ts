@@ -37,11 +37,12 @@ export async function GET(req: NextRequest) {
          p.updated_at    AS phase_updated_at
        FROM assets a
        LEFT JOIN domains d ON a.domain_id = d.id
+       LEFT JOIN tiers t ON a.tier_id = t.id
        LEFT JOIN asset_roadmap_phases p
          ON p.asset_id = a.id
          AND p.start_quarter <= ? AND p.end_quarter >= ?
        LEFT JOIN investment_classifications ic ON p.classification_id = ic.id
-       ORDER BY d.name ASC, a.name ASC, p.start_quarter ASC`,
+       ORDER BY d.name ASC, t.name ASC, a.name ASC, p.start_quarter ASC`,
       [to, from]
     );
 
