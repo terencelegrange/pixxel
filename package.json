@@ -9,7 +9,8 @@
     "lint": "next lint",
     "test": "jest --selectProjects unit ui --passWithNoTests",
     "test:integration": "jest --selectProjects integration --passWithNoTests",
-    "test:all": "jest --passWithNoTests"
+    "test:all": "jest --passWithNoTests",
+    "seed:demo": "ts-node --project tsconfig.seed.json scripts/seed-demo.ts"
   },
   "dependencies": {
     "@excalidraw/excalidraw": "^0.18.0",
