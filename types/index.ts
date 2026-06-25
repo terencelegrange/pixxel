@@ -290,3 +290,41 @@ export interface BusinessCapability {
   createdAt: string;
   updatedAt: string;
 }
+
+export interface InvestmentClassification {
+  id: string;
+  name: string;
+  color: string;
+  sortOrder: number | null;
+  createdById: string;
+  createdByName: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AssetRoadmapPhase {
+  id: string;
+  assetId: string;
+  classificationId: string;
+  classificationName: string;
+  classificationColor: string;
+  startQuarter: string;
+  endQuarter: string;
+  notes: string | null;
+  createdById: string;
+  createdByName: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface RoadmapAsset {
+  id: string;
+  name: string;
+  phases: AssetRoadmapPhase[];
+}
+
+export interface RoadmapDomainGroup {
+  domainId: string;
+  domainName: string;
+  assets: RoadmapAsset[];
+}

@@ -654,4 +654,58 @@ async function runSetup(): Promise<void> {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
   `);
 
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS plantuml_diagram_assets (
+      diagram_id  CHAR(36)     NOT NULL,
+      asset_id    CHAR(36)     NOT NULL,
+      matched_on  VARCHAR(255) NULL COMMENT 'which field matched: name or short_code',
+      tagged_at   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (diagram_id, asset_id),
+      KEY idx_pda_asset (asset_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  `);
+
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS investment_classifications (
+      id              CHAR(36)     NOT NULL,
+      name            VARCHAR(100) NOT NULL,
+      color           VARCHAR(20)  NOT NULL,
+      sort_order      INT UNSIGNED NULL,
+      created_by_id   CHAR(36)     NOT NULL,
+      created_by_name VARCHAR(255) NOT NULL,
+      created_at      DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at      DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      PRIMARY KEY (id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  `);
+
+  await db.execute(`
+    INSERT INTO investment_classifications (id, name, color, sort_order, created_by_id, created_by_name)
+    SELECT * FROM (
+      SELECT UUID(), 'Invest',       '#22c55e', 1, 'system', 'System' UNION ALL
+      SELECT UUID(), 'Experiment',   '#3b82f6', 2, 'system', 'System' UNION ALL
+      SELECT UUID(), 'Contain',      '#eab308', 3, 'system', 'System' UNION ALL
+      SELECT UUID(), 'Decommission', '#ef4444', 4, 'system', 'System'
+    ) AS seed
+    WHERE NOT EXISTS (SELECT 1 FROM investment_classifications LIMIT 1)
+  `);
+
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS asset_roadmap_phases (
+      id                CHAR(36)     NOT NULL,
+      asset_id          CHAR(36)     NOT NULL,
+      classification_id CHAR(36)     NOT NULL,
+      start_quarter     VARCHAR(7)   NOT NULL,
+      end_quarter       VARCHAR(7)   NOT NULL,
+      notes             TEXT         NULL,
+      created_by_id     CHAR(36)     NOT NULL,
+      created_by_name   VARCHAR(255) NOT NULL,
+      created_at        DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at        DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      PRIMARY KEY (id),
+      KEY idx_phases_asset_id (asset_id),
+      KEY idx_phases_classification_id (classification_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  `);
+
 }
