@@ -127,9 +127,14 @@ async function addColIfMissing(
     [table, column]
   );
   if (rows.length === 0) {
-    await db.execute(
-      `ALTER TABLE \`${table}\` ADD COLUMN \`${column}\` ${definition}`
-    );
+    try {
+      await db.execute(
+        `ALTER TABLE \`${table}\` ADD COLUMN \`${column}\` ${definition}`
+      );
+    } catch (e: unknown) {
+      // Race condition: another concurrent request already added the column
+      if ((e as NodeJS.ErrnoException & { code?: string }).code !== 'ER_DUP_FIELDNAME') throw e;
+    }
   }
 }
 
@@ -155,6 +160,10 @@ async function runSetup(): Promise<void> {
 
   // Now create tables inside the database via the pool
   const db = getPool();
+
+  // Serialize setup across all parallel Next.js build workers / processes
+  await db.execute<mysql.RowDataPacket[]>("SELECT GET_LOCK('pixxel_db_setup', 60) AS ok");
+  try {
 
   await db.execute(`
     CREATE TABLE IF NOT EXISTS users (
@@ -729,4 +738,7 @@ async function runSetup(): Promise<void> {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
   `);
 
+  } finally {
+    await db.execute("SELECT RELEASE_LOCK('pixxel_db_setup')");
+  }
 }
