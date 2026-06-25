@@ -13,6 +13,7 @@
     "seed:demo": "ts-node --project tsconfig.seed.json scripts/seed-demo.ts"
   },
   "dependencies": {
+    "@dagrejs/dagre": "^3.0.0",
     "@excalidraw/excalidraw": "^0.18.0",
     "@tailwindcss/typography": "^0.5.19",
     "bcryptjs": "^2.4.3",
