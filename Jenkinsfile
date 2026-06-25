@@ -8,6 +8,12 @@ pipeline {
         APP_PORT    = '3000'
     }
 
+    triggers {
+        GenericTrigger(
+            token: 'gxkhsonsjafbmlbcqrauryeomwjksgsb'
+        )
+    }
+
     stages {
         stage('Checkout') {
             steps {
