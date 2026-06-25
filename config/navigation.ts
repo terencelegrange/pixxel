@@ -35,6 +35,11 @@ export const navigationConfig: NavGroup[] = [
         icon: "GitBranch",
       },
       {
+        label: "PlantUML Diagrams",
+        href: "/plantuml",
+        icon: "FileCode2",
+      },
+      {
         label: "Projects",
         href: "/projects",
         icon: "FolderKanban",
@@ -58,6 +63,16 @@ export const navigationConfig: NavGroup[] = [
         label: "Complexity vs Cost",
         href: "/reports/complexity-cost",
         icon: "TrendingDown",
+      },
+    ],
+  },
+  {
+    title: "Roadmap",
+    items: [
+      {
+        label: "Roadmap by Platform",
+        href: "/roadmap/by-platform",
+        icon: "GanttChart",
       },
     ],
   },

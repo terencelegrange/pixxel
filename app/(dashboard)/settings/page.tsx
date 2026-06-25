@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Settings, Bell, Lock, Globe, ShieldCheck, MessageSquare, ChevronRight, Layers, GitBranch, Gauge, Building2, Network, Target, Package2, BarChart2, ScrollText } from "lucide-react";
+import { Settings, Bell, Lock, Globe, ShieldCheck, MessageSquare, ChevronRight, Layers, GitBranch, Gauge, Building2, Network, Target, Package2, BarChart2, ScrollText, MapPin } from "lucide-react";
 
 // ---------------------------------------------------------------------------
 // Clickable settings tile
@@ -122,6 +122,13 @@ export default function SettingsPage() {
           description="Record and publish what has changed in each platform release."
         />
         <SettingsTile
+          href="/settings/investment-classifications"
+          icon={MapPin}
+          iconBg="bg-rose-500"
+          title="Investment Classifications"
+          description="Configure roadmap investment labels and their colours."
+        />
+        <SettingsTile
           href="/settings/industry-sectors"
           icon={Globe}
           iconBg="bg-teal-500"
@@ -168,6 +175,7 @@ export default function SettingsPage() {
           description="Update your password and manage 2FA settings."
         />
         <SettingsTile
+          href="/settings/integrations"
           icon={Globe}
           iconBg="bg-sky-500"
           title="Integrations"
