@@ -128,7 +128,7 @@ export default function MyAssetsPage() {
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
                         <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-slate-100 dark:bg-slate-800">
-                          <AssetIcon name={asset.icon} className="h-4 w-4 text-slate-500 dark:text-slate-400" />
+                          <AssetIcon name={asset.icon ?? ''} className="h-4 w-4 text-slate-500 dark:text-slate-400" />
                         </div>
                         <div>
                           <div className="flex items-center gap-2">
