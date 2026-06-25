@@ -7,7 +7,7 @@ import {
   ArrowLeft, ExternalLink, Pencil, Trash2,
   AlertTriangle, ChevronDown, ChevronUp,
   FolderKanban, ArrowDownToLine, ArrowUpFromLine,
-  GitBranch,
+  GitBranch, CloudUpload, FileCode2,
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/Button";
@@ -209,6 +209,9 @@ export default function AssetDetailPage() {
     dependencyType: string; notes: string | null;
   }[]>([]);
   const [assetDiagrams, setAssetDiagrams] = useState<Pick<Diagram, "id" | "name" | "latestVersion" | "assetCount" | "updatedAt">[]>([]);
+  const [assetPlantUMLDiagrams, setAssetPlantUMLDiagrams] = useState<{
+    id: string; name: string; updatedAt: string; latestVersion: number; matchedOn: string;
+  }[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -217,12 +220,20 @@ export default function AssetDetailPage() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
+  // Confluence push modal
+  const [confluenceOpen, setConfluenceOpen] = useState(false);
+  const [confluencePageTitle, setConfluencePageTitle] = useState("");
+  const [confluenceParentPageId, setConfluenceParentPageId] = useState("");
+  const [isPushing, setIsPushing] = useState(false);
+  const [pushResult, setPushResult] = useState<{ url: string; title: string } | null>(null);
+  const [pushError, setPushError] = useState<string | null>(null);
+
   // ── Data loading ──────────────────────────────────────────────────────────
   const fetchAll = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     try {
-      const [assetRes, historyRes, deptsRes, strategiesRes, complexitiesRes, domainsRes, tiersRes, vendorsRes, usersRes, projectsRes, capsRes, sectorsRes, diagramsRes] = await Promise.all([
+      const [assetRes, historyRes, deptsRes, strategiesRes, complexitiesRes, domainsRes, tiersRes, vendorsRes, usersRes, projectsRes, capsRes, sectorsRes, diagramsRes, plantumlDiagramsRes] = await Promise.all([
         fetch(`/api/assets/${id}`),
         fetch(`/api/assets/${id}/history`),
         fetch("/api/organisations"),
@@ -236,12 +247,13 @@ export default function AssetDetailPage() {
         fetch("/api/business-capabilities"),
         fetch("/api/industry-sectors"),
         fetch(`/api/assets/${id}/diagrams`),
+        fetch(`/api/assets/${id}/plantuml-diagrams`),
       ]);
       if (!assetRes.ok) {
         const d = await assetRes.json();
         throw new Error(d.error ?? "Asset not found.");
       }
-      const [assetData, historyData, deptsData, strategiesData, complexitiesData, domainsData, tiersData, vendorsData, usersData, projectsData, capsData, sectorsData, diagramsData] = await Promise.all([
+      const [assetData, historyData, deptsData, strategiesData, complexitiesData, domainsData, tiersData, vendorsData, usersData, projectsData, capsData, sectorsData, diagramsData, plantumlDiagramsData] = await Promise.all([
         assetRes.json(),
         historyRes.json(),
         deptsRes.json(),
@@ -255,6 +267,7 @@ export default function AssetDetailPage() {
         capsRes.json(),
         sectorsRes.json(),
         diagramsRes.json(),
+        plantumlDiagramsRes.json(),
       ]);
       setAsset(assetData.asset);
       setHistory(historyData.history ?? []);
@@ -269,6 +282,7 @@ export default function AssetDetailPage() {
       setCapabilities(capsData.capabilities ?? []);
       setSectors(sectorsData.sectors ?? []);
       setAssetDiagrams(diagramsData.diagrams ?? []);
+      setAssetPlantUMLDiagrams(plantumlDiagramsData.diagrams ?? []);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load.");
     } finally {
@@ -361,7 +375,7 @@ export default function AssetDetailPage() {
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="flex items-start gap-4">
             <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl bg-slate-100">
-              <AssetIcon name={asset.icon} className="h-6 w-6 text-slate-500" />
+              <AssetIcon name={asset.icon ?? ''} className="h-6 w-6 text-slate-500" />
             </div>
             <div>
               <div className="flex flex-wrap items-center gap-2">
@@ -400,7 +414,16 @@ export default function AssetDetailPage() {
           </div>
 
           {/* Actions */}
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
+            <Button variant="secondary" size="sm" onClick={() => {
+              setConfluencePageTitle(asset.name);
+              setConfluenceParentPageId("");
+              setPushResult(null);
+              setPushError(null);
+              setConfluenceOpen(true);
+            }}>
+              <CloudUpload className="h-4 w-4" /> Push to Confluence
+            </Button>
             <Button variant="secondary" size="sm" onClick={() => setEditOpen(true)}>
               <Pencil className="h-4 w-4" /> Edit
             </Button>
@@ -585,6 +608,61 @@ export default function AssetDetailPage() {
         </div>
       )}
 
+      {/* ── PlantUML Diagrams ─────────────────────────────────────────────── */}
+      {assetPlantUMLDiagrams.length > 0 && (
+        <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden dark:border-slate-700 dark:bg-slate-900">
+          <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50 px-5 py-3">
+            <div className="flex items-center gap-2">
+              <FileCode2 className="h-4 w-4 text-slate-400" />
+              <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">PlantUML Diagrams</h2>
+            </div>
+            <span className="rounded-full bg-violet-100 dark:bg-violet-900/30 px-2 py-0.5 text-xs font-medium text-violet-700 dark:text-violet-400">
+              {assetPlantUMLDiagrams.length} diagram{assetPlantUMLDiagrams.length !== 1 ? "s" : ""}
+            </span>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="min-w-full">
+              <thead className="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-100 dark:border-slate-800">
+                <tr>
+                  <th className="px-5 py-2 text-left text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Diagram</th>
+                  <th className="px-5 py-2 text-left text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Version</th>
+                  <th className="px-5 py-2 text-left text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Matched by</th>
+                  <th className="px-5 py-2 text-left text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Last modified</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                {assetPlantUMLDiagrams.map((d) => (
+                  <tr key={d.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                    <td className="px-5 py-3">
+                      <Link
+                        href={`/plantuml/${d.id}`}
+                        className="flex items-center gap-2 text-sm font-medium text-slate-800 dark:text-slate-200 hover:text-brand-600 dark:hover:text-brand-400 transition-colors"
+                      >
+                        <FileCode2 className="h-4 w-4 text-violet-500 flex-shrink-0" />
+                        {d.name}
+                      </Link>
+                    </td>
+                    <td className="px-5 py-3">
+                      <span className="inline-flex items-center rounded-full bg-slate-100 dark:bg-slate-700 px-2 py-0.5 text-xs font-medium text-slate-600 dark:text-slate-300">
+                        v{d.latestVersion}
+                      </span>
+                    </td>
+                    <td className="px-5 py-3 text-xs text-slate-500 dark:text-slate-400">
+                      {d.matchedOn === "short_code" ? "Short code" : "Name"}
+                    </td>
+                    <td className="px-5 py-3 text-xs text-slate-400 dark:text-slate-500 whitespace-nowrap">
+                      {new Date(d.updatedAt).toLocaleDateString("en-GB", {
+                        day: "2-digit", month: "short", year: "numeric",
+                      })}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
       {/* ── Audit History ──────────────────────────────────────────────────── */}
       <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
         <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50 px-5 py-3">
@@ -655,6 +733,92 @@ export default function AssetDetailPage() {
               <Trash2 className="h-4 w-4" /> Delete
             </Button>
           </div>
+        </div>
+      </Modal>
+
+      {/* ── Confluence Push Modal ──────────────────────────────────────────── */}
+      <Modal isOpen={confluenceOpen} onClose={() => setConfluenceOpen(false)} title="Push to Confluence" maxWidth="max-w-md">
+        <div className="flex flex-col gap-4">
+          {pushResult ? (
+            <div className="flex flex-col gap-3">
+              <div className="flex items-start gap-3">
+                <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-emerald-50 dark:bg-emerald-900/20">
+                  <CloudUpload className="h-5 w-5 text-emerald-500" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-slate-800 dark:text-slate-200">
+                    Page published successfully!
+                  </p>
+                  <p className="text-sm text-slate-500 dark:text-slate-400">{pushResult.title}</p>
+                </div>
+              </div>
+              <div className="flex justify-end gap-3">
+                <Button variant="secondary" onClick={() => setConfluenceOpen(false)}>Close</Button>
+                <a href={pushResult.url} target="_blank" rel="noopener noreferrer">
+                  <Button>
+                    <ExternalLink className="h-4 w-4" /> Open in Confluence
+                  </Button>
+                </a>
+              </div>
+            </div>
+          ) : (
+            <>
+              <div className="flex flex-col gap-3">
+                <div className="flex flex-col gap-1">
+                  <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Page Title</label>
+                  <input
+                    className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500"
+                    value={confluencePageTitle}
+                    onChange={(e) => setConfluencePageTitle(e.target.value)}
+                    placeholder="Page title in Confluence"
+                  />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                    Parent Page ID <span className="font-normal text-slate-400">(optional)</span>
+                  </label>
+                  <input
+                    className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 text-sm text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-brand-500"
+                    value={confluenceParentPageId}
+                    onChange={(e) => setConfluenceParentPageId(e.target.value)}
+                    placeholder="Optional Confluence page ID"
+                  />
+                </div>
+                {pushError && <p className="text-sm text-red-500">{pushError}</p>}
+              </div>
+              <div className="flex justify-end gap-3">
+                <Button variant="secondary" onClick={() => setConfluenceOpen(false)}>Cancel</Button>
+                <Button
+                  isLoading={isPushing}
+                  onClick={async () => {
+                    if (!confluencePageTitle.trim()) return;
+                    setIsPushing(true);
+                    setPushError(null);
+                    try {
+                      const res = await fetch("/api/confluence/push", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          assetId: id,
+                          pageTitle: confluencePageTitle.trim(),
+                          parentPageId: confluenceParentPageId.trim() || undefined,
+                        }),
+                      });
+                      const data = await res.json();
+                      if (!res.ok) throw new Error(data.error ?? "Push failed.");
+                      setPushResult({ url: data.url, title: data.title ?? confluencePageTitle });
+                    } catch (err) {
+                      setPushError(err instanceof Error ? err.message : "Push failed.");
+                    } finally {
+                      setIsPushing(false);
+                    }
+                  }}
+                >
+                  <CloudUpload className="h-4 w-4" /> Push
+                </Button>
+              </div>
+            </>
+          )}
         </div>
       </Modal>
 
