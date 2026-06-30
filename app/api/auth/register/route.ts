@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { randomUUID } from "crypto";
 import { getDb, setupDatabase } from "@/lib/db";
+import { rateLimit } from "@/lib/rate-limit";
+import { signJwt } from "@/lib/jwt";
+import { validate } from "@/lib/validate";
+import { RegisterSchema } from "@/lib/schemas";
 import { User } from "@/types";
 import mysql from "mysql2/promise";
 
@@ -9,32 +13,18 @@ import mysql from "mysql2/promise";
 const SALT_ROUNDS = 12;
 
 export async function POST(req: NextRequest) {
+  const limit = rateLimit(req, { limit: 10, windowMs: 15 * 60 * 1000 });
+  if (!limit.ok) return limit.response;
+
   try {
     await setupDatabase();
 
-    const body = await req.json();
-    const { name, email, password } = body as {
-      name?: string;
-      email?: string;
-      password?: string;
-    };
-
-    if (!name?.trim() || !email || !password) {
-      return NextResponse.json(
-        { error: "Name, email, and password are required." },
-        { status: 400 }
-      );
-    }
-
-    if (password.length < 8) {
-      return NextResponse.json(
-        { error: "Password must be at least 8 characters." },
-        { status: 400 }
-      );
-    }
+    const v = await validate(req, RegisterSchema);
+    if (!v.ok) return v.response;
+    const { name, email, password } = v.data;
 
     const db = getDb();
-    const normalizedEmail = email.toLowerCase().trim();
+    const normalizedEmail = email; // already trimmed+lowercased by schema
 
     // Check for existing account
     const [existing] = await db.execute<mysql.RowDataPacket[]>(
@@ -53,7 +43,7 @@ export async function POST(req: NextRequest) {
     const passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
 
     const id = randomUUID();
-    const trimmedName = name.trim();
+    const trimmedName = name; // already trimmed by schema
     const initials = trimmedName
       .split(" ")
       .map((p) => p[0])
@@ -76,7 +66,17 @@ export async function POST(req: NextRequest) {
       createdAt: new Date().toISOString(),
     };
 
-    return NextResponse.json({ user }, { status: 201 });
+    const token = signJwt({ sub: user.id, name: user.name, email: user.email, role: user.role });
+
+    const res = NextResponse.json({ user, token }, { status: 201 });
+    res.cookies.set("authToken", token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: 7 * 24 * 3600,
+      path: "/",
+    });
+    return res;
   } catch (err) {
     console.error("[/api/auth/register]", err);
     return NextResponse.json(

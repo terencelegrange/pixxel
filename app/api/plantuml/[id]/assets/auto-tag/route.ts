@@ -1,8 +1,11 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { getDb, setupDatabase } from "@/lib/db";
 import mysql from "mysql2/promise";
+import { requireUser } from "@/lib/require-user";
 
-export async function POST(req: Request, { params }: { params: { id: string } }) {
+export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+  const auth = requireUser(req);
+  if (!auth.ok) return auth.response;
   await setupDatabase();
   const db = getDb();
   const { participantNames } = await req.json() as { participantNames: string[] };

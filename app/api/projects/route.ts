@@ -3,11 +3,14 @@ import { randomUUID } from "crypto";
 import mysql from "mysql2/promise";
 import { getDb, setupDatabase } from "@/lib/db";
 import { writeAudit } from "@/lib/audit";
+import { requireUser } from "@/lib/require-user";
 
 const VALID_STATUSES = ["Active", "On Hold", "Completed", "Cancelled"] as const;
 
 // GET /api/projects — list all projects with asset count
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const auth = requireUser(req);
+  if (!auth.ok) return auth.response;
   try {
     await setupDatabase();
     const db = getDb();
@@ -46,16 +49,17 @@ export async function GET() {
 
 // POST /api/projects — create project
 export async function POST(req: NextRequest) {
+  const auth = requireUser(req);
+  if (!auth.ok) return auth.response;
+  const { user } = auth;
   try {
     await setupDatabase();
     const body = await req.json();
-    const { name, description, status, startDate, endDate, userId, userName } = body;
+    const { name, description, status, startDate, endDate } = body;
 
     if (!name?.trim()) return NextResponse.json({ error: "Name is required." }, { status: 400 });
     if (status && !VALID_STATUSES.includes(status))
       return NextResponse.json({ error: "Invalid status." }, { status: 400 });
-    if (!userId || !userName)
-      return NextResponse.json({ error: "Authenticated user is required." }, { status: 401 });
 
     const id = randomUUID();
     const trimmedName = name.trim();
@@ -65,12 +69,12 @@ export async function POST(req: NextRequest) {
     await db.execute(
       `INSERT INTO projects (id, name, description, status, start_date, end_date, created_by_id, created_by_name, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
-      [id, trimmedName, description?.trim() || null, resolvedStatus, startDate || null, endDate || null, userId, userName]
+      [id, trimmedName, description?.trim() || null, resolvedStatus, startDate || null, endDate || null, user.id, user.name]
     );
 
     await writeAudit({
       tableName: "projects", recordId: id, action: "CREATE",
-      performedById: userId, performedByName: userName,
+      performedById: user.id, performedByName: user.name,
       oldValues: null,
       newValues: { name: trimmedName, status: resolvedStatus, startDate: startDate || null, endDate: endDate || null },
     });

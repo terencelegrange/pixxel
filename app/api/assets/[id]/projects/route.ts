@@ -1,12 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import mysql from "mysql2/promise";
 import { getDb, setupDatabase } from "@/lib/db";
+import { requireUser } from "@/lib/require-user";
 
 // GET /api/assets/[id]/projects — active projects that include this asset
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  const auth = requireUser(req);
+  if (!auth.ok) return auth.response;
   try {
     await setupDatabase();
     const db = getDb();

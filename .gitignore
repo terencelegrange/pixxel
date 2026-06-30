@@ -32,3 +32,11 @@ yarn-error.log*
 # Testing
 .env.test
 tsconfig.tsbuildinfo
+
+# DB backup files — never commit these
+*.sql.bak
+database-setup/*.sql
+backups/
+
+# Local scripts — not for source control
+scripts/

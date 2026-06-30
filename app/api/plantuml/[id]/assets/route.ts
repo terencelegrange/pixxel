@@ -1,9 +1,12 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { getDb, setupDatabase } from "@/lib/db";
 import mysql from "mysql2/promise";
+import { requireUser } from "@/lib/require-user";
 
 // GET — list tagged assets for this diagram
-export async function GET(_req: Request, { params }: { params: { id: string } }) {
+export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+  const auth = requireUser(req);
+  if (!auth.ok) return auth.response;
   await setupDatabase();
   const db = getDb();
   const [rows] = await db.execute<mysql.RowDataPacket[]>(`
@@ -18,7 +21,9 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
 }
 
 // DELETE — remove a specific asset tag (assetId in body)
-export async function DELETE(req: Request, { params }: { params: { id: string } }) {
+export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
+  const auth = requireUser(req);
+  if (!auth.ok) return auth.response;
   await setupDatabase();
   const db = getDb();
   const { assetId } = await req.json();

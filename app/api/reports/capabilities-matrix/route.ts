@@ -1,7 +1,8 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import mysql from "mysql2/promise";
 import { getDb, setupDatabase } from "@/lib/db";
 import { LifecycleStatus } from "@/types";
+import { requireUser } from "@/lib/require-user";
 
 export interface MatrixAsset {
   id: string;
@@ -25,7 +26,9 @@ export interface MatrixSector {
 }
 
 // GET /api/reports/capabilities-matrix
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const auth = requireUser(req);
+  if (!auth.ok) return auth.response;
   try {
     await setupDatabase();
     const db = getDb();

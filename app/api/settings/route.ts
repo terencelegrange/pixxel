@@ -1,8 +1,11 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { getDb, setupDatabase } from "@/lib/db";
 import mysql from "mysql2/promise";
+import { requireUser } from "@/lib/require-user";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const auth = requireUser(req);
+  if (!auth.ok) return auth.response;
   await setupDatabase();
   const db = getDb();
   const [rows] = await db.execute<mysql.RowDataPacket[]>("SELECT `key`, `value` FROM app_settings");
@@ -11,7 +14,9 @@ export async function GET() {
   return NextResponse.json({ settings });
 }
 
-export async function PUT(req: Request) {
+export async function PUT(req: NextRequest) {
+  const auth = requireUser(req);
+  if (!auth.ok) return auth.response;
   await setupDatabase();
   const db = getDb();
   const body = await req.json();

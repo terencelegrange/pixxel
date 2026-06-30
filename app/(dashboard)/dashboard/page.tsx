@@ -139,14 +139,6 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      {/* Page heading */}
-      <div>
-        <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Dashboard</h1>
-        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-          Enterprise architecture overview.
-        </p>
-      </div>
-
       {/* Stats grid */}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
         {stats.map((s) => (

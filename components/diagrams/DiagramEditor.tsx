@@ -6,7 +6,7 @@ import dynamic from "next/dynamic";
 import Link from "next/link";
 import {
   ArrowLeft, Save, History, Search, Plus, RotateCcw,
-  Check, Loader2, Grid3x3,
+  Check, Loader2, Grid3x3, ImagePlus,
 } from "lucide-react";
 import { Asset } from "@/types";
 import { STENCIL_GROUPS, type StencilItem } from "./stencils";
@@ -89,6 +89,9 @@ export default function DiagramEditor({
   const [loadingVersions, setLoadingVersions] = useState(false);
   const [restoringId, setRestoringId] = useState<string | null>(null);
 
+  // ── File input ref (image import) ─────────────────────────────────────────
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   // ── Initial data (parsed once) ────────────────────────────────────────────
   const initialData = useMemo(() => {
     try {
@@ -97,8 +100,11 @@ export default function DiagramEditor({
         elements: parsed.elements ?? [],
         appState: {
           viewBackgroundColor: "#ffffff",
-          gridSize: GRID,          // default on; restored diagrams may override below
+          gridSize: GRID,
           ...(parsed.appState ?? {}),
+          gridModeEnabled: false,
+          objectsSnapModeEnabled: true,
+          currentItemArrowType: "elbow" as const,
           collaborators: new Map(),
         },
         files: parsed.files ?? {},
@@ -107,7 +113,14 @@ export default function DiagramEditor({
     } catch {
       return {
         elements: [],
-        appState: { viewBackgroundColor: "#ffffff", gridSize: GRID, collaborators: new Map() },
+        appState: {
+          viewBackgroundColor: "#ffffff",
+          gridSize: GRID,
+          gridModeEnabled: false,
+          objectsSnapModeEnabled: true,
+          currentItemArrowType: "elbow" as const,
+          collaborators: new Map(),
+        },
         files: {},
       };
     }
@@ -249,6 +262,96 @@ export default function DiagramEditor({
     [excalidrawAPI]
   );
 
+  // ── Import image from file ────────────────────────────────────────────────
+  const importImage = useCallback(() => {
+    fileInputRef.current?.click();
+  }, []);
+
+  const handleImageFileChange = useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file || !excalidrawAPI) return;
+      e.target.value = "";
+
+      const dataURL = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+
+      const { w: naturalW, h: naturalH } = await new Promise<{ w: number; h: number }>((resolve) => {
+        const img = new Image();
+        img.onload = () => resolve({ w: img.naturalWidth, h: img.naturalHeight });
+        img.src = dataURL;
+      });
+
+      const MAX_DIM = 320;
+      const scale = Math.min(1, MAX_DIM / Math.max(naturalW, naturalH));
+      const W = snapToGrid(Math.round(naturalW * scale));
+      const H = snapToGrid(Math.round(naturalH * scale));
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const elements: any[] = excalidrawAPI.getSceneElements();
+      const appState = excalidrawAPI.getAppState();
+      const cascade = (elements.length % 6) * GRID;
+      const offsetX = snapToGrid(-(appState.scrollX ?? 0) + 200 + cascade);
+      const offsetY = snapToGrid(-(appState.scrollY ?? 0) + 200 + cascade);
+
+      const fileId = `img_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+      const elId = `el_${fileId}`;
+      const rng = () => Math.floor(Math.random() * 999999);
+      const now = Date.now();
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      excalidrawAPI.addFiles([{
+        id: fileId as any,
+        mimeType: file.type as any,
+        dataURL: dataURL as any,
+        created: now,
+        lastRetrieved: now,
+      }]);
+
+      excalidrawAPI.updateScene({
+        elements: [
+          ...elements,
+          {
+            type: "image",
+            id: elId,
+            x: offsetX,
+            y: offsetY,
+            width: W,
+            height: H,
+            angle: 0,
+            strokeColor: "transparent",
+            backgroundColor: "transparent",
+            fillStyle: "solid",
+            strokeWidth: 2,
+            strokeStyle: "solid",
+            roughness: 1,
+            opacity: 100,
+            isDeleted: false,
+            groupIds: [],
+            frameId: null,
+            roundness: null,
+            seed: rng(),
+            version: 1,
+            versionNonce: rng(),
+            updated: now,
+            link: null,
+            locked: false,
+            boundElements: null,
+            status: "saved",
+            fileId,
+            scale: [1, 1],
+          },
+        ],
+      });
+      setHasChanges(true);
+    },
+    [excalidrawAPI]
+  );
+
   // ── Save current scene as a new version ───────────────────────────────────
   const handleSave = useCallback(async () => {
     if (!excalidrawAPI) return;
@@ -275,6 +378,9 @@ export default function DiagramEditor({
         appState: {
           viewBackgroundColor: appState.viewBackgroundColor ?? "#ffffff",
           gridSize: appState.gridSize ?? GRID,
+          gridModeEnabled: appState.gridModeEnabled ?? false,
+          objectsSnapModeEnabled: appState.objectsSnapModeEnabled ?? true,
+          currentItemArrowType: appState.currentItemArrowType ?? "elbow",
         },
         files,
       });
@@ -343,6 +449,10 @@ export default function DiagramEditor({
         const parsed = JSON.parse(version.content);
         const restoredGridSize = parsed.appState?.gridSize ?? null;
         setGridEnabled(restoredGridSize !== null);
+        if (parsed.files && Object.keys(parsed.files).length > 0) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          excalidrawAPI.addFiles(Object.values(parsed.files) as any[]);
+        }
         excalidrawAPI.updateScene({
           elements: parsed.elements ?? [],
           appState: {
@@ -374,6 +484,13 @@ export default function DiagramEditor({
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div className="flex flex-col h-full overflow-hidden">
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={handleImageFileChange}
+      />
 
       {/* ── Header ──────────────────────────────────────────────────────── */}
       <header className="flex items-center gap-3 px-4 py-2 border-b border-slate-200 bg-white shrink-0 z-10 shadow-sm">
@@ -505,6 +622,14 @@ export default function DiagramEditor({
               <p className="text-[10px] text-slate-400 -mt-1 px-0.5">
                 Click to place on canvas
               </p>
+              <button
+                onClick={importImage}
+                disabled={!excalidrawAPI}
+                className="flex items-center gap-1.5 w-full px-2 py-1.5 text-xs font-medium text-slate-600 rounded border border-slate-200 hover:border-brand-300 hover:bg-brand-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                <ImagePlus className="h-3.5 w-3.5 shrink-0" />
+                Import image
+              </button>
               <div className="flex-1 overflow-y-auto space-y-0.5">
                 {filteredAssets.map((a) => (
                   <button

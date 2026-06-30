@@ -3,6 +3,7 @@ import { randomUUID } from "crypto";
 import mysql from "mysql2/promise";
 import { getDb, setupDatabase } from "@/lib/db";
 import { writeAudit } from "@/lib/audit";
+import { requireUser } from "@/lib/require-user";
 
 function rowToClassification(row: mysql.RowDataPacket) {
   const toISO = (v: unknown) => v instanceof Date ? v.toISOString() : v ? String(v) : null;
@@ -18,7 +19,9 @@ function rowToClassification(row: mysql.RowDataPacket) {
   };
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const auth = requireUser(req);
+  if (!auth.ok) return auth.response;
   try {
     await setupDatabase();
     const db = getDb();
@@ -33,14 +36,16 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
+  const auth = requireUser(req);
+  if (!auth.ok) return auth.response;
+  const { user } = auth;
   try {
     await setupDatabase();
     const body = await req.json();
-    const { name, color, sortOrder, userId, userName } = body;
+    const { name, color, sortOrder } = body;
 
     if (!name?.trim())  return NextResponse.json({ error: "Name is required." }, { status: 400 });
     if (!color?.trim()) return NextResponse.json({ error: "Color is required." }, { status: 400 });
-    if (!userId || !userName) return NextResponse.json({ error: "Authenticated user is required." }, { status: 401 });
 
     const db = getDb();
     const id = randomUUID();
@@ -48,12 +53,12 @@ export async function POST(req: NextRequest) {
     await db.execute(
       `INSERT INTO investment_classifications (id, name, color, sort_order, created_by_id, created_by_name)
        VALUES (?, ?, ?, ?, ?, ?)`,
-      [id, name.trim(), color.trim(), sortOrder ?? null, userId, userName]
+      [id, name.trim(), color.trim(), sortOrder ?? null, user.id, user.name]
     );
 
     await writeAudit({
       tableName: "investment_classifications", recordId: id, action: "CREATE",
-      performedById: userId, performedByName: userName,
+      performedById: user.id, performedByName: user.name,
       oldValues: null,
       newValues: { name: name.trim(), color: color.trim(), sortOrder: sortOrder ?? null },
     });

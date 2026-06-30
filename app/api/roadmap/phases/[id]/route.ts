@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import mysql from "mysql2/promise";
 import { getDb, setupDatabase } from "@/lib/db";
 import { writeAudit } from "@/lib/audit";
+import { requireUser } from "@/lib/require-user";
 
 function isValidQuarter(q: string): boolean {
   return /^\d{4}-Q[1-4]$/.test(q);
@@ -11,10 +12,13 @@ export async function PUT(
   req: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  const auth = requireUser(req);
+  if (!auth.ok) return auth.response;
+  const { user } = auth;
   try {
     await setupDatabase();
     const body = await req.json();
-    const { classificationId, startQuarter, endQuarter, notes, userId, userName } = body;
+    const { classificationId, startQuarter, endQuarter, notes } = body;
 
     if (!classificationId)
       return NextResponse.json({ error: "classificationId is required." }, { status: 400 });
@@ -24,8 +28,6 @@ export async function PUT(
       return NextResponse.json({ error: "endQuarter must be in YYYY-Qn format." }, { status: 400 });
     if (endQuarter < startQuarter)
       return NextResponse.json({ error: "endQuarter must be >= startQuarter." }, { status: 400 });
-    if (!userId || !userName)
-      return NextResponse.json({ error: "Authenticated user is required." }, { status: 401 });
 
     const db = getDb();
     const [rows] = await db.execute<mysql.RowDataPacket[]>(
@@ -57,7 +59,7 @@ export async function PUT(
 
     await writeAudit({
       tableName: "asset_roadmap_phases", recordId: params.id, action: "UPDATE",
-      performedById: userId, performedByName: userName,
+      performedById: user.id, performedByName: user.name,
       oldValues: {
         classificationId: current.classification_id,
         startQuarter: current.start_quarter,
@@ -78,12 +80,11 @@ export async function DELETE(
   req: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  const auth = requireUser(req);
+  if (!auth.ok) return auth.response;
+  const { user } = auth;
   try {
     await setupDatabase();
-    const body = await req.json();
-    const { userId, userName } = body as { userId?: string; userName?: string };
-    if (!userId || !userName)
-      return NextResponse.json({ error: "Authenticated user is required." }, { status: 401 });
 
     const db = getDb();
     const [rows] = await db.execute<mysql.RowDataPacket[]>(
@@ -96,7 +97,7 @@ export async function DELETE(
 
     await writeAudit({
       tableName: "asset_roadmap_phases", recordId: params.id, action: "DELETE",
-      performedById: userId, performedByName: userName,
+      performedById: user.id, performedByName: user.name,
       oldValues: {
         assetId: current.asset_id,
         classificationId: current.classification_id,

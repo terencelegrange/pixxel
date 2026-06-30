@@ -2,16 +2,19 @@ import { NextRequest, NextResponse } from "next/server";
 import mysql from "mysql2/promise";
 import { getDb, setupDatabase } from "@/lib/db";
 import { writeAudit } from "@/lib/audit";
+import { requireUser } from "@/lib/require-user";
 
 export async function PUT(
   req: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  const auth = requireUser(req);
+  if (!auth.ok) return auth.response;
+  const { user } = auth;
   try {
     await setupDatabase();
-    const { name, description, userId, userName } = await req.json();
+    const { name, description } = await req.json();
     if (!name?.trim()) return NextResponse.json({ error: "Name is required." }, { status: 400 });
-    if (!userId || !userName) return NextResponse.json({ error: "Authenticated user is required." }, { status: 401 });
 
     const db = getDb();
     const [rows] = await db.execute<mysql.RowDataPacket[]>(
@@ -26,7 +29,7 @@ export async function PUT(
     );
     await writeAudit({
       tableName: "industry_sectors", recordId: params.id, action: "UPDATE",
-      performedById: userId, performedByName: userName,
+      performedById: user.id, performedByName: user.name,
       oldValues: { name: current.name, description: current.description },
       newValues: { name: name.trim(), description: description?.trim() || null },
     });
@@ -43,10 +46,11 @@ export async function DELETE(
   req: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  const auth = requireUser(req);
+  if (!auth.ok) return auth.response;
+  const { user } = auth;
   try {
     await setupDatabase();
-    const { userId, userName } = await req.json() as { userId?: string; userName?: string };
-    if (!userId || !userName) return NextResponse.json({ error: "Authenticated user is required." }, { status: 401 });
 
     const db = getDb();
     const [rows] = await db.execute<mysql.RowDataPacket[]>(
@@ -68,7 +72,7 @@ export async function DELETE(
     await db.execute("DELETE FROM industry_sectors WHERE id = ?", [params.id]);
     await writeAudit({
       tableName: "industry_sectors", recordId: params.id, action: "DELETE",
-      performedById: userId, performedByName: userName,
+      performedById: user.id, performedByName: user.name,
       oldValues: { name: current.name, description: current.description }, newValues: null,
     });
     return NextResponse.json({ success: true });

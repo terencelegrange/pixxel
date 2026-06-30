@@ -43,6 +43,37 @@ export default function DashboardLayout({
           <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
             {children}
           </main>
+          <footer className="shrink-0 border-t border-slate-200 bg-white px-4 py-2 dark:border-slate-700 dark:bg-slate-900">
+            <p className="text-center text-xs text-slate-400 dark:text-slate-500">
+              &copy; {new Date().getFullYear()} Pixxel &mdash; Released under the{" "}
+              <a
+                href="https://github.com/terencelegrange/pixxel/blob/main/LICENSE"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline hover:text-slate-600 dark:hover:text-slate-300"
+              >
+                MIT License
+              </a>
+              {" "}&middot;{" "}
+              <a
+                href="https://github.com/terencelegrange/pixxel"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline hover:text-slate-600 dark:hover:text-slate-300"
+              >
+                GitHub
+              </a>
+              {" "}&middot;{" "}
+              <a
+                href="https://github.com/terencelegrange/pixxel/wiki"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline hover:text-slate-600 dark:hover:text-slate-300"
+              >
+                Wiki
+              </a>
+            </p>
+          </footer>
         </div>
       </div>
     </GetStartedProvider>

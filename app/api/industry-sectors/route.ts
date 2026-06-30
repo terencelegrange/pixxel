@@ -3,8 +3,11 @@ import { randomUUID } from "crypto";
 import mysql from "mysql2/promise";
 import { getDb, setupDatabase } from "@/lib/db";
 import { writeAudit } from "@/lib/audit";
+import { requireUser } from "@/lib/require-user";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const auth = requireUser(req);
+  if (!auth.ok) return auth.response;
   try {
     await setupDatabase();
     const db = getDb();
@@ -25,21 +28,23 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
+  const auth = requireUser(req);
+  if (!auth.ok) return auth.response;
+  const { user } = auth;
   try {
     await setupDatabase();
-    const { name, description, userId, userName } = await req.json();
+    const { name, description } = await req.json();
     if (!name?.trim()) return NextResponse.json({ error: "Name is required." }, { status: 400 });
-    if (!userId || !userName) return NextResponse.json({ error: "Authenticated user is required." }, { status: 401 });
 
     const db = getDb();
     const id = randomUUID();
     await db.execute(
       "INSERT INTO industry_sectors (id, name, description, created_by_id, created_by_name) VALUES (?,?,?,?,?)",
-      [id, name.trim(), description?.trim() || null, userId, userName]
+      [id, name.trim(), description?.trim() || null, user.id, user.name]
     );
     await writeAudit({
       tableName: "industry_sectors", recordId: id, action: "CREATE",
-      performedById: userId, performedByName: userName,
+      performedById: user.id, performedByName: user.name,
       oldValues: null, newValues: { name: name.trim(), description: description?.trim() || null },
     });
     return NextResponse.json({ id }, { status: 201 });

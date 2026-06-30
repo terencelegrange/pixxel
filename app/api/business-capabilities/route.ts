@@ -3,8 +3,11 @@ import { randomUUID } from "crypto";
 import mysql from "mysql2/promise";
 import { getDb, setupDatabase } from "@/lib/db";
 import { writeAudit } from "@/lib/audit";
+import { requireUser } from "@/lib/require-user";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const auth = requireUser(req);
+  if (!auth.ok) return auth.response;
   try {
     await setupDatabase();
     const db = getDb();
@@ -31,12 +34,14 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
+  const auth = requireUser(req);
+  if (!auth.ok) return auth.response;
+  const { user } = auth;
   try {
     await setupDatabase();
-    const { name, description, industrySectorId, sortOrder, userId, userName } = await req.json();
+    const { name, description, industrySectorId, sortOrder } = await req.json();
     if (!name?.trim()) return NextResponse.json({ error: "Name is required." }, { status: 400 });
     if (!industrySectorId) return NextResponse.json({ error: "Industry sector is required." }, { status: 400 });
-    if (!userId || !userName) return NextResponse.json({ error: "Authenticated user is required." }, { status: 401 });
 
     const db = getDb();
     const id = randomUUID();
@@ -45,11 +50,11 @@ export async function POST(req: NextRequest) {
       `INSERT INTO business_capabilities
          (id, name, description, industry_sector_id, sort_order, created_by_id, created_by_name)
        VALUES (?,?,?,?,?,?,?)`,
-      [id, name.trim(), description?.trim() || null, industrySectorId, sortVal, userId, userName]
+      [id, name.trim(), description?.trim() || null, industrySectorId, sortVal, user.id, user.name]
     );
     await writeAudit({
       tableName: "business_capabilities", recordId: id, action: "CREATE",
-      performedById: userId, performedByName: userName,
+      performedById: user.id, performedByName: user.name,
       oldValues: null,
       newValues: { name: name.trim(), description: description?.trim() || null, industrySectorId, sortOrder: sortVal },
     });

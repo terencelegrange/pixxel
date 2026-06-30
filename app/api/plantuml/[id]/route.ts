@@ -1,8 +1,11 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { getDb, setupDatabase } from "@/lib/db";
 import mysql from "mysql2/promise";
+import { requireUser } from "@/lib/require-user";
 
-export async function GET(_req: Request, { params }: { params: { id: string } }) {
+export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+  const auth = requireUser(req);
+  if (!auth.ok) return auth.response;
   await setupDatabase();
   const db = getDb();
   const [diagrams] = await db.execute<mysql.RowDataPacket[]>(
@@ -15,7 +18,9 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
   return NextResponse.json({ diagram: diagrams[0], latestVersion: versions[0] ?? null });
 }
 
-export async function PUT(req: Request, { params }: { params: { id: string } }) {
+export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
+  const auth = requireUser(req);
+  if (!auth.ok) return auth.response;
   await setupDatabase();
   const db = getDb();
   const { name, description } = await req.json();
@@ -23,7 +28,9 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
   return NextResponse.json({ ok: true });
 }
 
-export async function DELETE(_req: Request, { params }: { params: { id: string } }) {
+export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
+  const auth = requireUser(req);
+  if (!auth.ok) return auth.response;
   await setupDatabase();
   const db = getDb();
   await db.execute("DELETE FROM plantuml_versions WHERE diagram_id = ?", [params.id]);

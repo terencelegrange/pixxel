@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -230,6 +230,7 @@ export default function AssetDetailPage() {
     startDate: string | null; endDate: string | null;
     dependencyType: string; notes: string | null;
   }[]>([]);
+  const [diagrams, setDiagrams] = useState<Diagram[]>([]);
   const [assetDiagrams, setAssetDiagrams] = useState<Pick<Diagram, "id" | "name" | "latestVersion" | "assetCount" | "updatedAt">[]>([]);
   const [assetPlantUMLDiagrams, setAssetPlantUMLDiagrams] = useState<{
     id: string; name: string; updatedAt: string; latestVersion: number; matchedOn: string;
@@ -265,7 +266,7 @@ export default function AssetDetailPage() {
     setIsLoading(true);
     setError(null);
     try {
-      const [assetRes, historyRes, deptsRes, strategiesRes, complexitiesRes, domainsRes, tiersRes, vendorsRes, usersRes, projectsRes, capsRes, sectorsRes, diagramsRes, plantumlDiagramsRes, depRes, allAssetsRes] = await Promise.all([
+      const [assetRes, historyRes, deptsRes, strategiesRes, complexitiesRes, domainsRes, tiersRes, vendorsRes, usersRes, projectsRes, capsRes, sectorsRes, diagramsRes, plantumlDiagramsRes, depRes, allAssetsRes, allDiagramsRes] = await Promise.all([
         fetch(`/api/assets/${id}`),
         fetch(`/api/assets/${id}/history`),
         fetch("/api/organisations"),
@@ -282,12 +283,13 @@ export default function AssetDetailPage() {
         fetch(`/api/assets/${id}/plantuml-diagrams`),
         fetch(`/api/assets/${id}/dependencies`),
         fetch("/api/assets"),
+        fetch("/api/diagrams"),
       ]);
       if (!assetRes.ok) {
         const d = await assetRes.json();
         throw new Error(d.error ?? "Asset not found.");
       }
-      const [assetData, historyData, deptsData, strategiesData, complexitiesData, domainsData, tiersData, vendorsData, usersData, projectsData, capsData, sectorsData, diagramsData, plantumlDiagramsData, depDataResult, allAssetsData] = await Promise.all([
+      const [assetData, historyData, deptsData, strategiesData, complexitiesData, domainsData, tiersData, vendorsData, usersData, projectsData, capsData, sectorsData, diagramsData, plantumlDiagramsData, depDataResult, allAssetsData, allDiagramsData] = await Promise.all([
         assetRes.json(),
         historyRes.json(),
         deptsRes.json(),
@@ -304,6 +306,7 @@ export default function AssetDetailPage() {
         plantumlDiagramsRes.json(),
         depRes.json(),
         allAssetsRes.json(),
+        allDiagramsRes.json(),
       ]);
       setAsset(assetData.asset);
       setHistory(historyData.history ?? []);
@@ -317,6 +320,7 @@ export default function AssetDetailPage() {
       setActiveProjects(projectsData.projects ?? []);
       setCapabilities(capsData.capabilities ?? []);
       setSectors(sectorsData.sectors ?? []);
+      setDiagrams(allDiagramsData.diagrams ?? []);
       setAssetDiagrams(diagramsData.diagrams ?? []);
       setAssetPlantUMLDiagrams(plantumlDiagramsData.diagrams ?? []);
       const downstream: AssetDependency[] = depDataResult.downstream ?? [];
@@ -494,6 +498,23 @@ export default function AssetDetailPage() {
       </div>
     );
   }
+
+  // ── Section diagrams: hero pinned first, then linked diagrams (deduped) ──
+  const sectionDiagrams = useMemo(() => {
+    if (!asset) return assetDiagrams;
+    const heroId = asset.heroDiagramId;
+    if (!heroId) return assetDiagrams;
+    const linkedIds = new Set(assetDiagrams.map((d) => d.id));
+    const heroInLinked = linkedIds.has(heroId);
+    const heroFromAll = !heroInLinked ? diagrams.find((d) => d.id === heroId) : null;
+    const nonHero = assetDiagrams.filter((d) => d.id !== heroId);
+    const heroEntry = heroInLinked
+      ? assetDiagrams.find((d) => d.id === heroId)!
+      : heroFromAll
+        ? { id: heroFromAll.id, name: heroFromAll.name, latestVersion: heroFromAll.latestVersion, assetCount: heroFromAll.assetCount, updatedAt: heroFromAll.updatedAt }
+        : null;
+    return heroEntry ? [heroEntry, ...nonHero] : assetDiagrams;
+  }, [asset, assetDiagrams, diagrams]);
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
@@ -704,7 +725,7 @@ export default function AssetDetailPage() {
       )}
 
       {/* ── Diagrams ───────────────────────────────────────────────────────── */}
-      {assetDiagrams.length > 0 && (
+      {(sectionDiagrams.length > 0 || asset.heroDiagramId) && (
         <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
           <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50 px-5 py-3">
             <div className="flex items-center gap-2">
@@ -712,33 +733,43 @@ export default function AssetDetailPage() {
               <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-500">Architecture Diagrams</h2>
             </div>
             <span className="rounded-full bg-brand-100 px-2 py-0.5 text-xs font-medium text-brand-700">
-              {assetDiagrams.length} diagram{assetDiagrams.length !== 1 ? "s" : ""}
+              {sectionDiagrams.length} diagram{sectionDiagrams.length !== 1 ? "s" : ""}
             </span>
           </div>
           <div className="divide-y divide-slate-100">
-            {assetDiagrams.map((d) => (
-              <div key={d.id} className="flex items-center gap-4 px-5 py-3 hover:bg-slate-50 transition-colors">
-                <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-brand-50">
-                  <GitBranch className="h-4 w-4 text-brand-500" />
+            {sectionDiagrams.map((d) => {
+              const isHero = d.id === asset.heroDiagramId;
+              return (
+                <div key={d.id} className={`flex items-center gap-4 px-5 py-3 transition-colors ${isHero ? "bg-brand-50/40 hover:bg-brand-50" : "hover:bg-slate-50"}`}>
+                  <div className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg ${isHero ? "bg-brand-100" : "bg-brand-50"}`}>
+                    <GitBranch className={`h-4 w-4 ${isHero ? "text-brand-600" : "text-brand-500"}`} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <Link
+                        href={`/diagrams/${d.id}`}
+                        className="text-sm font-medium text-slate-900 hover:text-brand-600 transition-colors"
+                      >
+                        {d.name}
+                      </Link>
+                      {isHero && (
+                        <span className="inline-flex items-center rounded-full bg-brand-100 px-2 py-0.5 text-[10px] font-semibold text-brand-700">
+                          Main
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600 shrink-0">
+                    v{d.latestVersion}
+                  </span>
+                  <span className="text-xs text-slate-400 shrink-0 hidden sm:block">
+                    {new Date(d.updatedAt).toLocaleDateString("en-GB", {
+                      day: "2-digit", month: "short", year: "numeric",
+                    })}
+                  </span>
                 </div>
-                <div className="flex-1 min-w-0">
-                  <Link
-                    href={`/diagrams/${d.id}`}
-                    className="text-sm font-medium text-slate-900 hover:text-brand-600 transition-colors"
-                  >
-                    {d.name}
-                  </Link>
-                </div>
-                <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600 shrink-0">
-                  v{d.latestVersion}
-                </span>
-                <span className="text-xs text-slate-400 shrink-0 hidden sm:block">
-                  {new Date(d.updatedAt).toLocaleDateString("en-GB", {
-                    day: "2-digit", month: "short", year: "numeric",
-                  })}
-                </span>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
@@ -1006,6 +1037,7 @@ export default function AssetDetailPage() {
         users={users}
         capabilities={capabilities}
         sectors={sectors}
+        diagrams={diagrams}
         onSave={handleSave}
       />
 
@@ -1092,6 +1124,23 @@ export default function AssetDetailPage() {
                     setIsPushing(true);
                     setPushError(null);
                     try {
+                      // Render main diagram as PNG (client-side, non-fatal)
+                      let diagramPng: string | null = null;
+                      if (asset.heroDiagramId) {
+                        try {
+                          const dRes = await fetch(`/api/diagrams/${asset.heroDiagramId}`);
+                          if (dRes.ok) {
+                            const dData = await dRes.json();
+                            const content: string = dData.diagram?.content ?? "";
+                            if (content) {
+                              const { exportDiagramPng } = await import("@/components/diagrams/exportDiagramPng");
+                              diagramPng = await exportDiagramPng(content);
+                            }
+                          }
+                        } catch {
+                          // non-fatal — push without image
+                        }
+                      }
                       const res = await fetch("/api/confluence/push", {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
@@ -1099,6 +1148,7 @@ export default function AssetDetailPage() {
                           assetId: id,
                           pageTitle: confluencePageTitle.trim(),
                           parentPageId: confluenceParentPageId.trim() || undefined,
+                          diagramPng,
                         }),
                       });
                       const data = await res.json();

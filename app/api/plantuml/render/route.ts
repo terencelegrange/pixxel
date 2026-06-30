@@ -1,5 +1,6 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import zlib from "zlib";
+import { requireUser } from "@/lib/require-user";
 
 function encodePlantUML(source: string): string {
   const ALPHABET = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz-_";
@@ -15,7 +16,9 @@ function encodePlantUML(source: string): string {
   return result;
 }
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
+  const auth = requireUser(req);
+  if (!auth.ok) return auth.response;
   const { source } = await req.json();
   if (!source) return NextResponse.json({ error: "No source" }, { status: 400 });
   try {

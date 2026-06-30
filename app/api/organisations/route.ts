@@ -4,6 +4,7 @@ import mysql from "mysql2/promise";
 import { getDb, setupDatabase } from "@/lib/db";
 import { writeAudit } from "@/lib/audit";
 import { Department } from "@/types";
+import { requireUser } from "@/lib/require-user";
 
 function rowToDepartment(row: mysql.RowDataPacket): Department {
   return {
@@ -19,7 +20,9 @@ function rowToDepartment(row: mysql.RowDataPacket): Department {
 }
 
 // GET /api/organisations — list all departments
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const auth = requireUser(req);
+  if (!auth.ok) return auth.response;
   try {
     await setupDatabase();
     const db = getDb();
@@ -35,23 +38,21 @@ export async function GET() {
 
 // POST /api/organisations — create a department
 export async function POST(req: NextRequest) {
+  const auth = requireUser(req);
+  if (!auth.ok) return auth.response;
+  const { user } = auth;
   try {
     await setupDatabase();
 
     const body = await req.json();
-    const { name, description, status, userId, userName } = body as {
+    const { name, description, status } = body as {
       name?: string;
       description?: string;
       status?: string;
-      userId?: string;
-      userName?: string;
     };
 
     if (!name?.trim()) {
       return NextResponse.json({ error: "Department name is required." }, { status: 400 });
-    }
-    if (!userId || !userName) {
-      return NextResponse.json({ error: "Authenticated user is required." }, { status: 401 });
     }
 
     const db = getDb();
@@ -73,7 +74,7 @@ export async function POST(req: NextRequest) {
     await db.execute(
       `INSERT INTO departments (id, name, description, status, created_by_id, created_by_name)
        VALUES (?, ?, ?, ?, ?, ?)`,
-      [id, trimmedName, trimmedDesc, resolvedStatus, userId, userName]
+      [id, trimmedName, trimmedDesc, resolvedStatus, user.id, user.name]
     );
 
     const newDept: Department = {
@@ -81,8 +82,8 @@ export async function POST(req: NextRequest) {
       name: trimmedName,
       description: trimmedDesc,
       status: resolvedStatus,
-      createdById: userId,
-      createdByName: userName,
+      createdById: user.id,
+      createdByName: user.name,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -91,8 +92,8 @@ export async function POST(req: NextRequest) {
       tableName: "departments",
       recordId: id,
       action: "CREATE",
-      performedById: userId,
-      performedByName: userName,
+      performedById: user.id,
+      performedByName: user.name,
       oldValues: null,
       newValues: { name: trimmedName, description: trimmedDesc, status: resolvedStatus },
     });

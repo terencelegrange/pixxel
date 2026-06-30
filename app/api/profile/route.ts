@@ -2,15 +2,18 @@ import { NextRequest, NextResponse } from "next/server";
 import mysql from "mysql2/promise";
 import { getDb, setupDatabase } from "@/lib/db";
 import { writeAudit } from "@/lib/audit";
+import { requireUser } from "@/lib/require-user";
 
 // PUT /api/profile — update the current user's name and/or email
 export async function PUT(req: NextRequest) {
+  const auth = requireUser(req);
+  if (!auth.ok) return auth.response;
+  const { user } = auth;
   try {
     await setupDatabase();
     const body = await req.json();
-    const { userId, name, email } = body as { userId?: string; name?: string; email?: string };
+    const { name, email } = body as { name?: string; email?: string };
 
-    if (!userId) return NextResponse.json({ error: "Authenticated user is required." }, { status: 401 });
     if (!name?.trim()) return NextResponse.json({ error: "Name is required." }, { status: 400 });
     if (!email?.trim()) return NextResponse.json({ error: "Email is required." }, { status: 400 });
 
@@ -20,7 +23,7 @@ export async function PUT(req: NextRequest) {
 
     // Fetch current row for audit + change detection
     const [rows] = await db.execute<mysql.RowDataPacket[]>(
-      "SELECT id, name, email FROM users WHERE id = ? LIMIT 1", [userId]
+      "SELECT id, name, email FROM users WHERE id = ? LIMIT 1", [user.id]
     );
     const current = rows[0];
     if (!current) return NextResponse.json({ error: "User not found." }, { status: 404 });
@@ -29,7 +32,7 @@ export async function PUT(req: NextRequest) {
     if (normalizedEmail !== current.email) {
       const [conflict] = await db.execute<mysql.RowDataPacket[]>(
         "SELECT id FROM users WHERE email = ? AND id != ? LIMIT 1",
-        [normalizedEmail, userId]
+        [normalizedEmail, user.id]
       );
       if ((conflict as mysql.RowDataPacket[]).length > 0) {
         return NextResponse.json({ error: "That email address is already in use." }, { status: 409 });
@@ -46,12 +49,12 @@ export async function PUT(req: NextRequest) {
 
     await db.execute(
       "UPDATE users SET name = ?, email = ? WHERE id = ?",
-      [trimmedName, normalizedEmail, userId]
+      [trimmedName, normalizedEmail, user.id]
     );
 
     await writeAudit({
-      tableName: "users", recordId: userId, action: "UPDATE",
-      performedById: userId, performedByName: trimmedName,
+      tableName: "users", recordId: user.id, action: "UPDATE",
+      performedById: user.id, performedByName: trimmedName,
       oldValues: { name: current.name, email: current.email },
       newValues: { name: trimmedName, email: normalizedEmail },
     });
@@ -59,7 +62,7 @@ export async function PUT(req: NextRequest) {
     // Return the updated user fields so the client can refresh its auth state
     return NextResponse.json({
       user: {
-        id: userId,
+        id: user.id,
         name: trimmedName,
         email: normalizedEmail,
         avatarInitials: initials,

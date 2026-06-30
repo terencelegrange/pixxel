@@ -1,9 +1,12 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { getDb, setupDatabase } from "@/lib/db";
 import mysql from "mysql2/promise";
 import { randomUUID } from "crypto";
+import { requireUser } from "@/lib/require-user";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const auth = requireUser(req);
+  if (!auth.ok) return auth.response;
   await setupDatabase();
   const db = getDb();
   const [rows] = await db.execute<mysql.RowDataPacket[]>(`
@@ -19,20 +22,23 @@ export async function GET() {
   return NextResponse.json({ diagrams: rows });
 }
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
+  const auth = requireUser(req);
+  if (!auth.ok) return auth.response;
+  const { user } = auth;
   await setupDatabase();
   const db = getDb();
-  const { name, description, userId, userName } = await req.json();
+  const { name, description } = await req.json();
   const id = randomUUID();
   const defaultSource = `@startuml\nactor User\nUser -> System : Request\nSystem --> User : Response\n@enduml`;
   await db.execute(
     "INSERT INTO plantuml_diagrams (id, name, description, created_by_id, created_by_name) VALUES (?, ?, ?, ?, ?)",
-    [id, name, description ?? null, userId, userName]
+    [id, name, description ?? null, user.id, user.name]
   );
   const versionId = randomUUID();
   await db.execute(
     "INSERT INTO plantuml_versions (id, diagram_id, version_number, source, created_by_id, created_by_name) VALUES (?, ?, 1, ?, ?, ?)",
-    [versionId, id, defaultSource, userId, userName]
+    [versionId, id, defaultSource, user.id, user.name]
   );
   return NextResponse.json({ id, versionNumber: 1 }, { status: 201 });
 }

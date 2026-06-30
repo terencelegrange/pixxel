@@ -2,9 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import mysql from "mysql2/promise";
 import { getDb, setupDatabase } from "@/lib/db";
 import { Asset, AssetCategory, AssetType, LifecycleStatus } from "@/types";
+import { requireUser } from "@/lib/require-user";
 
 // GET /api/assets/my-assets?userId=<id> — assets where user is an assigned architect
 export async function GET(req: NextRequest) {
+  const auth = requireUser(req);
+  if (!auth.ok) return auth.response;
   try {
     await setupDatabase();
     const userId = req.nextUrl.searchParams.get("userId");
@@ -46,6 +49,8 @@ export async function GET(req: NextRequest) {
       shortCode: row.short_code ?? null, description: row.description ?? null,
       type: row.type as AssetType, category: (row.category ?? "Application") as AssetCategory,
       icon: row.icon ?? null,
+      heroDiagramId: row.hero_diagram_id ?? null,
+      heroDiagramName: null,
       lifecycleStatus: row.lifecycle_status as LifecycleStatus,
       departmentIds:   row.department_ids   ? String(row.department_ids).split(",").filter(Boolean)   : [],
       departmentNames: row.department_names ? String(row.department_names).split("|").filter(Boolean) : [],

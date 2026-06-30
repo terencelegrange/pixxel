@@ -2,17 +2,20 @@ import { NextRequest, NextResponse } from "next/server";
 import mysql from "mysql2/promise";
 import { getDb, setupDatabase } from "@/lib/db";
 import { writeAudit } from "@/lib/audit";
+import { requireUser } from "@/lib/require-user";
 
 // PUT /api/diagram-types/[id]
 export async function PUT(
   req: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  const auth = requireUser(req);
+  if (!auth.ok) return auth.response;
+  const { user } = auth;
   try {
     await setupDatabase();
-    const { name, description, sortOrder, userId, userName } = await req.json();
+    const { name, description, sortOrder } = await req.json();
     if (!name?.trim()) return NextResponse.json({ error: "Name is required." }, { status: 400 });
-    if (!userId || !userName) return NextResponse.json({ error: "Authenticated user is required." }, { status: 401 });
 
     const db = getDb();
     const [rows] = await db.execute<mysql.RowDataPacket[]>(
@@ -27,7 +30,7 @@ export async function PUT(
     );
     await writeAudit({
       tableName: "diagram_types", recordId: params.id, action: "UPDATE",
-      performedById: userId, performedByName: userName,
+      performedById: user.id, performedByName: user.name,
       oldValues: { name: current.name, description: current.description, sortOrder: current.sort_order },
       newValues: { name: name.trim(), description: description?.trim() || null, sortOrder: sortOrder ?? null },
     });
@@ -45,10 +48,11 @@ export async function DELETE(
   req: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  const auth = requireUser(req);
+  if (!auth.ok) return auth.response;
+  const { user } = auth;
   try {
     await setupDatabase();
-    const { userId, userName } = await req.json() as { userId?: string; userName?: string };
-    if (!userId || !userName) return NextResponse.json({ error: "Authenticated user is required." }, { status: 401 });
 
     const db = getDb();
     const [rows] = await db.execute<mysql.RowDataPacket[]>(
@@ -71,7 +75,7 @@ export async function DELETE(
     await db.execute("DELETE FROM diagram_types WHERE id = ?", [params.id]);
     await writeAudit({
       tableName: "diagram_types", recordId: params.id, action: "DELETE",
-      performedById: userId, performedByName: userName,
+      performedById: user.id, performedByName: user.name,
       oldValues: { name: current.name }, newValues: null,
     });
     return NextResponse.json({ success: true });

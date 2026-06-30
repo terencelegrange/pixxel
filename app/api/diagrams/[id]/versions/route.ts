@@ -3,15 +3,18 @@ import { randomUUID } from "crypto";
 import mysql from "mysql2/promise";
 import { getDb, setupDatabase } from "@/lib/db";
 import { writeAudit } from "@/lib/audit";
+import { requireUser } from "@/lib/require-user";
 
 const toISO = (v: unknown) =>
   v instanceof Date ? v.toISOString() : v ? String(v) : null;
 
 // GET /api/diagrams/[id]/versions — list all versions (no content)
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  const auth = requireUser(req);
+  if (!auth.ok) return auth.response;
   try {
     await setupDatabase();
     const db = getDb();
@@ -38,11 +41,13 @@ export async function POST(
   req: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  const auth = requireUser(req);
+  if (!auth.ok) return auth.response;
+  const { user } = auth;
   try {
     await setupDatabase();
-    const { content, assetIds, userId, userName } = await req.json();
+    const { content, assetIds } = await req.json();
     if (!content) return NextResponse.json({ error: "Content is required." }, { status: 400 });
-    if (!userId || !userName) return NextResponse.json({ error: "Authenticated user is required." }, { status: 401 });
 
     const db = getDb();
 
@@ -62,7 +67,7 @@ export async function POST(
     const versionId = randomUUID();
     await db.execute(
       "INSERT INTO diagram_versions (id, diagram_id, version_number, content, created_by_id, created_by_name) VALUES (?,?,?,?,?,?)",
-      [versionId, params.id, nextVersion, content, userId, userName]
+      [versionId, params.id, nextVersion, content, user.id, user.name]
     );
 
     // Update diagram.updated_at
@@ -80,7 +85,7 @@ export async function POST(
 
     await writeAudit({
       tableName: "diagrams", recordId: params.id, action: "UPDATE",
-      performedById: userId, performedByName: userName,
+      performedById: user.id, performedByName: user.name,
       oldValues: null,
       newValues: { versionSaved: nextVersion, assetCount: ids.length },
     });

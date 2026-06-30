@@ -7,7 +7,7 @@ import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import AssetModal, { AssetFormState, AssetIcon, LIFECYCLE_STATUSES } from "@/components/assets/AssetModal";
-import { Asset, AssetComplexity, AssetStrategy, AssetType, BusinessCapability, Department, Domain, IndustrySector, LifecycleStatus, Tier, User, Vendor } from "@/types";
+import { Asset, AssetComplexity, AssetStrategy, AssetType, BusinessCapability, Department, Diagram, Domain, IndustrySector, LifecycleStatus, Tier, User, Vendor } from "@/types";
 
 // ---------------------------------------------------------------------------
 // Badge helpers
@@ -54,6 +54,7 @@ export default function AssetsPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [capabilities, setCapabilities] = useState<BusinessCapability[]>([]);
   const [sectors, setSectors] = useState<IndustrySector[]>([]);
+  const [diagrams, setDiagrams] = useState<Diagram[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
 
@@ -78,7 +79,7 @@ export default function AssetsPage() {
     setIsLoading(true);
     setFetchError(null);
     try {
-      const [assetsRes, deptsRes, strategiesRes, complexitiesRes, domainsRes, tiersRes, vendorsRes, usersRes, capsRes, sectorsRes] = await Promise.all([
+      const [assetsRes, deptsRes, strategiesRes, complexitiesRes, domainsRes, tiersRes, vendorsRes, usersRes, capsRes, sectorsRes, diagramsRes] = await Promise.all([
         fetch("/api/assets"),
         fetch("/api/organisations"),
         fetch("/api/asset-strategy"),
@@ -89,8 +90,9 @@ export default function AssetsPage() {
         fetch("/api/users"),
         fetch("/api/business-capabilities"),
         fetch("/api/industry-sectors"),
+        fetch("/api/diagrams"),
       ]);
-      const [assetsData, deptsData, strategiesData, complexitiesData, domainsData, tiersData, vendorsData, usersData, capsData, sectorsData] = await Promise.all([
+      const [assetsData, deptsData, strategiesData, complexitiesData, domainsData, tiersData, vendorsData, usersData, capsData, sectorsData, diagramsData] = await Promise.all([
         assetsRes.json(),
         deptsRes.json(),
         strategiesRes.json(),
@@ -101,6 +103,7 @@ export default function AssetsPage() {
         usersRes.json(),
         capsRes.json(),
         sectorsRes.json(),
+        diagramsRes.json(),
       ]);
       if (!assetsRes.ok) throw new Error(assetsData.error ?? "Failed to load assets.");
       setAssets(assetsData.assets);
@@ -113,6 +116,7 @@ export default function AssetsPage() {
       setUsers(usersData.users ?? []);
       setCapabilities(capsData.capabilities ?? []);
       setSectors(sectorsData.sectors ?? []);
+      setDiagrams(diagramsData.diagrams ?? []);
     } catch (err) {
       setFetchError(err instanceof Error ? err.message : "Failed to load data.");
     } finally {
@@ -364,6 +368,7 @@ export default function AssetsPage() {
         users={users}
         capabilities={capabilities}
         sectors={sectors}
+        diagrams={diagrams}
         onSave={handleSave}
       />
 

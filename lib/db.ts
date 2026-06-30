@@ -717,6 +717,8 @@ async function runSetup(): Promise<void> {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
   `);
 
+  await addColIfMissing(db, 'assets', 'hero_diagram_id', 'CHAR(36) NULL AFTER icon');
+
   await db.execute(`
     CREATE TABLE IF NOT EXISTS asset_dependencies (
       id              CHAR(36)     NOT NULL,
@@ -740,5 +742,31 @@ async function runSetup(): Promise<void> {
 
   } finally {
     await db.execute("SELECT RELEASE_LOCK('pixxel_db_setup')");
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Transaction helper
+// Runs callback inside a BEGIN/COMMIT block. Rolls back automatically on throw.
+// Usage:
+//   await withTransaction(async (tx) => {
+//     await tx.execute("INSERT INTO ...", [...]);
+//     await tx.execute("INSERT INTO ...", [...]);
+//   });
+// ---------------------------------------------------------------------------
+export async function withTransaction<T>(
+  callback: (conn: mysql.Connection) => Promise<T>
+): Promise<T> {
+  const conn = await getPool().getConnection();
+  await conn.beginTransaction();
+  try {
+    const result = await callback(conn);
+    await conn.commit();
+    return result;
+  } catch (err) {
+    await conn.rollback();
+    throw err;
+  } finally {
+    conn.release();
   }
 }

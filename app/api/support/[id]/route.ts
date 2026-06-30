@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import mysql from "mysql2/promise";
 import { getDb, setupDatabase } from "@/lib/db";
+import { requireUser } from "@/lib/require-user";
 
 const VALID_STATUSES = ["New", "Acknowledged", "Under Review", "Will Fix", "Will Not Implement", "Completed"] as const;
 type SupportStatus = typeof VALID_STATUSES[number];
@@ -10,6 +11,8 @@ export async function PATCH(
   req: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  const auth = requireUser(req);
+  if (!auth.ok) return auth.response;
   try {
     await setupDatabase();
     const { status } = await req.json() as { status?: string };

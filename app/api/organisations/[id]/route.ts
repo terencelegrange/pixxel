@@ -2,29 +2,28 @@ import { NextRequest, NextResponse } from "next/server";
 import mysql from "mysql2/promise";
 import { getDb, setupDatabase } from "@/lib/db";
 import { writeAudit } from "@/lib/audit";
+import { requireUser } from "@/lib/require-user";
 
 // PUT /api/organisations/[id] — update a department
 export async function PUT(
   req: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  const auth = requireUser(req);
+  if (!auth.ok) return auth.response;
+  const { user } = auth;
   try {
     await setupDatabase();
 
     const body = await req.json();
-    const { name, description, status, userId, userName } = body as {
+    const { name, description, status } = body as {
       name?: string;
       description?: string;
       status?: string;
-      userId?: string;
-      userName?: string;
     };
 
     if (!name?.trim()) {
       return NextResponse.json({ error: "Department name is required." }, { status: 400 });
-    }
-    if (!userId || !userName) {
-      return NextResponse.json({ error: "Authenticated user is required." }, { status: 401 });
     }
 
     const db = getDb();
@@ -61,8 +60,8 @@ export async function PUT(
       tableName: "departments",
       recordId: params.id,
       action: "UPDATE",
-      performedById: userId,
-      performedByName: userName,
+      performedById: user.id,
+      performedByName: user.name,
       oldValues: { name: current.name, description: current.description ?? null, status: current.status },
       newValues: { name: trimmedName, description: trimmedDesc, status: resolvedStatus },
     });
@@ -79,17 +78,11 @@ export async function DELETE(
   req: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  const auth = requireUser(req);
+  if (!auth.ok) return auth.response;
+  const { user } = auth;
   try {
     await setupDatabase();
-
-    const { userId, userName } = await req.json() as {
-      userId?: string;
-      userName?: string;
-    };
-
-    if (!userId || !userName) {
-      return NextResponse.json({ error: "Authenticated user is required." }, { status: 401 });
-    }
 
     const db = getDb();
 
@@ -109,8 +102,8 @@ export async function DELETE(
       tableName: "departments",
       recordId: params.id,
       action: "DELETE",
-      performedById: userId,
-      performedByName: userName,
+      performedById: user.id,
+      performedByName: user.name,
       oldValues: { name: current.name, description: current.description ?? null },
       newValues: null,
     });

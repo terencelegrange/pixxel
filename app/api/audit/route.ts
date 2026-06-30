@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import mysql from "mysql2/promise";
 import { getDb, setupDatabase } from "@/lib/db";
 import { AuditLog } from "@/types";
+import { requireUser } from "@/lib/require-user";
 
 // GET /api/audit
 // Query params:
@@ -11,6 +12,8 @@ import { AuditLog } from "@/types";
 //   action    — filter by action: CREATE | UPDATE | DELETE (optional)
 //   performer — partial match on performed_by_name (optional)
 export async function GET(req: NextRequest) {
+  const auth = requireUser(req, "Admin");
+  if (!auth.ok) return auth.response;
   try {
     await setupDatabase();
     const db = getDb();

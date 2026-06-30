@@ -16,6 +16,7 @@ import {
   clearStoredUser,
   loginUser,
   registerUser,
+  logoutUser,
 } from "@/lib/auth";
 
 // ---------------------------------------------------------------------------
@@ -71,6 +72,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = useCallback(() => {
     clearStoredUser();
     setUser(null);
+    // Clear the server-side HttpOnly cookie so the JWT is invalidated.
+    logoutUser();
     router.push("/login");
   }, [router]);
 

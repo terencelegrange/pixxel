@@ -3,15 +3,18 @@ import mysql from "mysql2/promise";
 import { getDb, setupDatabase } from "@/lib/db";
 import { writeAudit } from "@/lib/audit";
 import { Asset, AssetCategory, AssetType, LifecycleStatus } from "@/types";
+import { requireUser } from "@/lib/require-user";
 
 const VALID_TYPES: AssetType[] = ["SaaS", "On-Premise", "Hybrid", "Cloud", "Open Source", "Other"];
 const VALID_STATUSES: LifecycleStatus[] = ["Proposed", "Approved", "In Development", "Production", "Sunset", "Retired"];
 
 // GET /api/assets/[id] — fetch a single asset with aggregated departments
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  const auth = requireUser(req);
+  if (!auth.ok) return auth.response;
   try {
     await setupDatabase();
     const db = getDb();
@@ -28,7 +31,8 @@ export async function GET(
          dom.name AS domain_name,
          s.name AS strategy_name,
          c.name AS complexity_name,
-         t.name AS tier_name
+         t.name AS tier_name,
+         hd.name AS hero_diagram_name
        FROM assets a
        LEFT JOIN asset_departments ad  ON ad.asset_id = a.id
        LEFT JOIN departments d         ON d.id = ad.department_id
@@ -40,6 +44,7 @@ export async function GET(
        LEFT JOIN asset_strategies s    ON s.id = a.strategy_id
        LEFT JOIN asset_complexities c  ON c.id = a.complexity_id
        LEFT JOIN tiers t               ON t.id = a.tier_id
+       LEFT JOIN diagrams hd           ON hd.id = a.hero_diagram_id
        WHERE a.id = ?
        GROUP BY a.id
        LIMIT 1`,
@@ -56,6 +61,8 @@ export async function GET(
       shortCode: row.short_code ?? null, description: row.description ?? null,
       type: row.type as AssetType, category: (row.category ?? "Application") as AssetCategory,
       icon: row.icon ?? null,
+      heroDiagramId: row.hero_diagram_id ?? null,
+      heroDiagramName: row.hero_diagram_name ?? null,
       lifecycleStatus: row.lifecycle_status as LifecycleStatus,
       departmentIds:   row.department_ids   ? String(row.department_ids).split(",").filter(Boolean)   : [],
       departmentNames: row.department_names ? String(row.department_names).split("|").filter(Boolean) : [],
@@ -98,6 +105,9 @@ export async function PUT(
   req: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  const auth = requireUser(req);
+  if (!auth.ok) return auth.response;
+  const { user } = auth;
   try {
     await setupDatabase();
     const body = await req.json();
@@ -106,7 +116,7 @@ export async function PUT(
       departmentIds, architectIds, capabilityIds, tierId, strategyId, complexityId, domainId, vendorId, businessOwner, technicalOwner,
       slaAvailability, slaRto, slaRpo,
       goLiveDate, retirementDate, appUrl, docUrl, contractEndDate, contractAmount, notes,
-      userId, userName,
+      heroDiagramId,
     } = body;
 
     if (!name?.trim()) return NextResponse.json({ error: "Asset name is required." }, { status: 400 });
@@ -114,7 +124,6 @@ export async function PUT(
       return NextResponse.json({ error: "At least one department is required." }, { status: 400 });
     if (!VALID_TYPES.includes(type)) return NextResponse.json({ error: "Invalid asset type." }, { status: 400 });
     if (!VALID_STATUSES.includes(lifecycleStatus)) return NextResponse.json({ error: "Invalid lifecycle status." }, { status: 400 });
-    if (!userId || !userName) return NextResponse.json({ error: "Authenticated user is required." }, { status: 401 });
 
     const db = getDb();
 
@@ -140,6 +149,7 @@ export async function PUT(
       type,
       category: category || "Application",
       icon: icon || "Server",
+      heroDiagramId: heroDiagramId || null,
       lifecycleStatus,
       departmentIds: departmentIds as string[],
       architectIds: Array.isArray(architectIds) ? architectIds as string[] : [],
@@ -165,13 +175,13 @@ export async function PUT(
 
     await db.execute(
       `UPDATE assets SET
-         name=?, short_code=?, description=?, type=?, category=?, icon=?, tier_id=?, strategy_id=?, complexity_id=?, domain_id=?, vendor_id=?,
+         name=?, short_code=?, description=?, type=?, category=?, icon=?, hero_diagram_id=?, tier_id=?, strategy_id=?, complexity_id=?, domain_id=?, vendor_id=?,
          lifecycle_status=?, business_owner=?, technical_owner=?,
          sla_availability=?, sla_rto=?, sla_rpo=?,
          go_live_date=?, retirement_date=?, app_url=?, doc_url=?, contract_end_date=?, contract_amount=?, notes=?
        WHERE id=?`,
       [values.name, values.shortCode, values.description, values.type, values.category,
-       values.icon, values.tierId, values.strategyId, values.complexityId, values.domainId, values.vendorId, values.lifecycleStatus,
+       values.icon, values.heroDiagramId, values.tierId, values.strategyId, values.complexityId, values.domainId, values.vendorId, values.lifecycleStatus,
        values.businessOwner, values.technicalOwner,
        values.slaAvailability, values.slaRto, values.slaRpo,
        values.goLiveDate, values.retirementDate, values.appUrl, values.docUrl, values.contractEndDate, values.contractAmount,
@@ -210,10 +220,11 @@ export async function PUT(
 
     await writeAudit({
       tableName: "assets", recordId: params.id, action: "UPDATE",
-      performedById: userId, performedByName: userName,
+      performedById: user.id, performedByName: user.name,
       oldValues: {
         name: current.name, shortCode: current.short_code, description: current.description,
         type: current.type, category: current.category, icon: current.icon,
+        heroDiagramId: current.hero_diagram_id ?? null,
         lifecycleStatus: current.lifecycle_status, departmentIds: oldDeptIds,
         architectIds: oldArchIds, capabilityIds: oldCapIds,
         tierId: current.tier_id,
@@ -243,10 +254,11 @@ export async function DELETE(
   req: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  const auth = requireUser(req);
+  if (!auth.ok) return auth.response;
+  const { user } = auth;
   try {
     await setupDatabase();
-    const { userId, userName } = await req.json() as { userId?: string; userName?: string };
-    if (!userId || !userName) return NextResponse.json({ error: "Authenticated user is required." }, { status: 401 });
 
     const db = getDb();
 
@@ -263,7 +275,7 @@ export async function DELETE(
 
     await writeAudit({
       tableName: "assets", recordId: params.id, action: "DELETE",
-      performedById: userId, performedByName: userName,
+      performedById: user.id, performedByName: user.name,
       oldValues: { name: current.name, type: current.type, lifecycleStatus: current.lifecycle_status },
       newValues: null,
     });

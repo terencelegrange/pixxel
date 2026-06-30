@@ -4,6 +4,7 @@ import mysql from "mysql2/promise";
 import { getDb, setupDatabase } from "@/lib/db";
 import { writeAudit } from "@/lib/audit";
 import { Tier } from "@/types";
+import { requireUser } from "@/lib/require-user";
 
 function rowToTier(row: mysql.RowDataPacket): Tier {
   const toISO = (v: unknown) => v instanceof Date ? v.toISOString() : v ? String(v) : null;
@@ -23,7 +24,9 @@ function rowToTier(row: mysql.RowDataPacket): Tier {
 }
 
 // GET /api/tiers
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const auth = requireUser(req);
+  if (!auth.ok) return auth.response;
   try {
     await setupDatabase();
     const db = getDb();
@@ -39,16 +42,18 @@ export async function GET() {
 
 // POST /api/tiers
 export async function POST(req: NextRequest) {
+  const auth = requireUser(req);
+  if (!auth.ok) return auth.response;
+  const { user } = auth;
   try {
     await setupDatabase();
     const body = await req.json();
     const {
       name, description, slaAvailability, supportHours,
-      responseTime, resolutionTime, userId, userName,
+      responseTime, resolutionTime,
     } = body;
 
     if (!name?.trim()) return NextResponse.json({ error: "Tier name is required." }, { status: 400 });
-    if (!userId || !userName) return NextResponse.json({ error: "Authenticated user is required." }, { status: 401 });
 
     const db = getDb();
     const id = randomUUID();
@@ -67,12 +72,12 @@ export async function POST(req: NextRequest) {
           created_by_id, created_by_name)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [id, values.name, values.description, values.slaAvailability, values.supportHours,
-       values.responseTime, values.resolutionTime, userId, userName]
+       values.responseTime, values.resolutionTime, user.id, user.name]
     );
 
     await writeAudit({
       tableName: "tiers", recordId: id, action: "CREATE",
-      performedById: userId, performedByName: userName,
+      performedById: user.id, performedByName: user.name,
       oldValues: null, newValues: values,
     });
 

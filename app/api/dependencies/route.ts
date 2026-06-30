@@ -4,6 +4,7 @@ import mysql from "mysql2/promise";
 import { getDb, setupDatabase } from "@/lib/db";
 import { writeAudit } from "@/lib/audit";
 import { AssetDependency, DependencyConnectionType, DependencyDirection } from "@/types";
+import { requireUser } from "@/lib/require-user";
 
 const VALID_TYPES: DependencyConnectionType[] = [
   'API', 'Database', 'File Transfer', 'Event / Message', 'UI Embed', 'Other',
@@ -52,7 +53,9 @@ const JOIN_SQL = `
   LEFT JOIN domains tdom ON tdom.id = ta.domain_id
 `;
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const auth = requireUser(req);
+  if (!auth.ok) return auth.response;
   try {
     await setupDatabase();
     const db = getDb();
@@ -67,10 +70,13 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
+  const auth = requireUser(req);
+  if (!auth.ok) return auth.response;
+  const { user } = auth;
   try {
     await setupDatabase();
     const body = await req.json();
-    const { sourceAssetId, targetAssetId, type, direction, notes, userId, userName } = body;
+    const { sourceAssetId, targetAssetId, type, direction, notes } = body;
 
     if (!sourceAssetId)
       return NextResponse.json({ error: "sourceAssetId is required." }, { status: 400 });
@@ -82,8 +88,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid type." }, { status: 400 });
     if (!direction || !VALID_DIRECTIONS.includes(direction))
       return NextResponse.json({ error: "direction must be outbound or bidirectional." }, { status: 400 });
-    if (!userId || !userName)
-      return NextResponse.json({ error: "Authenticated user is required." }, { status: 401 });
 
     const db = getDb();
 
@@ -105,7 +109,7 @@ export async function POST(req: NextRequest) {
         `INSERT INTO asset_dependencies
            (id, source_asset_id, target_asset_id, type, direction, notes, created_by_id, created_by_name)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-        [id, sourceAssetId, targetAssetId, type, direction, notes?.trim() || null, userId, userName]
+        [id, sourceAssetId, targetAssetId, type, direction, notes?.trim() || null, user.id, user.name]
       );
     } catch (err: unknown) {
       const e = err as { errno?: number };
@@ -120,7 +124,7 @@ export async function POST(req: NextRequest) {
 
     await writeAudit({
       tableName: "asset_dependencies", recordId: id, action: "CREATE",
-      performedById: userId, performedByName: userName,
+      performedById: user.id, performedByName: user.name,
       oldValues: null,
       newValues: { sourceAssetId, targetAssetId, type, direction, notes: notes?.trim() || null },
     });

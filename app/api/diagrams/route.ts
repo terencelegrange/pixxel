@@ -3,12 +3,15 @@ import { randomUUID } from "crypto";
 import mysql from "mysql2/promise";
 import { getDb, setupDatabase } from "@/lib/db";
 import { writeAudit } from "@/lib/audit";
+import { requireUser } from "@/lib/require-user";
 
 const toISO = (v: unknown) =>
   v instanceof Date ? v.toISOString() : v ? String(v) : null;
 
 // GET /api/diagrams — list all diagrams with latest version, asset count, project + last modifier
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const auth = requireUser(req);
+  if (!auth.ok) return auth.response;
   try {
     await setupDatabase();
     const db = getDb();
@@ -61,18 +64,20 @@ export async function GET() {
 
 // POST /api/diagrams — create a new diagram (with initial empty version)
 export async function POST(req: NextRequest) {
+  const auth = requireUser(req);
+  if (!auth.ok) return auth.response;
+  const { user } = auth;
   try {
     await setupDatabase();
-    const { name, description, projectId, diagramTypeId, userId, userName } = await req.json();
+    const { name, description, projectId, diagramTypeId } = await req.json();
     if (!name?.trim()) return NextResponse.json({ error: "Name is required." }, { status: 400 });
-    if (!userId || !userName) return NextResponse.json({ error: "Authenticated user is required." }, { status: 401 });
 
     const db = getDb();
     const id = randomUUID();
 
     await db.execute(
       "INSERT INTO diagrams (id, name, description, project_id, diagram_type_id, created_by_id, created_by_name) VALUES (?,?,?,?,?,?,?)",
-      [id, name.trim(), description?.trim() || null, projectId || null, diagramTypeId || null, userId, userName]
+      [id, name.trim(), description?.trim() || null, projectId || null, diagramTypeId || null, user.id, user.name]
     );
 
     // Create version 1 with empty canvas
@@ -80,12 +85,12 @@ export async function POST(req: NextRequest) {
     const emptyContent = JSON.stringify({ elements: [], appState: { viewBackgroundColor: "#ffffff", gridSize: 20 }, files: {} });
     await db.execute(
       "INSERT INTO diagram_versions (id, diagram_id, version_number, content, created_by_id, created_by_name) VALUES (?,?,?,?,?,?)",
-      [versionId, id, 1, emptyContent, userId, userName]
+      [versionId, id, 1, emptyContent, user.id, user.name]
     );
 
     await writeAudit({
       tableName: "diagrams", recordId: id, action: "CREATE",
-      performedById: userId, performedByName: userName,
+      performedById: user.id, performedByName: user.name,
       oldValues: null,
       newValues: { name: name.trim(), description: description?.trim() || null, projectId: projectId || null, diagramTypeId: diagramTypeId || null },
     });

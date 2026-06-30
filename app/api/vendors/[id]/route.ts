@@ -2,12 +2,16 @@ import { NextRequest, NextResponse } from "next/server";
 import mysql from "mysql2/promise";
 import { getDb, setupDatabase } from "@/lib/db";
 import { writeAudit } from "@/lib/audit";
+import { requireUser } from "@/lib/require-user";
 
 // PUT /api/vendors/[id]
 export async function PUT(
   req: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  const auth = requireUser(req);
+  if (!auth.ok) return auth.response;
+  const { user } = auth;
   try {
     await setupDatabase();
     const body = await req.json();
@@ -15,11 +19,10 @@ export async function PUT(
       name, website, email, phone,
       addressLine1, addressLine2, city, stateProvince, country, postalCode,
       primaryContactName, primaryContactRole, primaryContactEmail, primaryContactPhone,
-      notes, userId, userName,
+      notes,
     } = body;
 
     if (!name?.trim()) return NextResponse.json({ error: "Vendor name is required." }, { status: 400 });
-    if (!userId || !userName) return NextResponse.json({ error: "Authenticated user is required." }, { status: 401 });
 
     const db = getDb();
     const [rows] = await db.execute<mysql.RowDataPacket[]>(
@@ -63,7 +66,7 @@ export async function PUT(
 
     await writeAudit({
       tableName: "vendors", recordId: params.id, action: "UPDATE",
-      performedById: userId, performedByName: userName,
+      performedById: user.id, performedByName: user.name,
       oldValues: {
         name: current.name, website: current.website, email: current.email, phone: current.phone,
         addressLine1: current.address_line1, addressLine2: current.address_line2,
@@ -90,10 +93,11 @@ export async function DELETE(
   req: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  const auth = requireUser(req);
+  if (!auth.ok) return auth.response;
+  const { user } = auth;
   try {
     await setupDatabase();
-    const { userId, userName } = await req.json() as { userId?: string; userName?: string };
-    if (!userId || !userName) return NextResponse.json({ error: "Authenticated user is required." }, { status: 401 });
 
     const db = getDb();
     const [rows] = await db.execute<mysql.RowDataPacket[]>(
@@ -108,7 +112,7 @@ export async function DELETE(
 
     await writeAudit({
       tableName: "vendors", recordId: params.id, action: "DELETE",
-      performedById: userId, performedByName: userName,
+      performedById: user.id, performedByName: user.name,
       oldValues: { name: current.name, email: current.email, country: current.country },
       newValues: null,
     });

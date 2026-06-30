@@ -1,0 +1,12 @@
+{
+  "setupComplete": false,
+  "appName": "Pixxel",
+  "orgName": "Your Organisation",
+  "db": {
+    "host": "localhost",
+    "port": 3306,
+    "user": "root",
+    "password": "your-db-password",
+    "name": "pixxel"
+  }
+}

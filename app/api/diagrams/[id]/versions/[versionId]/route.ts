@@ -1,15 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import mysql from "mysql2/promise";
 import { getDb, setupDatabase } from "@/lib/db";
+import { requireUser } from "@/lib/require-user";
 
 const toISO = (v: unknown) =>
   v instanceof Date ? v.toISOString() : v ? String(v) : null;
 
 // GET /api/diagrams/[id]/versions/[versionId] — fetch a specific version with content
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: { id: string; versionId: string } }
 ) {
+  const auth = requireUser(req);
+  if (!auth.ok) return auth.response;
   try {
     await setupDatabase();
     const db = getDb();

@@ -127,6 +127,8 @@ export interface Asset {
   type: AssetType;
   category: AssetCategory;
   icon: string | null;
+  heroDiagramId: string | null;
+  heroDiagramName: string | null;
   lifecycleStatus: LifecycleStatus;
   departmentIds: string[];
   departmentNames: string[];

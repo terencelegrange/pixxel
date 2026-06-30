@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import mysql from "mysql2/promise";
 import { getDb, setupDatabase } from "@/lib/db";
+import { rateLimit } from "@/lib/rate-limit";
+import { signJwt } from "@/lib/jwt";
+import { validate } from "@/lib/validate";
+import { LoginSchema } from "@/lib/schemas";
 import { User } from "@/types";
 
 interface DbUserRow {
@@ -14,23 +18,20 @@ interface DbUserRow {
 }
 
 export async function POST(req: NextRequest) {
+  const limit = rateLimit(req, { limit: 10, windowMs: 15 * 60 * 1000 });
+  if (!limit.ok) return limit.response;
+
   try {
     await setupDatabase();
 
-    const body = await req.json();
-    const { email, password } = body as { email?: string; password?: string };
-
-    if (!email || !password) {
-      return NextResponse.json(
-        { error: "Email and password are required." },
-        { status: 400 }
-      );
-    }
+    const v = await validate(req, LoginSchema);
+    if (!v.ok) return v.response;
+    const { email, password } = v.data;
 
     const db = getDb();
     const [rows] = await db.execute<mysql.RowDataPacket[]>(
       "SELECT id, name, email, password, role, created_at FROM users WHERE email = ? LIMIT 1",
-      [email.toLowerCase().trim()]
+      [email]
     );
 
     const row = rows[0] as DbUserRow | undefined;
@@ -62,7 +63,17 @@ export async function POST(req: NextRequest) {
         : String(row.created_at),
     };
 
-    return NextResponse.json({ user }, { status: 200 });
+    const token = signJwt({ sub: user.id, name: user.name, email: user.email, role: user.role });
+
+    const res = NextResponse.json({ user, token }, { status: 200 });
+    res.cookies.set("authToken", token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: 7 * 24 * 3600,
+      path: "/",
+    });
+    return res;
   } catch (err) {
     console.error("[/api/auth/login]", err);
     return NextResponse.json(
