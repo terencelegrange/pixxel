@@ -432,14 +432,153 @@ function DraggablePhaseBar({
 // Roadmap chart
 // ---------------------------------------------------------------------------
 function RoadmapChart({
-  groups, quarters, onAddPhase, onEditPhase,
+  groups, quarters, onAddPhase, onEditPhase, onSavePhase, onError,
 }: {
-  groups: RoadmapDomainGroup[];
-  quarters: string[];
-  onAddPhase: (asset: RoadmapAsset) => void;
+  groups:      RoadmapDomainGroup[];
+  quarters:    string[];
+  onAddPhase:  (asset: RoadmapAsset) => void;
   onEditPhase: (asset: RoadmapAsset, phase: AssetRoadmapPhase) => void;
+  onSavePhase: (phase: AssetRoadmapPhase, newStart: string, newEnd: string) => Promise<void>;
+  onError:     (message: string) => void;
 }) {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+
+  const dragRef      = useRef<DragState | null>(null);
+  const quartersRef  = useRef(quarters);
+  const groupsRef    = useRef(groups);
+  const phasesMapRef = useRef<Map<string, AssetRoadmapPhase[]>>(new Map());
+  const callbacksRef = useRef({ onEditPhase, onSavePhase, onError });
+  const [dragPreview, setDragPreview] = useState<DragPreview | null>(null);
+  const [savingId,    setSavingId]    = useState<string | null>(null);
+
+  // Mutate refs during render — safe React pattern for keeping refs fresh
+  quartersRef.current  = quarters;
+  groupsRef.current    = groups;
+  callbacksRef.current = { onEditPhase, onSavePhase, onError };
+
+  // Rebuild phase map whenever groups change (needed for overlap check)
+  useEffect(() => {
+    const m = new Map<string, AssetRoadmapPhase[]>();
+    for (const g of groups) for (const a of g.assets) m.set(a.id, a.phases);
+    phasesMapRef.current = m;
+  }, [groups]);
+
+  const startDrag = useCallback((
+    e: React.PointerEvent,
+    phase: AssetRoadmapPhase,
+    laneEl: HTMLElement,
+    mode: "move" | "resize",
+  ) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const qs = quartersRef.current;
+    const n  = qs.length;
+    if (n === 0) return;
+    const colWidth = laneEl.offsetWidth / n;
+    const startQ   = phase.startQuarter < qs[0]     ? qs[0]     : phase.startQuarter;
+    const endQ     = phase.endQuarter   > qs[n - 1] ? qs[n - 1] : phase.endQuarter;
+    const startIdx = qs.indexOf(startQ);
+    const endIdx   = qs.indexOf(endQ);
+    if (startIdx === -1 || endIdx === -1) return;
+    const initialPreview: DragPreview = {
+      phaseId: phase.id, startIdx, endIdx, hasOverlap: false,
+    };
+    dragRef.current = {
+      phase, mode,
+      originalStartIdx: startIdx, originalEndIdx: endIdx,
+      startX: e.clientX, colWidth,
+      hasMoved: false, currentPreview: initialPreview,
+    };
+    setDragPreview(initialPreview);
+  }, []);
+
+  const onPointerDownMove = useCallback(
+    (e: React.PointerEvent, phase: AssetRoadmapPhase, laneEl: HTMLElement) =>
+      startDrag(e, phase, laneEl, "move"),
+    [startDrag],
+  );
+
+  const onPointerDownResize = useCallback(
+    (e: React.PointerEvent, phase: AssetRoadmapPhase, laneEl: HTMLElement) =>
+      startDrag(e, phase, laneEl, "resize"),
+    [startDrag],
+  );
+
+  useEffect(() => {
+    function onPointerMove(e: PointerEvent) {
+      const drag = dragRef.current;
+      if (!drag) return;
+      const qs = quartersRef.current;
+      const n  = qs.length;
+      if (Math.abs(e.clientX - drag.startX) > 4) drag.hasMoved = true;
+      const delta = Math.round((e.clientX - drag.startX) / drag.colWidth);
+
+      let startIdx: number;
+      let endIdx:   number;
+      if (drag.mode === "move") {
+        const span = drag.originalEndIdx - drag.originalStartIdx;
+        startIdx   = Math.max(0, Math.min(n - 1 - span, drag.originalStartIdx + delta));
+        endIdx     = startIdx + span;
+      } else {
+        // resize: only the right edge moves; minimum span = 1 quarter
+        startIdx = drag.originalStartIdx;
+        endIdx   = Math.max(drag.originalStartIdx, Math.min(n - 1, drag.originalEndIdx + delta));
+      }
+
+      const phases     = phasesMapRef.current.get(drag.phase.assetId) ?? [];
+      const hasOverlap = hasOverlapWith(phases, drag.phase.id, qs, startIdx, endIdx);
+      const preview: DragPreview = { phaseId: drag.phase.id, startIdx, endIdx, hasOverlap };
+      drag.currentPreview = preview;
+      setDragPreview(preview);
+    }
+
+    function onPointerUp() {
+      const drag = dragRef.current;
+      if (!drag) return;
+      const preview = drag.currentPreview;
+      dragRef.current = null;
+
+      // Under 4 px travel — treat as click, open edit modal
+      if (!drag.hasMoved) {
+        setDragPreview(null);
+        const asset = groupsRef.current
+          .flatMap((g) => g.assets)
+          .find((a) => a.id === drag.phase.assetId) ?? null;
+        if (asset) callbacksRef.current.onEditPhase(asset, drag.phase);
+        return;
+      }
+
+      // Drop blocked by overlap — snap back
+      if (preview.hasOverlap) {
+        setDragPreview(null);
+        return;
+      }
+
+      // Commit the drag
+      const qs       = quartersRef.current;
+      const newStart = qs[preview.startIdx];
+      const newEnd   = qs[preview.endIdx];
+      setSavingId(drag.phase.id);
+      callbacksRef.current
+        .onSavePhase(drag.phase, newStart, newEnd)
+        .catch((err: Error) =>
+          callbacksRef.current.onError(
+            err?.message ?? "Save failed - your change was not saved.",
+          ),
+        )
+        .finally(() => {
+          setSavingId(null);
+          setDragPreview(null);
+        });
+    }
+
+    window.addEventListener("pointermove", onPointerMove);
+    window.addEventListener("pointerup",   onPointerUp);
+    return () => {
+      window.removeEventListener("pointermove", onPointerMove);
+      window.removeEventListener("pointerup",   onPointerUp);
+    };
+  }, []); // empty deps — reads all live values via refs
 
   function toggleDomain(id: string) {
     setCollapsed((prev) => {
@@ -527,25 +666,17 @@ function RoadmapChart({
                     )}
 
                     {/* Phase bars */}
-                    {asset.phases.map((phase) => {
-                      const pos = phasePosition(phase, quarters);
-                      if (!pos) return null;
-                      return (
-                        <div
-                          key={phase.id}
-                          className="absolute inset-y-1.5 flex cursor-pointer items-center rounded-md px-2 text-xs font-medium text-white shadow-sm overflow-hidden"
-                          style={{
-                            left: pos.left,
-                            width: pos.width,
-                            backgroundColor: phase.classificationColor,
-                          }}
-                          title={`${phase.classificationName}${phase.notes ? `: ${phase.notes}` : ""}`}
-                          onClick={(e) => { e.stopPropagation(); onEditPhase(asset, phase); }}
-                        >
-                          <span className="truncate">{phase.classificationName}</span>
-                        </div>
-                      );
-                    })}
+                    {asset.phases.map((phase) => (
+                      <DraggablePhaseBar
+                        key={phase.id}
+                        phase={phase}
+                        quarters={quarters}
+                        dragPreview={dragPreview}
+                        isSaving={savingId === phase.id}
+                        onPointerDownMove={onPointerDownMove}
+                        onPointerDownResize={onPointerDownResize}
+                      />
+                    ))}
                   </div>
                 </div>
               ))}
@@ -583,6 +714,18 @@ export default function RoadmapByPlatformPage() {
   const [activeAsset,  setActiveAsset]  = useState<RoadmapAsset | null>(null);
   const [activePhase,  setActivePhase]  = useState<AssetRoadmapPhase | null>(null);
 
+  // Toast state
+  const [toasts, setToasts] = useState<ToastItem[]>([]);
+  const toastCounterRef = useRef(0);
+
+  function showToast(message: string) {
+    const id = ++toastCounterRef.current;
+    setToasts((prev) => [...prev, { id, message }]);
+    setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 4000);
+  }
+
+  const { user } = useAuth();
+
   const quarters = generateQuarters(from, to);
 
   const fetchRoadmap = useCallback(async () => {
@@ -598,6 +741,28 @@ export default function RoadmapByPlatformPage() {
   }, [from, to]);
 
   useEffect(() => { fetchRoadmap(); }, [fetchRoadmap]);
+
+  const handleSavePhase = useCallback(async (
+    phase: AssetRoadmapPhase,
+    newStart: string,
+    newEnd: string,
+  ): Promise<void> => {
+    const res = await fetch(`/api/roadmap/phases/${phase.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        classificationId: phase.classificationId,
+        startQuarter: newStart,
+        endQuarter: newEnd,
+        notes: phase.notes ?? "",
+        userId: user?.id ?? "",
+        userName: user?.name ?? "",
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error ?? "Save failed.");
+    await fetchRoadmap();
+  }, [user, fetchRoadmap]);
 
   useEffect(() => {
     Promise.all([
@@ -674,6 +839,8 @@ export default function RoadmapByPlatformPage() {
           quarters={quarters}
           onAddPhase={openAddModal}
           onEditPhase={openEditModal}
+          onSavePhase={handleSavePhase}
+          onError={showToast}
         />
       )}
 
@@ -687,6 +854,21 @@ export default function RoadmapByPlatformPage() {
         fromQuarter={from}
         onSaved={fetchRoadmap}
       />
+
+      {/* Toast notifications */}
+      {toasts.length > 0 && (
+        <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2">
+          {toasts.map((t) => (
+            <div
+              key={t.id}
+              className="flex items-center gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 shadow-lg dark:border-red-900 dark:bg-red-950/80 dark:text-red-400"
+            >
+              <AlertTriangle className="h-4 w-4 flex-shrink-0" />
+              <span>{t.message}</span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
