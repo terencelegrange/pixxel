@@ -42,7 +42,7 @@ function Badge({ label, style }: { label: string; style: string }) {
 // Page
 // ---------------------------------------------------------------------------
 export default function AssetsPage() {
-  const { user } = useAuth();
+  const { user, canWrite } = useAuth();
 
   const [assets, setAssets] = useState<Asset[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
@@ -200,10 +200,12 @@ export default function AssetsPage() {
             Enterprise application and technology asset inventory.
           </p>
         </div>
-        <Button onClick={() => { setEditing(null); setModalOpen(true); }}>
-          <Plus className="h-4 w-4" />
-          Register Asset
-        </Button>
+        {canWrite && (
+          <Button onClick={() => { setEditing(null); setModalOpen(true); }}>
+            <Plus className="h-4 w-4" />
+            Register Asset
+          </Button>
+        )}
       </div>
 
       {/* Filters */}
@@ -251,7 +253,7 @@ export default function AssetsPage() {
             <p className="text-sm font-medium">
               {assets.length === 0 ? "No assets registered yet" : "No assets match your filters"}
             </p>
-            {assets.length === 0 && (
+            {assets.length === 0 && canWrite && (
               <Button size="sm" onClick={() => { setEditing(null); setModalOpen(true); }}>
                 <Plus className="h-4 w-4" /> Register Asset
               </Button>
@@ -320,20 +322,24 @@ export default function AssetsPage() {
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center justify-end gap-2">
-                        <button
-                          onClick={() => { setEditing(asset); setModalOpen(true); }}
-                          className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors dark:hover:bg-slate-800 dark:hover:text-slate-300"
-                          aria-label={`Edit ${asset.name}`}
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </button>
-                        <button
-                          onClick={() => { setDeleteTarget(asset); setDeleteError(null); }}
-                          className="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600 transition-colors dark:hover:bg-red-950/40 dark:hover:text-red-400"
-                          aria-label={`Delete ${asset.name}`}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
+                        {canWrite && (
+                          <>
+                            <button
+                              onClick={() => { setEditing(asset); setModalOpen(true); }}
+                              className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors dark:hover:bg-slate-800 dark:hover:text-slate-300"
+                              aria-label={`Edit ${asset.name}`}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </button>
+                            <button
+                              onClick={() => { setDeleteTarget(asset); setDeleteError(null); }}
+                              className="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600 transition-colors dark:hover:bg-red-950/40 dark:hover:text-red-400"
+                              aria-label={`Delete ${asset.name}`}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </>
+                        )}
                       </div>
                     </td>
                   </tr>

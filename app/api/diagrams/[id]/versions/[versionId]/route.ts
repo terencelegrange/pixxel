@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import logger from "@/lib/logger";
 import mysql from "mysql2/promise";
 import { getDb, setupDatabase } from "@/lib/db";
 import { requireUser } from "@/lib/require-user";
@@ -36,7 +37,7 @@ export async function GET(
       },
     });
   } catch (err) {
-    console.error("[GET /api/diagrams/:id/versions/:versionId]", err);
+    logger.error({ err, route: "GET /api/diagrams/:id/versions/:versionId" }, "request failed");
     return NextResponse.json({ error: "Failed to load version." }, { status: 500 });
   }
 }

@@ -21,6 +21,17 @@ pipeline {
             }
         }
 
+        stage('Verify') {
+            steps {
+                sh """
+                    npm ci
+                    npx tsc --noEmit
+                    npm run lint
+                    npm test
+                """
+            }
+        }
+
         stage('Write .env') {
             steps {
                 withCredentials([

@@ -32,6 +32,7 @@ yarn-error.log*
 # Testing
 .env.test
 tsconfig.tsbuildinfo
+coverage/
 
 # DB backup files — never commit these
 *.sql.bak

@@ -124,7 +124,7 @@ function StrategyModal({
 // Page
 // ---------------------------------------------------------------------------
 export default function AssetStrategyPage() {
-  const { user } = useAuth();
+  const { user, canWrite } = useAuth();
   const [strategies, setStrategies] = useState<AssetStrategy[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
@@ -200,9 +200,11 @@ export default function AssetStrategyPage() {
             Define strategic classifications that describe how each asset should be treated.
           </p>
         </div>
-        <Button onClick={() => { setEditing(null); setModalOpen(true); }}>
-          <Plus className="h-4 w-4" /> Add Strategy
-        </Button>
+        {canWrite && (
+          <Button onClick={() => { setEditing(null); setModalOpen(true); }}>
+            <Plus className="h-4 w-4" /> Add Strategy
+          </Button>
+        )}
       </div>
 
       {/* Search */}
@@ -234,7 +236,7 @@ export default function AssetStrategyPage() {
             <p className="text-sm font-medium">
               {strategies.length === 0 ? "No strategies defined yet" : "No strategies match your search"}
             </p>
-            {strategies.length === 0 && (
+            {strategies.length === 0 && canWrite && (
               <Button size="sm" onClick={() => { setEditing(null); setModalOpen(true); }}>
                 <Plus className="h-4 w-4" /> Add Strategy
               </Button>
@@ -280,20 +282,24 @@ export default function AssetStrategyPage() {
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center justify-end gap-2">
-                        <button
-                          onClick={() => { setEditing(strategy); setModalOpen(true); }}
-                          className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-300 transition-colors"
-                          aria-label={`Edit ${strategy.name}`}
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </button>
-                        <button
-                          onClick={() => { setDeleteTarget(strategy); setDeleteError(null); }}
-                          className="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/40 dark:hover:text-red-400 transition-colors"
-                          aria-label={`Delete ${strategy.name}`}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
+                        {canWrite && (
+                          <>
+                            <button
+                              onClick={() => { setEditing(strategy); setModalOpen(true); }}
+                              className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-300 transition-colors"
+                              aria-label={`Edit ${strategy.name}`}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </button>
+                            <button
+                              onClick={() => { setDeleteTarget(strategy); setDeleteError(null); }}
+                              className="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/40 dark:hover:text-red-400 transition-colors"
+                              aria-label={`Delete ${strategy.name}`}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </>
+                        )}
                       </div>
                     </td>
                   </tr>

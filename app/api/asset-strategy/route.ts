@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import logger from "@/lib/logger";
 import { randomUUID } from "crypto";
 import mysql from "mysql2/promise";
 import { getDb, setupDatabase } from "@/lib/db";
@@ -32,14 +33,14 @@ export async function GET(req: NextRequest) {
     );
     return NextResponse.json({ strategies: rows.map(rowToStrategy) });
   } catch (err) {
-    console.error("[GET /api/asset-strategy]", err);
+    logger.error({ err, route: "GET /api/asset-strategy" }, "request failed");
     return NextResponse.json({ error: "Failed to load strategies." }, { status: 500 });
   }
 }
 
 // POST /api/asset-strategy
 export async function POST(req: NextRequest) {
-  const auth = requireUser(req);
+  const auth = requireUser(req, ["Admin", "Member"]);
   if (!auth.ok) return auth.response;
   const { user } = auth;
   try {
@@ -73,7 +74,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ id }, { status: 201 });
   } catch (err) {
-    console.error("[POST /api/asset-strategy]", err);
+    logger.error({ err, route: "POST /api/asset-strategy" }, "request failed");
     return NextResponse.json({ error: "Failed to create strategy." }, { status: 500 });
   }
 }

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import logger from "@/lib/logger";
 import { randomUUID } from "crypto";
 import mysql from "mysql2/promise";
 import { getDb, setupDatabase } from "@/lib/db";
@@ -29,7 +30,7 @@ export async function GET(req: NextRequest, props: { params: Promise<{ id: strin
     }));
     return NextResponse.json({ versions });
   } catch (err) {
-    console.error("[GET /api/diagrams/:id/versions]", err);
+    logger.error({ err, route: "GET /api/diagrams/:id/versions" }, "request failed");
     return NextResponse.json({ error: "Failed to load versions." }, { status: 500 });
   }
 }
@@ -37,7 +38,7 @@ export async function GET(req: NextRequest, props: { params: Promise<{ id: strin
 // POST /api/diagrams/[id]/versions — save a new version
 export async function POST(req: NextRequest, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
-  const auth = requireUser(req);
+  const auth = requireUser(req, ["Admin", "Member"]);
   if (!auth.ok) return auth.response;
   const { user } = auth;
   try {
@@ -88,7 +89,7 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
 
     return NextResponse.json({ versionId, versionNumber: nextVersion }, { status: 201 });
   } catch (err) {
-    console.error("[POST /api/diagrams/:id/versions]", err);
+    logger.error({ err, route: "POST /api/diagrams/:id/versions" }, "request failed");
     return NextResponse.json({ error: "Failed to save version." }, { status: 500 });
   }
 }

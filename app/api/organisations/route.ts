@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import logger from "@/lib/logger";
 import { randomUUID } from "crypto";
 import mysql from "mysql2/promise";
 import { getDb, setupDatabase } from "@/lib/db";
@@ -31,14 +32,14 @@ export async function GET(req: NextRequest) {
     );
     return NextResponse.json({ departments: rows.map(rowToDepartment) });
   } catch (err) {
-    console.error("[GET /api/organisations]", err);
+    logger.error({ err, route: "GET /api/organisations" }, "request failed");
     return NextResponse.json({ error: "Failed to load departments." }, { status: 500 });
   }
 }
 
 // POST /api/organisations — create a department
 export async function POST(req: NextRequest) {
-  const auth = requireUser(req);
+  const auth = requireUser(req, ["Admin", "Member"]);
   if (!auth.ok) return auth.response;
   const { user } = auth;
   try {
@@ -100,7 +101,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ department: newDept }, { status: 201 });
   } catch (err) {
-    console.error("[POST /api/organisations]", err);
+    logger.error({ err, route: "POST /api/organisations" }, "request failed");
     return NextResponse.json({ error: "Failed to create department." }, { status: 500 });
   }
 }

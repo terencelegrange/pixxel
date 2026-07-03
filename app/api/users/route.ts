@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import logger from "@/lib/logger";
 import { randomUUID } from "crypto";
 import bcrypt from "bcryptjs";
 import mysql from "mysql2/promise";
@@ -32,7 +33,7 @@ export async function GET(req: NextRequest) {
     }));
     return NextResponse.json({ users });
   } catch (err) {
-    console.error("[GET /api/users]", err);
+    logger.error({ err, route: "GET /api/users" }, "request failed");
     return NextResponse.json({ error: "Failed to load users." }, { status: 500 });
   }
 }
@@ -73,7 +74,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ id }, { status: 201 });
   } catch (err) {
-    console.error("[POST /api/users]", err);
+    logger.error({ err, route: "POST /api/users" }, "request failed");
     return NextResponse.json({ error: "Failed to create user." }, { status: 500 });
   }
 }

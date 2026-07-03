@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import logger from "@/lib/logger";
 import mysql from "mysql2/promise";
 import { getDb, setupDatabase } from "@/lib/db";
 import { AuditLog } from "@/types";
@@ -35,7 +36,7 @@ export async function GET(req: NextRequest, props: { params: Promise<{ id: strin
 
     return NextResponse.json({ history: entries });
   } catch (err) {
-    console.error("[GET /api/assets/:id/history]", err);
+    logger.error({ err, route: "GET /api/assets/:id/history" }, "request failed");
     return NextResponse.json({ error: "Failed to load audit history." }, { status: 500 });
   }
 }

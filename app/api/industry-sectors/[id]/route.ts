@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import logger from "@/lib/logger";
 import mysql from "mysql2/promise";
 import { getDb, setupDatabase } from "@/lib/db";
 import { writeAudit } from "@/lib/audit";
@@ -6,7 +7,7 @@ import { requireUser } from "@/lib/require-user";
 
 export async function PUT(req: NextRequest, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
-  const auth = requireUser(req);
+  const auth = requireUser(req, ["Admin", "Member"]);
   if (!auth.ok) return auth.response;
   const { user } = auth;
   try {
@@ -35,14 +36,14 @@ export async function PUT(req: NextRequest, props: { params: Promise<{ id: strin
   } catch (err: unknown) {
     const e = err as { code?: string };
     if (e.code === "ER_DUP_ENTRY") return NextResponse.json({ error: "An industry sector with that name already exists." }, { status: 409 });
-    console.error("[PUT /api/industry-sectors/:id]", err);
+    logger.error({ err, route: "PUT /api/industry-sectors/:id" }, "request failed");
     return NextResponse.json({ error: "Failed to update industry sector." }, { status: 500 });
   }
 }
 
 export async function DELETE(req: NextRequest, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
-  const auth = requireUser(req);
+  const auth = requireUser(req, ["Admin", "Member"]);
   if (!auth.ok) return auth.response;
   const { user } = auth;
   try {
@@ -73,7 +74,7 @@ export async function DELETE(req: NextRequest, props: { params: Promise<{ id: st
     });
     return NextResponse.json({ success: true });
   } catch (err) {
-    console.error("[DELETE /api/industry-sectors/:id]", err);
+    logger.error({ err, route: "DELETE /api/industry-sectors/:id" }, "request failed");
     return NextResponse.json({ error: "Failed to delete industry sector." }, { status: 500 });
   }
 }

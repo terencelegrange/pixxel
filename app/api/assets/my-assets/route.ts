@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import logger from "@/lib/logger";
 import mysql from "mysql2/promise";
 import { getDb, setupDatabase } from "@/lib/db";
 import { Asset, AssetCategory, AssetType, LifecycleStatus } from "@/types";
@@ -77,7 +78,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({ assets });
   } catch (err) {
-    console.error("[GET /api/assets/my-assets]", err);
+    logger.error({ err, route: "GET /api/assets/my-assets" }, "request failed");
     return NextResponse.json({ error: "Failed to load assets." }, { status: 500 });
   }
 }

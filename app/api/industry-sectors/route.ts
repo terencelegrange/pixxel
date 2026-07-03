@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import logger from "@/lib/logger";
 import { randomUUID } from "crypto";
 import mysql from "mysql2/promise";
 import { getDb, setupDatabase } from "@/lib/db";
@@ -22,13 +23,13 @@ export async function GET(req: NextRequest) {
     }));
     return NextResponse.json({ sectors });
   } catch (err) {
-    console.error("[GET /api/industry-sectors]", err);
+    logger.error({ err, route: "GET /api/industry-sectors" }, "request failed");
     return NextResponse.json({ error: "Failed to load industry sectors." }, { status: 500 });
   }
 }
 
 export async function POST(req: NextRequest) {
-  const auth = requireUser(req);
+  const auth = requireUser(req, ["Admin", "Member"]);
   if (!auth.ok) return auth.response;
   const { user } = auth;
   try {
@@ -51,7 +52,7 @@ export async function POST(req: NextRequest) {
   } catch (err: unknown) {
     const e = err as { code?: string };
     if (e.code === "ER_DUP_ENTRY") return NextResponse.json({ error: "An industry sector with that name already exists." }, { status: 409 });
-    console.error("[POST /api/industry-sectors]", err);
+    logger.error({ err, route: "POST /api/industry-sectors" }, "request failed");
     return NextResponse.json({ error: "Failed to create industry sector." }, { status: 500 });
   }
 }

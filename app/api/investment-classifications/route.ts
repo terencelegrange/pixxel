@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import logger from "@/lib/logger";
 import { randomUUID } from "crypto";
 import mysql from "mysql2/promise";
 import { getDb, setupDatabase } from "@/lib/db";
@@ -30,13 +31,13 @@ export async function GET(req: NextRequest) {
     );
     return NextResponse.json({ classifications: rows.map(rowToClassification) });
   } catch (err) {
-    console.error("[GET /api/investment-classifications]", err);
+    logger.error({ err, route: "GET /api/investment-classifications" }, "request failed");
     return NextResponse.json({ error: "Failed to load investment classifications." }, { status: 500 });
   }
 }
 
 export async function POST(req: NextRequest) {
-  const auth = requireUser(req);
+  const auth = requireUser(req, ["Admin", "Member"]);
   if (!auth.ok) return auth.response;
   const { user } = auth;
   try {
@@ -65,7 +66,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ id }, { status: 201 });
   } catch (err) {
-    console.error("[POST /api/investment-classifications]", err);
+    logger.error({ err, route: "POST /api/investment-classifications" }, "request failed");
     return NextResponse.json({ error: "Failed to create investment classification." }, { status: 500 });
   }
 }

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import logger from "@/lib/logger";
 import mysql from "mysql2/promise";
 import { getDb, setupDatabase } from "@/lib/db";
 import { writeAudit } from "@/lib/audit";
@@ -6,10 +7,10 @@ import { requireUser } from "@/lib/require-user";
 
 const VALID_ROLES = ["Admin", "Member", "Viewer"];
 
-// PUT /api/users/[id] — update name and/or role
+// PUT /api/users/[id] — update name and/or role (Admin only)
 export async function PUT(req: NextRequest, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
-  const auth = requireUser(req);
+  const auth = requireUser(req, "Admin");
   if (!auth.ok) return auth.response;
   const { user } = auth;
   try {
@@ -42,15 +43,15 @@ export async function PUT(req: NextRequest, props: { params: Promise<{ id: strin
 
     return NextResponse.json({ success: true });
   } catch (err) {
-    console.error("[PUT /api/users/:id]", err);
+    logger.error({ err, route: "PUT /api/users/:id" }, "request failed");
     return NextResponse.json({ error: "Failed to update user." }, { status: 500 });
   }
 }
 
-// DELETE /api/users/[id]
+// DELETE /api/users/[id] (Admin only)
 export async function DELETE(req: NextRequest, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
-  const auth = requireUser(req);
+  const auth = requireUser(req, "Admin");
   if (!auth.ok) return auth.response;
   const { user } = auth;
   try {
@@ -75,7 +76,7 @@ export async function DELETE(req: NextRequest, props: { params: Promise<{ id: st
 
     return NextResponse.json({ success: true });
   } catch (err) {
-    console.error("[DELETE /api/users/:id]", err);
+    logger.error({ err, route: "DELETE /api/users/:id" }, "request failed");
     return NextResponse.json({ error: "Failed to delete user." }, { status: 500 });
   }
 }

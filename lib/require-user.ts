@@ -13,6 +13,9 @@
  * Role guard:
  *   const auth = requireUser(req, "Admin");
  *   if (!auth.ok) return auth.response;  // returns 403 if role doesn't match
+ *
+ *   const auth = requireUser(req, ["Admin", "Member"]);
+ *   if (!auth.ok) return auth.response;  // returns 403 unless role is one of these
  */
 import { NextRequest, NextResponse } from "next/server";
 import { verifyJwt } from "@/lib/jwt";
@@ -28,7 +31,7 @@ type RequireUserResult =
   | { ok: true; user: AuthUser }
   | { ok: false; response: NextResponse };
 
-export function requireUser(req: NextRequest, requiredRole?: string): RequireUserResult {
+export function requireUser(req: NextRequest, requiredRole?: string | string[]): RequireUserResult {
   const token = req.cookies.get("authToken")?.value;
 
   if (!token) {
@@ -59,7 +62,8 @@ export function requireUser(req: NextRequest, requiredRole?: string): RequireUse
     role: payload.role,
   };
 
-  if (requiredRole && user.role !== requiredRole) {
+  const allowedRoles = Array.isArray(requiredRole) ? requiredRole : requiredRole ? [requiredRole] : null;
+  if (allowedRoles && !allowedRoles.includes(user.role)) {
     return {
       ok: false,
       response: NextResponse.json(

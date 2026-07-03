@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import logger from "@/lib/logger";
 import mysql from "mysql2/promise";
 import { getDb, setupDatabase } from "@/lib/db";
 import { writeAudit } from "@/lib/audit";
@@ -69,7 +70,7 @@ export async function PUT(req: NextRequest) {
       },
     });
   } catch (err) {
-    console.error("[PUT /api/profile]", err);
+    logger.error({ err, route: "PUT /api/profile" }, "request failed");
     return NextResponse.json({ error: "Failed to update profile." }, { status: 500 });
   }
 }

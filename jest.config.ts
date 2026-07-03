@@ -2,6 +2,15 @@ import type { Config } from 'jest'
 
 const config: Config = {
   testTimeout: 30000,
+  coverageDirectory: '<rootDir>/coverage',
+  // ts-jest's TS-compiled output isn't compatible with the default Babel-based
+  // instrumentation (babel-plugin-istanbul) — use V8's native coverage instead.
+  coverageProvider: 'v8',
+  collectCoverageFrom: [
+    'app/api/**/*.ts',
+    'lib/**/*.ts',
+    '!**/*.d.ts',
+  ],
   projects: [
     {
       displayName: 'unit',

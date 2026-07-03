@@ -19,7 +19,7 @@ interface FormState {
 const EMPTY: FormState = { name: "", description: "", industrySectorId: "", sortOrder: "" };
 
 export default function BusinessCapabilitiesPage() {
-  const { user } = useAuth();
+  const { user, canWrite } = useAuth();
   const [capabilities, setCapabilities] = useState<BusinessCapability[]>([]);
   const [sectors, setSectors] = useState<IndustrySector[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -152,9 +152,11 @@ export default function BusinessCapabilitiesPage() {
             Define business capabilities grouped by industry sector.
           </p>
         </div>
-        <Button onClick={() => openCreate()}>
-          <Plus className="h-4 w-4" /> Add Capability
-        </Button>
+        {canWrite && (
+          <Button onClick={() => openCreate()}>
+            <Plus className="h-4 w-4" /> Add Capability
+          </Button>
+        )}
       </div>
 
       {isLoading ? (
@@ -170,7 +172,9 @@ export default function BusinessCapabilitiesPage() {
       ) : totalCount === 0 ? (
         <div className="flex flex-col items-center justify-center gap-3 py-20 text-slate-400 rounded-xl border border-slate-200 bg-white shadow-sm">
           <p className="text-sm font-medium">No business capabilities yet</p>
-          <Button size="sm" onClick={() => openCreate()}><Plus className="h-4 w-4" /> Add Capability</Button>
+          {canWrite && (
+            <Button size="sm" onClick={() => openCreate()}><Plus className="h-4 w-4" /> Add Capability</Button>
+          )}
         </div>
       ) : (
         <div className="space-y-4">
@@ -193,12 +197,14 @@ export default function BusinessCapabilitiesPage() {
                       : <ChevronUp className="h-4 w-4 text-slate-400 ml-auto" />
                     }
                   </button>
-                  <button
-                    onClick={() => openCreate(sector.id)}
-                    className="ml-4 flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-medium text-brand-600 hover:bg-brand-50 transition-colors"
-                  >
-                    <Plus className="h-3 w-3" /> Add
-                  </button>
+                  {canWrite && (
+                    <button
+                      onClick={() => openCreate(sector.id)}
+                      className="ml-4 flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-medium text-brand-600 hover:bg-brand-50 transition-colors"
+                    >
+                      <Plus className="h-3 w-3" /> Add
+                    </button>
+                  )}
                 </div>
                 {!isCollapsed && (
                   <table className="min-w-full divide-y divide-slate-100">
@@ -222,12 +228,16 @@ export default function BusinessCapabilitiesPage() {
                           </td>
                           <td className="px-6 py-3">
                             <div className="flex items-center justify-end gap-2">
-                              <button onClick={() => openEdit(c)} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors" aria-label="Edit">
-                                <Pencil className="h-4 w-4" />
-                              </button>
-                              <button onClick={() => { setDeleteTarget(c); setDeleteError(null); }} className="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600 transition-colors" aria-label="Delete">
-                                <Trash2 className="h-4 w-4" />
-                              </button>
+                              {canWrite && (
+                                <>
+                                  <button onClick={() => openEdit(c)} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors" aria-label="Edit">
+                                    <Pencil className="h-4 w-4" />
+                                  </button>
+                                  <button onClick={() => { setDeleteTarget(c); setDeleteError(null); }} className="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600 transition-colors" aria-label="Delete">
+                                    <Trash2 className="h-4 w-4" />
+                                  </button>
+                                </>
+                              )}
                             </div>
                           </td>
                         </tr>
@@ -251,8 +261,12 @@ export default function BusinessCapabilitiesPage() {
                       <td className="hidden px-6 py-3 text-sm text-slate-500 md:table-cell">{c.description || <span className="italic text-slate-300">—</span>}</td>
                       <td className="px-6 py-3">
                         <div className="flex items-center justify-end gap-2">
-                          <button onClick={() => openEdit(c)} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors"><Pencil className="h-4 w-4" /></button>
-                          <button onClick={() => { setDeleteTarget(c); setDeleteError(null); }} className="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600 transition-colors"><Trash2 className="h-4 w-4" /></button>
+                          {canWrite && (
+                            <>
+                              <button onClick={() => openEdit(c)} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors"><Pencil className="h-4 w-4" /></button>
+                              <button onClick={() => { setDeleteTarget(c); setDeleteError(null); }} className="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600 transition-colors"><Trash2 className="h-4 w-4" /></button>
+                            </>
+                          )}
                         </div>
                       </td>
                     </tr>

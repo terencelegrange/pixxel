@@ -303,7 +303,7 @@ export default function DiagramEditor({
       const rng = () => Math.floor(Math.random() * 999999);
       const now = Date.now();
 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      /* eslint-disable @typescript-eslint/no-explicit-any -- Excalidraw's BinaryFileData type isn't exported */
       excalidrawAPI.addFiles([{
         id: fileId as any,
         mimeType: file.type as any,
@@ -311,6 +311,7 @@ export default function DiagramEditor({
         created: now,
         lastRetrieved: now,
       }]);
+      /* eslint-enable @typescript-eslint/no-explicit-any */
 
       excalidrawAPI.updateScene({
         elements: [

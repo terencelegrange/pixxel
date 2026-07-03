@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import logger from "@/lib/logger";
 import mysql from "mysql2/promise";
 import { getDb, setupDatabase } from "@/lib/db";
 import { AuditLog } from "@/types";
@@ -67,7 +68,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({ entries, total, page, pageSize });
   } catch (err) {
-    console.error("[GET /api/audit]", err);
+    logger.error({ err, route: "GET /api/audit" }, "request failed");
     return NextResponse.json({ error: "Failed to load audit log." }, { status: 500 });
   }
 }

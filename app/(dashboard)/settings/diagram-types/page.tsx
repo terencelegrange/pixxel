@@ -13,7 +13,7 @@ interface FormState { name: string; description: string; sortOrder: string; }
 const EMPTY: FormState = { name: "", description: "", sortOrder: "" };
 
 export default function DiagramTypesPage() {
-  const { user } = useAuth();
+  const { user, canWrite } = useAuth();
   const [types, setTypes] = useState<DiagramType[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
@@ -129,9 +129,11 @@ export default function DiagramTypesPage() {
             Configure the types used to classify architecture diagrams (e.g. Domain, Solution).
           </p>
         </div>
-        <Button onClick={openCreate}>
-          <Plus className="h-4 w-4" /> Add Type
-        </Button>
+        {canWrite && (
+          <Button onClick={openCreate}>
+            <Plus className="h-4 w-4" /> Add Type
+          </Button>
+        )}
       </div>
 
       <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
@@ -148,7 +150,9 @@ export default function DiagramTypesPage() {
         ) : types.length === 0 ? (
           <div className="flex flex-col items-center justify-center gap-3 py-20 text-slate-400">
             <p className="text-sm font-medium">No diagram types yet</p>
-            <Button size="sm" onClick={openCreate}><Plus className="h-4 w-4" /> Add Type</Button>
+            {canWrite && (
+              <Button size="sm" onClick={openCreate}><Plus className="h-4 w-4" /> Add Type</Button>
+            )}
           </div>
         ) : (
           <table className="min-w-full divide-y divide-slate-200">
@@ -172,20 +176,24 @@ export default function DiagramTypesPage() {
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex items-center justify-end gap-2">
-                      <button
-                        onClick={() => openEdit(t)}
-                        className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors"
-                        aria-label="Edit"
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </button>
-                      <button
-                        onClick={() => { setDeleteTarget(t); setDeleteError(null); }}
-                        className="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600 transition-colors"
-                        aria-label="Delete"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
+                      {canWrite && (
+                        <>
+                          <button
+                            onClick={() => openEdit(t)}
+                            className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors"
+                            aria-label="Edit"
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </button>
+                          <button
+                            onClick={() => { setDeleteTarget(t); setDeleteError(null); }}
+                            className="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600 transition-colors"
+                            aria-label="Delete"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </>
+                      )}
                     </div>
                   </td>
                 </tr>

@@ -51,7 +51,7 @@ interface DiagramDetail {
 export default function PlantUMLEditorPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, canWrite } = useAuth();
 
   const [diagram, setDiagram] = useState<DiagramDetail | null>(null);
   const [source, setSource] = useState("");
@@ -310,10 +310,12 @@ export default function PlantUMLEditorPage() {
           <Button variant="secondary" size="sm" onClick={handleDownload} title="Download SVG">
             <Download className="h-4 w-4" />
           </Button>
-          <Button size="sm" onClick={handleSave} isLoading={isSaving}>
-            {saveSuccess ? <Check className="h-4 w-4" /> : <Save className="h-4 w-4" />}
-            {saveSuccess ? "Saved!" : "Save New Version"}
-          </Button>
+          {canWrite && (
+            <Button size="sm" onClick={handleSave} isLoading={isSaving}>
+              {saveSuccess ? <Check className="h-4 w-4" /> : <Save className="h-4 w-4" />}
+              {saveSuccess ? "Saved!" : "Save New Version"}
+            </Button>
+          )}
         </div>
       </header>
 
@@ -322,11 +324,13 @@ export default function PlantUMLEditorPage() {
         {/* Editor */}
         <div className="flex-1 min-h-0 min-w-0">
           <textarea
-            className="w-full h-full resize-none p-4 font-mono text-sm bg-slate-950 text-green-400 focus:outline-none"
+            className="w-full h-full resize-none p-4 font-mono text-sm bg-slate-950 text-green-400 focus:outline-none disabled:opacity-70"
             value={source}
             onChange={(e) => setSource(e.target.value)}
             spellCheck={false}
             placeholder="@startuml&#10;...&#10;@enduml"
+            disabled={!canWrite}
+            readOnly={!canWrite}
           />
         </div>
 
@@ -373,13 +377,15 @@ export default function PlantUMLEditorPage() {
                     <div key={v.id} className="px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
                       <div className="flex items-center justify-between gap-1">
                         <span className="text-xs font-medium text-slate-700 dark:text-slate-300">v{v.version_number}</span>
-                        <button
-                          onClick={() => restoreVersion(v)}
-                          className="rounded p-1 text-slate-400 hover:text-brand-600 dark:hover:text-brand-400 transition-colors"
-                          title="Restore this version"
-                        >
-                          <RotateCcw className="h-3 w-3" />
-                        </button>
+                        {canWrite && (
+                          <button
+                            onClick={() => restoreVersion(v)}
+                            className="rounded p-1 text-slate-400 hover:text-brand-600 dark:hover:text-brand-400 transition-colors"
+                            title="Restore this version"
+                          >
+                            <RotateCcw className="h-3 w-3" />
+                          </button>
+                        )}
                       </div>
                       <p className="text-xs text-slate-400 dark:text-slate-500">{v.created_by_name}</p>
                       <p className="text-xs text-slate-400 dark:text-slate-500">
@@ -434,13 +440,15 @@ export default function PlantUMLEditorPage() {
                             </span>
                           </div>
                         </div>
-                        <button
-                          onClick={() => handleRemoveAsset(a.id)}
-                          className="rounded p-0.5 text-slate-300 hover:text-red-500 dark:text-slate-600 dark:hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100"
-                          title="Remove tag"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
+                        {canWrite && (
+                          <button
+                            onClick={() => handleRemoveAsset(a.id)}
+                            className="rounded p-0.5 text-slate-300 hover:text-red-500 dark:text-slate-600 dark:hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100"
+                            title="Remove tag"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        )}
                       </div>
                     </div>
                   ))}

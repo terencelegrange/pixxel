@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import logger from "@/lib/logger";
 import { randomUUID } from "crypto";
 import mysql from "mysql2/promise";
 import { getDb, setupDatabase } from "@/lib/db";
@@ -42,14 +43,14 @@ export async function GET(req: NextRequest) {
     }));
     return NextResponse.json({ projects });
   } catch (err) {
-    console.error("[GET /api/projects]", err);
+    logger.error({ err, route: "GET /api/projects" }, "request failed");
     return NextResponse.json({ error: "Failed to load projects." }, { status: 500 });
   }
 }
 
 // POST /api/projects — create project
 export async function POST(req: NextRequest) {
-  const auth = requireUser(req);
+  const auth = requireUser(req, ["Admin", "Member"]);
   if (!auth.ok) return auth.response;
   const { user } = auth;
   try {
@@ -81,7 +82,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ id }, { status: 201 });
   } catch (err) {
-    console.error("[POST /api/projects]", err);
+    logger.error({ err, route: "POST /api/projects" }, "request failed");
     return NextResponse.json({ error: "Failed to create project." }, { status: 500 });
   }
 }

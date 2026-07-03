@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import logger from "@/lib/logger";
 import mysql from "mysql2/promise";
 import { getDb, setupDatabase } from "@/lib/db";
 import { requireUser } from "@/lib/require-user";
@@ -35,7 +36,7 @@ export async function GET(req: NextRequest, props: { params: Promise<{ id: strin
 
     return NextResponse.json({ projects });
   } catch (err) {
-    console.error("[GET /api/assets/:id/projects]", err);
+    logger.error({ err, route: "GET /api/assets/:id/projects" }, "request failed");
     return NextResponse.json({ error: "Failed to load projects." }, { status: 500 });
   }
 }

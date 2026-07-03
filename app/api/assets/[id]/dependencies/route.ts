@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import logger from "@/lib/logger";
 import mysql from "mysql2/promise";
 import { getDb, setupDatabase } from "@/lib/db";
 import { AssetDependency, DependencyConnectionType, DependencyDirection } from "@/types";
@@ -72,7 +73,7 @@ export async function GET(req: NextRequest, props: { params: Promise<{ id: strin
       upstream:   [...upstreamRows,   ...bidiFromDownstream].map(mapRow),
     });
   } catch (err) {
-    console.error("[GET /api/assets/:id/dependencies]", err);
+    logger.error({ err, route: "GET /api/assets/:id/dependencies" }, "request failed");
     return NextResponse.json({ error: "Failed to load dependencies." }, { status: 500 });
   }
 }

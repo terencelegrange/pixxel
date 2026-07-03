@@ -249,10 +249,11 @@ function EditLinkModal({
 // Asset row
 // ---------------------------------------------------------------------------
 function AssetRow({
-  pa, projectId, onRemove, onEdit,
+  pa, projectId, canWrite, onRemove, onEdit,
 }: {
   pa: ProjectAsset;
   projectId: string;
+  canWrite: boolean;
   onRemove: (assetId: string) => void;
   onEdit: (pa: ProjectAsset) => void;
 }) {
@@ -300,21 +301,25 @@ function AssetRow({
           }
           {pa.dependencyType}
         </span>
-        <button
-          onClick={() => onEdit(pa)}
-          className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors"
-          aria-label="Edit dependency"
-        >
-          <Pencil className="h-3.5 w-3.5" />
-        </button>
-        <button
-          onClick={handleRemove}
-          disabled={removing}
-          className="rounded p-1 text-slate-400 hover:bg-red-50 hover:text-red-600 transition-colors disabled:opacity-40"
-          aria-label={`Remove ${pa.assetName}`}
-        >
-          <Trash2 className="h-3.5 w-3.5" />
-        </button>
+        {canWrite && (
+          <>
+            <button
+              onClick={() => onEdit(pa)}
+              className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors"
+              aria-label="Edit dependency"
+            >
+              <Pencil className="h-3.5 w-3.5" />
+            </button>
+            <button
+              onClick={handleRemove}
+              disabled={removing}
+              className="rounded p-1 text-slate-400 hover:bg-red-50 hover:text-red-600 transition-colors disabled:opacity-40"
+              aria-label={`Remove ${pa.assetName}`}
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </button>
+          </>
+        )}
       </div>
     </div>
   );
@@ -325,7 +330,7 @@ function AssetRow({
 // ---------------------------------------------------------------------------
 export default function ProjectDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const { user } = useAuth();
+  const { user, canWrite } = useAuth();
 
   const [project, setProject] = useState<Project | null>(null);
   const [assets, setAssets] = useState<ProjectAsset[]>([]);
@@ -455,9 +460,11 @@ export default function ProjectDetailPage() {
                 <GitFork className="h-3.5 w-3.5" /> Flow
               </button>
             </div>
-            <Button size="sm" onClick={() => setLinkOpen(true)}>
-              <Plus className="h-3.5 w-3.5" /> Link asset
-            </Button>
+            {canWrite && (
+              <Button size="sm" onClick={() => setLinkOpen(true)}>
+                <Plus className="h-3.5 w-3.5" /> Link asset
+              </Button>
+            )}
           </div>
         </div>
 
@@ -465,9 +472,11 @@ export default function ProjectDetailPage() {
           <div className="flex flex-col items-center justify-center gap-3 py-16 text-slate-400">
             <FolderKanban className="h-8 w-8 text-slate-200" />
             <p className="text-sm">No assets linked yet.</p>
-            <Button size="sm" variant="secondary" onClick={() => setLinkOpen(true)}>
-              <Plus className="h-3.5 w-3.5" /> Link first asset
-            </Button>
+            {canWrite && (
+              <Button size="sm" variant="secondary" onClick={() => setLinkOpen(true)}>
+                <Plus className="h-3.5 w-3.5" /> Link first asset
+              </Button>
+            )}
           </div>
         ) : view === "flow" ? (
           <DependencyFlow project={project} assets={assets} />
@@ -486,6 +495,7 @@ export default function ProjectDetailPage() {
                     key={pa.assetId}
                     pa={pa}
                     projectId={project.id}
+                    canWrite={canWrite}
                     onRemove={handleRemove}
                     onEdit={setEditLink}
                   />
@@ -505,6 +515,7 @@ export default function ProjectDetailPage() {
                     key={pa.assetId}
                     pa={pa}
                     projectId={project.id}
+                    canWrite={canWrite}
                     onRemove={handleRemove}
                     onEdit={setEditLink}
                   />

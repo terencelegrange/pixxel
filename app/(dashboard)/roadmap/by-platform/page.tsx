@@ -182,7 +182,7 @@ function PhaseModal({
   fromQuarter: string;
   onSaved: () => void;
 }) {
-  const { user } = useAuth();
+  const { user, canWrite } = useAuth();
   const isEdit = phase !== null;
 
   const defaultForm: PhaseForm = {
@@ -329,14 +329,16 @@ function PhaseModal({
           </div>
         </div>
         <div className="mt-6 flex items-center justify-between border-t border-slate-100 pt-4 dark:border-slate-800">
-          {isEdit ? (
+          {isEdit && canWrite ? (
             <Button type="button" variant="danger" isLoading={isDeleting} onClick={handleDelete}>
               <Trash2 className="h-4 w-4" /> Delete
             </Button>
           ) : <div />}
           <div className="flex gap-3">
             <Button type="button" variant="secondary" onClick={onClose}>Cancel</Button>
-            <Button type="submit" isLoading={isSaving}>{isEdit ? "Save changes" : "Add phase"}</Button>
+            {canWrite && (
+              <Button type="submit" isLoading={isSaving}>{isEdit ? "Save changes" : "Add phase"}</Button>
+            )}
           </div>
         </div>
       </form>
@@ -352,6 +354,7 @@ function DraggablePhaseBar({
   quarters,
   dragPreview,
   isSaving,
+  canWrite,
   onPointerDownMove,
   onPointerDownResize,
 }: {
@@ -359,6 +362,7 @@ function DraggablePhaseBar({
   quarters:            string[];
   dragPreview:         DragPreview | null;
   isSaving:            boolean;
+  canWrite:            boolean;
   onPointerDownMove:   (e: React.PointerEvent, phase: AssetRoadmapPhase, laneEl: HTMLElement) => void;
   onPointerDownResize: (e: React.PointerEvent, phase: AssetRoadmapPhase, laneEl: HTMLElement) => void;
 }) {
@@ -384,7 +388,9 @@ function DraggablePhaseBar({
     : isBeingDragged
     ? (isOverlap ? 0.55 : 0.85)
     : 1;
-  const cursor = isSaving
+  const cursor = !canWrite
+    ? "pointer"
+    : isSaving
     ? "wait"
     : isBeingDragged
     ? (isOverlap ? "not-allowed" : "grabbing")
@@ -409,21 +415,26 @@ function DraggablePhaseBar({
       // Prevent click bubbling to the lane (which would open Add modal)
       onClick={(e) => e.stopPropagation()}
       onPointerDown={(e) => {
+        // Always allow: a plain click (no movement) opens the view/edit modal,
+        // which itself gates save/delete behind canWrite. Only actual dragging
+        // (handled inside onPointerDownMove's move-tracking) results in a mutation.
         const lane = (e.currentTarget as HTMLElement).parentElement!;
         onPointerDownMove(e, phase, lane);
       }}
     >
       <span className="flex-1 truncate pointer-events-none">{phase.classificationName}</span>
-      {/* Resize handle — 8 px strip on the right edge */}
-      <div
-        className="absolute right-0 top-0 bottom-0 w-2 cursor-ew-resize"
-        onPointerDown={(e) => {
-          e.stopPropagation();
-          // parentElement = bar div, parentElement.parentElement = lane div
-          const lane = (e.currentTarget as HTMLElement).parentElement!.parentElement!;
-          onPointerDownResize(e, phase, lane);
-        }}
-      />
+      {/* Resize handle — 8 px strip on the right edge (mutates via drag, so write-only) */}
+      {canWrite && (
+        <div
+          className="absolute right-0 top-0 bottom-0 w-2 cursor-ew-resize"
+          onPointerDown={(e) => {
+            e.stopPropagation();
+            // parentElement = bar div, parentElement.parentElement = lane div
+            const lane = (e.currentTarget as HTMLElement).parentElement!.parentElement!;
+            onPointerDownResize(e, phase, lane);
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -432,10 +443,11 @@ function DraggablePhaseBar({
 // Roadmap chart
 // ---------------------------------------------------------------------------
 function RoadmapChart({
-  groups, quarters, onAddPhase, onEditPhase, onSavePhase, onError,
+  groups, quarters, canWrite, onAddPhase, onEditPhase, onSavePhase, onError,
 }: {
   groups:      RoadmapDomainGroup[];
   quarters:    string[];
+  canWrite:    boolean;
   onAddPhase:  (asset: RoadmapAsset) => void;
   onEditPhase: (asset: RoadmapAsset, phase: AssetRoadmapPhase) => void;
   onSavePhase: (phase: AssetRoadmapPhase, newStart: string, newEnd: string) => Promise<void>;
@@ -448,6 +460,7 @@ function RoadmapChart({
   const groupsRef    = useRef(groups);
   const phasesMapRef = useRef<Map<string, AssetRoadmapPhase[]>>(new Map());
   const callbacksRef = useRef({ onEditPhase, onSavePhase, onError });
+  const canWriteRef  = useRef(canWrite);
   const [dragPreview, setDragPreview] = useState<DragPreview | null>(null);
   const [savingId,    setSavingId]    = useState<string | null>(null);
 
@@ -455,6 +468,7 @@ function RoadmapChart({
   quartersRef.current  = quarters;
   groupsRef.current    = groups;
   callbacksRef.current = { onEditPhase, onSavePhase, onError };
+  canWriteRef.current   = canWrite;
 
   // Rebuild phase map whenever groups change (needed for overlap check)
   useEffect(() => {
@@ -556,6 +570,12 @@ function RoadmapChart({
         return;
       }
 
+      // Read-only users cannot commit drag/resize mutations — snap back
+      if (!canWriteRef.current) {
+        setDragPreview(null);
+        return;
+      }
+
       // Commit the drag
       const qs       = quartersRef.current;
       const newStart = qs[preview.startIdx];
@@ -649,9 +669,9 @@ function RoadmapChart({
 
                   {/* Phase lane */}
                   <div
-                    className="relative flex-1 cursor-pointer"
+                    className={`relative flex-1 ${canWrite ? "cursor-pointer" : ""}`}
                     style={{ height: "40px" }}
-                    onClick={() => onAddPhase(asset)}
+                    onClick={() => { if (canWrite) onAddPhase(asset); }}
                   >
                     {/* Quarter column guides */}
                     <div
@@ -664,7 +684,7 @@ function RoadmapChart({
                     </div>
 
                     {/* Empty state hint */}
-                    {asset.phases.length === 0 && (
+                    {asset.phases.length === 0 && canWrite && (
                       <div className="pointer-events-none absolute inset-1 rounded-md border-2 border-dashed border-slate-200 flex items-center px-3 dark:border-slate-700">
                         <span className="text-xs text-slate-400">Click to add a phase</span>
                       </div>
@@ -678,6 +698,7 @@ function RoadmapChart({
                         quarters={quarters}
                         dragPreview={dragPreview}
                         isSaving={savingId === phase.id}
+                        canWrite={canWrite}
                         onPointerDownMove={onPointerDownMove}
                         onPointerDownResize={onPointerDownResize}
                       />
@@ -729,7 +750,7 @@ export default function RoadmapByPlatformPage() {
     setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 4000);
   }
 
-  const { user } = useAuth();
+  const { user, canWrite } = useAuth();
 
   const quarters = generateQuarters(from, to);
 
@@ -842,6 +863,7 @@ export default function RoadmapByPlatformPage() {
         <RoadmapChart
           groups={filteredGroups}
           quarters={quarters}
+          canWrite={canWrite}
           onAddPhase={openAddModal}
           onEditPhase={openEditModal}
           onSavePhase={handleSavePhase}

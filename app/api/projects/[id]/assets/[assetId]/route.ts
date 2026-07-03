@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import logger from "@/lib/logger";
 import { getDb, setupDatabase } from "@/lib/db";
 import { requireUser } from "@/lib/require-user";
 
@@ -8,7 +9,7 @@ export async function PATCH(
   props: { params: Promise<{ id: string; assetId: string }> }
 ) {
   const params = await props.params;
-  const auth = requireUser(req);
+  const auth = requireUser(req, ["Admin", "Member"]);
   if (!auth.ok) return auth.response;
   try {
     await setupDatabase();
@@ -26,7 +27,7 @@ export async function PATCH(
 
     return NextResponse.json({ success: true });
   } catch (err) {
-    console.error("[PATCH /api/projects/:id/assets/:assetId]", err);
+    logger.error({ err, route: "PATCH /api/projects/:id/assets/:assetId" }, "request failed");
     return NextResponse.json({ error: "Failed to update asset link." }, { status: 500 });
   }
 }
@@ -37,7 +38,7 @@ export async function DELETE(
   props: { params: Promise<{ id: string; assetId: string }> }
 ) {
   const params = await props.params;
-  const auth = requireUser(req);
+  const auth = requireUser(req, ["Admin", "Member"]);
   if (!auth.ok) return auth.response;
   try {
     await setupDatabase();
@@ -48,7 +49,7 @@ export async function DELETE(
     );
     return NextResponse.json({ success: true });
   } catch (err) {
-    console.error("[DELETE /api/projects/:id/assets/:assetId]", err);
+    logger.error({ err, route: "DELETE /api/projects/:id/assets/:assetId" }, "request failed");
     return NextResponse.json({ error: "Failed to remove asset link." }, { status: 500 });
   }
 }

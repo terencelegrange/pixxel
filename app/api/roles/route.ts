@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import logger from "@/lib/logger";
 import { randomUUID } from "crypto";
 import mysql from "mysql2/promise";
 import { getDb, setupDatabase } from "@/lib/db";
@@ -34,14 +35,14 @@ export async function GET(req: NextRequest) {
     );
     return NextResponse.json({ roles: rows.map(rowToRole) });
   } catch (err) {
-    console.error("[GET /api/roles]", err);
+    logger.error({ err, route: "GET /api/roles" }, "request failed");
     return NextResponse.json({ error: "Failed to load roles." }, { status: 500 });
   }
 }
 
 // POST /api/roles
 export async function POST(req: NextRequest) {
-  const auth = requireUser(req);
+  const auth = requireUser(req, "Admin");
   if (!auth.ok) return auth.response;
   const { user } = auth;
   try {
@@ -80,7 +81,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ id }, { status: 201 });
   } catch (err) {
-    console.error("[POST /api/roles]", err);
+    logger.error({ err, route: "POST /api/roles" }, "request failed");
     return NextResponse.json({ error: "Failed to create role." }, { status: 500 });
   }
 }

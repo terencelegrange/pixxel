@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import logger from "@/lib/logger";
 import { randomUUID } from "crypto";
 import mysql from "mysql2/promise";
 import { getDb, setupDatabase } from "@/lib/db";
@@ -32,7 +33,7 @@ export async function GET(req: NextRequest) {
     }));
     return NextResponse.json({ requests });
   } catch (err) {
-    console.error("[GET /api/support]", err);
+    logger.error({ err, route: "GET /api/support" }, "request failed");
     return NextResponse.json({ error: "Failed to load feedback." }, { status: 500 });
   }
 }
@@ -63,7 +64,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ id }, { status: 201 });
   } catch (err) {
-    console.error("[POST /api/support]", err);
+    logger.error({ err, route: "POST /api/support" }, "request failed");
     return NextResponse.json({ error: "Failed to submit request." }, { status: 500 });
   }
 }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+import logger from "@/lib/logger";
 import mysql from "mysql2/promise";
-import { getDb, setupDatabase } from "@/lib/db";
+import { getDb, setupDatabase, withTransaction } from "@/lib/db";
 import { writeAudit } from "@/lib/audit";
 import { Asset, AssetCategory, AssetType, LifecycleStatus } from "@/types";
 import { requireUser } from "@/lib/require-user";
@@ -93,7 +94,7 @@ export async function GET(req: NextRequest, props: { params: Promise<{ id: strin
 
     return NextResponse.json({ asset });
   } catch (err) {
-    console.error("[GET /api/assets/:id]", err);
+    logger.error({ err, route: "GET /api/assets/:id" }, "request failed");
     return NextResponse.json({ error: "Failed to load asset." }, { status: 500 });
   }
 }
@@ -101,7 +102,7 @@ export async function GET(req: NextRequest, props: { params: Promise<{ id: strin
 // PUT /api/assets/[id] — update an asset
 export async function PUT(req: NextRequest, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
-  const auth = requireUser(req);
+  const auth = requireUser(req, ["Admin", "Member"]);
   if (!auth.ok) return auth.response;
   const { user } = auth;
   try {
@@ -169,50 +170,52 @@ export async function PUT(req: NextRequest, props: { params: Promise<{ id: strin
       notes: notes?.trim() || null,
     };
 
-    await db.execute(
-      `UPDATE assets SET
-         name=?, short_code=?, description=?, type=?, category=?, icon=?, hero_diagram_id=?, tier_id=?, strategy_id=?, complexity_id=?, domain_id=?, vendor_id=?,
-         lifecycle_status=?, business_owner=?, technical_owner=?,
-         sla_availability=?, sla_rto=?, sla_rpo=?,
-         go_live_date=?, retirement_date=?, app_url=?, doc_url=?, contract_end_date=?, contract_amount=?, notes=?
-       WHERE id=?`,
-      [values.name, values.shortCode, values.description, values.type, values.category,
-       values.icon, values.heroDiagramId, values.tierId, values.strategyId, values.complexityId, values.domainId, values.vendorId, values.lifecycleStatus,
-       values.businessOwner, values.technicalOwner,
-       values.slaAvailability, values.slaRto, values.slaRpo,
-       values.goLiveDate, values.retirementDate, values.appUrl, values.docUrl, values.contractEndDate, values.contractAmount,
-       values.notes, params.id]
-    );
+    await withTransaction(async (tx) => {
+      await tx.execute(
+        `UPDATE assets SET
+           name=?, short_code=?, description=?, type=?, category=?, icon=?, hero_diagram_id=?, tier_id=?, strategy_id=?, complexity_id=?, domain_id=?, vendor_id=?,
+           lifecycle_status=?, business_owner=?, technical_owner=?,
+           sla_availability=?, sla_rto=?, sla_rpo=?,
+           go_live_date=?, retirement_date=?, app_url=?, doc_url=?, contract_end_date=?, contract_amount=?, notes=?
+         WHERE id=?`,
+        [values.name, values.shortCode, values.description, values.type, values.category,
+         values.icon, values.heroDiagramId, values.tierId, values.strategyId, values.complexityId, values.domainId, values.vendorId, values.lifecycleStatus,
+         values.businessOwner, values.technicalOwner,
+         values.slaAvailability, values.slaRto, values.slaRpo,
+         values.goLiveDate, values.retirementDate, values.appUrl, values.docUrl, values.contractEndDate, values.contractAmount,
+         values.notes, params.id]
+      );
 
-    // Replace department junction rows
-    await db.execute("DELETE FROM asset_departments WHERE asset_id = ?", [params.id]);
-    for (const deptId of values.departmentIds) {
-      await db.execute(
-        "INSERT IGNORE INTO asset_departments (asset_id, department_id) VALUES (?, ?)",
-        [params.id, deptId]
-      );
-    }
-    // Replace architect junction rows
-    await db.execute("DELETE FROM asset_architects WHERE asset_id = ?", [params.id]);
-    for (const uid of values.architectIds) {
-      const [uRows] = await db.execute<mysql.RowDataPacket[]>(
-        "SELECT name FROM users WHERE id = ? LIMIT 1", [uid]
-      );
-      if (uRows[0]) {
-        await db.execute(
-          "INSERT IGNORE INTO asset_architects (asset_id, user_id, user_name) VALUES (?, ?, ?)",
-          [params.id, uid, uRows[0].name]
+      // Replace department junction rows
+      await tx.execute("DELETE FROM asset_departments WHERE asset_id = ?", [params.id]);
+      for (const deptId of values.departmentIds) {
+        await tx.execute(
+          "INSERT IGNORE INTO asset_departments (asset_id, department_id) VALUES (?, ?)",
+          [params.id, deptId]
         );
       }
-    }
-    // Replace capability junction rows
-    await db.execute("DELETE FROM asset_capabilities WHERE asset_id = ?", [params.id]);
-    for (const capId of values.capabilityIds) {
-      await db.execute(
-        "INSERT IGNORE INTO asset_capabilities (asset_id, business_capability_id) VALUES (?, ?)",
-        [params.id, capId]
-      );
-    }
+      // Replace architect junction rows
+      await tx.execute("DELETE FROM asset_architects WHERE asset_id = ?", [params.id]);
+      for (const uid of values.architectIds) {
+        const [uRows] = await tx.execute<mysql.RowDataPacket[]>(
+          "SELECT name FROM users WHERE id = ? LIMIT 1", [uid]
+        );
+        if (uRows[0]) {
+          await tx.execute(
+            "INSERT IGNORE INTO asset_architects (asset_id, user_id, user_name) VALUES (?, ?, ?)",
+            [params.id, uid, uRows[0].name]
+          );
+        }
+      }
+      // Replace capability junction rows
+      await tx.execute("DELETE FROM asset_capabilities WHERE asset_id = ?", [params.id]);
+      for (const capId of values.capabilityIds) {
+        await tx.execute(
+          "INSERT IGNORE INTO asset_capabilities (asset_id, business_capability_id) VALUES (?, ?)",
+          [params.id, capId]
+        );
+      }
+    });
 
     await writeAudit({
       tableName: "assets", recordId: params.id, action: "UPDATE",
@@ -240,7 +243,7 @@ export async function PUT(req: NextRequest, props: { params: Promise<{ id: strin
 
     return NextResponse.json({ success: true });
   } catch (err) {
-    console.error("[PUT /api/assets/:id]", err);
+    logger.error({ err, route: "PUT /api/assets/:id" }, "request failed");
     return NextResponse.json({ error: "Failed to update asset." }, { status: 500 });
   }
 }
@@ -248,7 +251,7 @@ export async function PUT(req: NextRequest, props: { params: Promise<{ id: strin
 // DELETE /api/assets/[id] — delete an asset and its department links
 export async function DELETE(req: NextRequest, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
-  const auth = requireUser(req);
+  const auth = requireUser(req, ["Admin", "Member"]);
   if (!auth.ok) return auth.response;
   const { user } = auth;
   try {
@@ -262,10 +265,12 @@ export async function DELETE(req: NextRequest, props: { params: Promise<{ id: st
     const current = rows[0];
     if (!current) return NextResponse.json({ error: "Asset not found." }, { status: 404 });
 
-    await db.execute("DELETE FROM asset_departments WHERE asset_id = ?", [params.id]);
-    await db.execute("DELETE FROM asset_architects WHERE asset_id = ?", [params.id]);
-    await db.execute("DELETE FROM asset_capabilities WHERE asset_id = ?", [params.id]);
-    await db.execute("DELETE FROM assets WHERE id = ?", [params.id]);
+    await withTransaction(async (tx) => {
+      await tx.execute("DELETE FROM asset_departments WHERE asset_id = ?", [params.id]);
+      await tx.execute("DELETE FROM asset_architects WHERE asset_id = ?", [params.id]);
+      await tx.execute("DELETE FROM asset_capabilities WHERE asset_id = ?", [params.id]);
+      await tx.execute("DELETE FROM assets WHERE id = ?", [params.id]);
+    });
 
     await writeAudit({
       tableName: "assets", recordId: params.id, action: "DELETE",
@@ -276,7 +281,7 @@ export async function DELETE(req: NextRequest, props: { params: Promise<{ id: st
 
     return NextResponse.json({ success: true });
   } catch (err) {
-    console.error("[DELETE /api/assets/:id]", err);
+    logger.error({ err, route: "DELETE /api/assets/:id" }, "request failed");
     return NextResponse.json({ error: "Failed to delete asset." }, { status: 500 });
   }
 }

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import logger from "@/lib/logger";
 import { randomUUID } from "crypto";
 import mysql from "mysql2/promise";
 import { getDb, setupDatabase } from "@/lib/db";
@@ -28,13 +29,13 @@ export async function GET(req: NextRequest) {
     }));
     return NextResponse.json({ capabilities });
   } catch (err) {
-    console.error("[GET /api/business-capabilities]", err);
+    logger.error({ err, route: "GET /api/business-capabilities" }, "request failed");
     return NextResponse.json({ error: "Failed to load business capabilities." }, { status: 500 });
   }
 }
 
 export async function POST(req: NextRequest) {
-  const auth = requireUser(req);
+  const auth = requireUser(req, ["Admin", "Member"]);
   if (!auth.ok) return auth.response;
   const { user } = auth;
   try {
@@ -60,7 +61,7 @@ export async function POST(req: NextRequest) {
     });
     return NextResponse.json({ id }, { status: 201 });
   } catch (err) {
-    console.error("[POST /api/business-capabilities]", err);
+    logger.error({ err, route: "POST /api/business-capabilities" }, "request failed");
     return NextResponse.json({ error: "Failed to create business capability." }, { status: 500 });
   }
 }

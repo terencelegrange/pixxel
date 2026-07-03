@@ -24,7 +24,7 @@ export async function GET(req: NextRequest, props: { params: Promise<{ id: strin
 // DELETE — remove a specific asset tag (assetId in body)
 export async function DELETE(req: NextRequest, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
-  const auth = requireUser(req);
+  const auth = requireUser(req, ["Admin", "Member"]);
   if (!auth.ok) return auth.response;
   await setupDatabase();
   const db = getDb();

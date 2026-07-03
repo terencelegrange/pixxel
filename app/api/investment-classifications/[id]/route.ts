@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import logger from "@/lib/logger";
 import mysql from "mysql2/promise";
 import { getDb, setupDatabase } from "@/lib/db";
 import { writeAudit } from "@/lib/audit";
@@ -6,7 +7,7 @@ import { requireUser } from "@/lib/require-user";
 
 export async function PUT(req: NextRequest, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
-  const auth = requireUser(req);
+  const auth = requireUser(req, ["Admin", "Member"]);
   if (!auth.ok) return auth.response;
   const { user } = auth;
   try {
@@ -38,14 +39,14 @@ export async function PUT(req: NextRequest, props: { params: Promise<{ id: strin
 
     return NextResponse.json({ ok: true });
   } catch (err) {
-    console.error("[PUT /api/investment-classifications/[id]]", err);
+    logger.error({ err, route: "PUT /api/investment-classifications/[id]" }, "request failed");
     return NextResponse.json({ error: "Failed to update investment classification." }, { status: 500 });
   }
 }
 
 export async function DELETE(req: NextRequest, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
-  const auth = requireUser(req);
+  const auth = requireUser(req, ["Admin", "Member"]);
   if (!auth.ok) return auth.response;
   const { user } = auth;
   try {
@@ -79,7 +80,7 @@ export async function DELETE(req: NextRequest, props: { params: Promise<{ id: st
 
     return NextResponse.json({ ok: true });
   } catch (err) {
-    console.error("[DELETE /api/investment-classifications/[id]]", err);
+    logger.error({ err, route: "DELETE /api/investment-classifications/[id]" }, "request failed");
     return NextResponse.json({ error: "Failed to delete investment classification." }, { status: 500 });
   }
 }

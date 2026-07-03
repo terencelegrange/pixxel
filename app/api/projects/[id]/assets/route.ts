@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import logger from "@/lib/logger";
 import mysql from "mysql2/promise";
 import { getDb, setupDatabase } from "@/lib/db";
 import { requireUser } from "@/lib/require-user";
@@ -42,7 +43,7 @@ export async function GET(req: NextRequest, props: { params: Promise<{ id: strin
 
     return NextResponse.json({ assets });
   } catch (err) {
-    console.error("[GET /api/projects/:id/assets]", err);
+    logger.error({ err, route: "GET /api/projects/:id/assets" }, "request failed");
     return NextResponse.json({ error: "Failed to load project assets." }, { status: 500 });
   }
 }
@@ -50,7 +51,7 @@ export async function GET(req: NextRequest, props: { params: Promise<{ id: strin
 // POST /api/projects/[id]/assets — link an asset
 export async function POST(req: NextRequest, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
-  const auth = requireUser(req);
+  const auth = requireUser(req, ["Admin", "Member"]);
   if (!auth.ok) return auth.response;
   try {
     await setupDatabase();
@@ -87,7 +88,7 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
 
     return NextResponse.json({ success: true }, { status: 201 });
   } catch (err) {
-    console.error("[POST /api/projects/:id/assets]", err);
+    logger.error({ err, route: "POST /api/projects/:id/assets" }, "request failed");
     return NextResponse.json({ error: "Failed to link asset." }, { status: 500 });
   }
 }

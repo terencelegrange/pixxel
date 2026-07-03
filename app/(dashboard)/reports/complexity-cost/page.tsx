@@ -146,7 +146,7 @@ export default function ComplexityCostReportPage() {
   );
 
   const rows = useMemo(() => {
-    let list = assets.filter((a) => {
+    const list = assets.filter((a) => {
       if (filterComplexity && a.complexityId !== filterComplexity) return false;
       if (filterLifecycle && a.lifecycleStatus !== filterLifecycle) return false;
       if (filterDomain && a.domainId !== filterDomain) return false;

@@ -20,7 +20,7 @@ interface PlantUMLDiagram {
 
 export default function PlantUMLListPage() {
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, canWrite } = useAuth();
 
   const [diagrams, setDiagrams] = useState<PlantUMLDiagram[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -131,9 +131,11 @@ export default function PlantUMLListPage() {
             Create and manage PlantUML diagrams with version history.
           </p>
         </div>
-        <Button onClick={openCreate}>
-          <Plus className="h-4 w-4" /> New PlantUML Diagram
-        </Button>
+        {canWrite && (
+          <Button onClick={openCreate}>
+            <Plus className="h-4 w-4" /> New PlantUML Diagram
+          </Button>
+        )}
       </div>
 
       {/* Content */}
@@ -153,9 +155,11 @@ export default function PlantUMLListPage() {
             <p className="font-medium text-slate-600 dark:text-slate-400">No PlantUML diagrams yet</p>
             <p className="text-sm text-slate-400 dark:text-slate-500">Create your first diagram to get started.</p>
           </div>
-          <Button onClick={openCreate}>
-            <Plus className="h-4 w-4" /> New PlantUML Diagram
-          </Button>
+          {canWrite && (
+            <Button onClick={openCreate}>
+              <Plus className="h-4 w-4" /> New PlantUML Diagram
+            </Button>
+          )}
         </div>
       ) : (
         <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-sm overflow-hidden">
@@ -209,20 +213,24 @@ export default function PlantUMLListPage() {
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center justify-end gap-2">
-                      <button
-                        onClick={() => openEdit(d)}
-                        className="rounded p-1.5 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
-                        title="Edit"
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </button>
-                      <button
-                        onClick={() => { setDeleteTarget(d); setDeleteError(null); }}
-                        className="rounded p-1.5 text-slate-400 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-600 dark:hover:text-red-400 transition-colors"
-                        title="Delete"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
+                      {canWrite && (
+                        <>
+                          <button
+                            onClick={() => openEdit(d)}
+                            className="rounded p-1.5 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
+                            title="Edit"
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </button>
+                          <button
+                            onClick={() => { setDeleteTarget(d); setDeleteError(null); }}
+                            className="rounded p-1.5 text-slate-400 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-600 dark:hover:text-red-400 transition-colors"
+                            title="Delete"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </>
+                      )}
                     </div>
                   </td>
                 </tr>

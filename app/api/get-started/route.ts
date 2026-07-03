@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import logger from "@/lib/logger";
 import { getDb, setupDatabase } from "@/lib/db";
 import mysql from "mysql2/promise";
 
@@ -29,7 +30,7 @@ export async function GET() {
       projects:    Number(row.projects),
     });
   } catch (err) {
-    console.error("[GET /api/get-started]", err);
+    logger.error({ err, route: "GET /api/get-started" }, "request failed");
     return NextResponse.json({ error: "Failed to load setup status." }, { status: 500 });
   }
 }

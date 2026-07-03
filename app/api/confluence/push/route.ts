@@ -54,7 +54,7 @@ ${asset.notes ? `<h2>Notes</h2><p>${asset.notes}</p>` : ""}
 }
 
 export async function POST(req: NextRequest) {
-  const auth = requireUser(req);
+  const auth = requireUser(req, ["Admin", "Member"]);
   if (!auth.ok) return auth.response;
   await setupDatabase();
   const db = getDb();

@@ -212,7 +212,7 @@ const DEP_EDGE_TYPES: EdgeTypes = { dependencyEdge: DependencyEdge };
 export default function AssetDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, canWrite } = useAuth();
 
   const [asset, setAsset] = useState<Asset | null>(null);
   const [departments, setDepartments] = useState<Department[]>([]);
@@ -336,6 +336,24 @@ export default function AssetDetailPage() {
   }, [id]);
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
+
+  // ── Section diagrams: hero pinned first, then linked diagrams (deduped) ──
+  // Must run before any early return below — Hooks can't be called conditionally.
+  const sectionDiagrams = useMemo(() => {
+    if (!asset) return assetDiagrams;
+    const heroId = asset.heroDiagramId;
+    if (!heroId) return assetDiagrams;
+    const linkedIds = new Set(assetDiagrams.map((d) => d.id));
+    const heroInLinked = linkedIds.has(heroId);
+    const heroFromAll = !heroInLinked ? diagrams.find((d) => d.id === heroId) : null;
+    const nonHero = assetDiagrams.filter((d) => d.id !== heroId);
+    const heroEntry = heroInLinked
+      ? assetDiagrams.find((d) => d.id === heroId)!
+      : heroFromAll
+        ? { id: heroFromAll.id, name: heroFromAll.name, latestVersion: heroFromAll.latestVersion, assetCount: heroFromAll.assetCount, updatedAt: heroFromAll.updatedAt }
+        : null;
+    return heroEntry ? [heroEntry, ...nonHero] : assetDiagrams;
+  }, [asset, assetDiagrams, diagrams]);
 
   // ── Dependency mini-map builder ───────────────────────────────────────────
   function buildDepMiniMap(
@@ -499,23 +517,6 @@ export default function AssetDetailPage() {
     );
   }
 
-  // ── Section diagrams: hero pinned first, then linked diagrams (deduped) ──
-  const sectionDiagrams = useMemo(() => {
-    if (!asset) return assetDiagrams;
-    const heroId = asset.heroDiagramId;
-    if (!heroId) return assetDiagrams;
-    const linkedIds = new Set(assetDiagrams.map((d) => d.id));
-    const heroInLinked = linkedIds.has(heroId);
-    const heroFromAll = !heroInLinked ? diagrams.find((d) => d.id === heroId) : null;
-    const nonHero = assetDiagrams.filter((d) => d.id !== heroId);
-    const heroEntry = heroInLinked
-      ? assetDiagrams.find((d) => d.id === heroId)!
-      : heroFromAll
-        ? { id: heroFromAll.id, name: heroFromAll.name, latestVersion: heroFromAll.latestVersion, assetCount: heroFromAll.assetCount, updatedAt: heroFromAll.updatedAt }
-        : null;
-    return heroEntry ? [heroEntry, ...nonHero] : assetDiagrams;
-  }, [asset, assetDiagrams, diagrams]);
-
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div className="space-y-6">
@@ -571,21 +572,25 @@ export default function AssetDetailPage() {
 
           {/* Actions */}
           <div className="flex gap-2 flex-wrap">
-            <Button variant="secondary" size="sm" onClick={() => {
-              setConfluencePageTitle(asset.name);
-              setConfluenceParentPageId("");
-              setPushResult(null);
-              setPushError(null);
-              setConfluenceOpen(true);
-            }}>
-              <CloudUpload className="h-4 w-4" /> Push to Confluence
-            </Button>
-            <Button variant="secondary" size="sm" onClick={() => setEditOpen(true)}>
-              <Pencil className="h-4 w-4" /> Edit
-            </Button>
-            <Button variant="danger" size="sm" onClick={() => { setDeleteOpen(true); setDeleteError(null); }}>
-              <Trash2 className="h-4 w-4" /> Delete
-            </Button>
+            {canWrite && (
+              <>
+                <Button variant="secondary" size="sm" onClick={() => {
+                  setConfluencePageTitle(asset.name);
+                  setConfluenceParentPageId("");
+                  setPushResult(null);
+                  setPushError(null);
+                  setConfluenceOpen(true);
+                }}>
+                  <CloudUpload className="h-4 w-4" /> Push to Confluence
+                </Button>
+                <Button variant="secondary" size="sm" onClick={() => setEditOpen(true)}>
+                  <Pencil className="h-4 w-4" /> Edit
+                </Button>
+                <Button variant="danger" size="sm" onClick={() => { setDeleteOpen(true); setDeleteError(null); }}>
+                  <Trash2 className="h-4 w-4" /> Delete
+                </Button>
+              </>
+            )}
           </div>
         </div>
 
@@ -842,7 +847,7 @@ export default function AssetDetailPage() {
             <span className="rounded-full bg-slate-200 dark:bg-slate-700 px-2 py-0.5 text-xs font-medium text-slate-600 dark:text-slate-300">
               {depData.downstream.length + depData.upstream.length} connection{depData.downstream.length + depData.upstream.length !== 1 ? "s" : ""}
             </span>
-            {user && (
+            {canWrite && (
               <button
                 onClick={() => setDepAddOpen(true)}
                 className="flex items-center gap-1 rounded-lg bg-brand-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-brand-700"
@@ -896,7 +901,7 @@ export default function AssetDetailPage() {
                     </span>
                     <span className="text-xs text-slate-300 dark:text-slate-600">{d.direction}</span>
                     {d.notes && <span className="text-xs text-slate-400 dark:text-slate-500 truncate max-w-[120px]" title={d.notes}>{d.notes}</span>}
-                    {user && (
+                    {canWrite && user && (
                       depDeleteId === d.id ? (
                         <div className="flex items-center gap-1">
                           <span className="text-xs text-slate-500 dark:text-slate-400">Delete?</span>
@@ -942,7 +947,7 @@ export default function AssetDetailPage() {
                     </span>
                     <span className="text-xs text-slate-300 dark:text-slate-600">{d.direction}</span>
                     {d.notes && <span className="text-xs text-slate-400 dark:text-slate-500 truncate max-w-[120px]" title={d.notes}>{d.notes}</span>}
-                    {user && (
+                    {canWrite && user && (
                       <button onClick={() => setEditingDep(d)} className="text-slate-300 hover:text-brand-500 dark:text-slate-600 dark:hover:text-brand-400">
                         <Pencil className="h-3.5 w-3.5" />
                       </button>
@@ -958,7 +963,7 @@ export default function AssetDetailPage() {
           <div className="flex flex-col items-center justify-center gap-2 py-10 text-slate-400 dark:text-slate-500">
             <Network className="h-8 w-8 text-slate-300 dark:text-slate-600" />
             <p className="text-sm">No dependencies recorded yet</p>
-            {user && (
+            {canWrite && (
               <button onClick={() => setDepAddOpen(true)} className="text-xs text-brand-600 hover:underline dark:text-brand-400">
                 Add first dependency
               </button>
@@ -967,7 +972,7 @@ export default function AssetDetailPage() {
         )}
       </div>
 
-      {user && (
+      {canWrite && user && (
         <AddDependencyModal
           open={depAddOpen}
           onClose={() => setDepAddOpen(false)}
@@ -980,7 +985,7 @@ export default function AssetDetailPage() {
         />
       )}
 
-      {editingDep && user && (
+      {editingDep && canWrite && user && (
         <DependencyPanel
           dependency={editingDep}
           onClose={() => setEditingDep(null)}

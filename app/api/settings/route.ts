@@ -15,7 +15,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function PUT(req: NextRequest) {
-  const auth = requireUser(req);
+  const auth = requireUser(req, "Admin");
   if (!auth.ok) return auth.response;
   await setupDatabase();
   const db = getDb();

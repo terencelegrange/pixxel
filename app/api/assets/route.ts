@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import logger from "@/lib/logger";
 import { randomUUID } from "crypto";
 import mysql from "mysql2/promise";
-import { getDb, setupDatabase } from "@/lib/db";
+import { getDb, setupDatabase, withTransaction } from "@/lib/db";
 import { writeAudit } from "@/lib/audit";
 import { Asset, AssetCategory, AssetType, LifecycleStatus } from "@/types";
 import { requireUser } from "@/lib/require-user";
@@ -101,14 +102,14 @@ export async function GET(req: NextRequest) {
     `);
     return NextResponse.json({ assets: rows.map(rowToAsset) });
   } catch (err) {
-    console.error("[GET /api/assets]", err);
+    logger.error({ err, route: "GET /api/assets" }, "request failed");
     return NextResponse.json({ error: "Failed to load assets." }, { status: 500 });
   }
 }
 
 // POST /api/assets — create an asset
 export async function POST(req: NextRequest) {
-  const auth = requireUser(req);
+  const auth = requireUser(req, ["Admin", "Member"]);
   if (!auth.ok) return auth.response;
   const { user } = auth;
   try {
@@ -128,7 +129,6 @@ export async function POST(req: NextRequest) {
     if (!VALID_TYPES.includes(type)) return NextResponse.json({ error: "Invalid asset type." }, { status: 400 });
     if (!VALID_STATUSES.includes(lifecycleStatus)) return NextResponse.json({ error: "Invalid lifecycle status." }, { status: 400 });
 
-    const db = getDb();
     const id = randomUUID();
 
     const values = {
@@ -162,45 +162,47 @@ export async function POST(req: NextRequest) {
       notes: notes?.trim() || null,
     };
 
-    await db.execute(
-      `INSERT INTO assets
-         (id, name, short_code, description, type, category, icon, hero_diagram_id, tier_id, strategy_id, complexity_id, domain_id, vendor_id, lifecycle_status,
-          business_owner, technical_owner, sla_availability, sla_rto, sla_rpo,
-          go_live_date, retirement_date, app_url, doc_url, contract_end_date, contract_amount, notes, created_by_id, created_by_name)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-      [id, values.name, values.shortCode, values.description, values.type, values.category,
-       values.icon, values.heroDiagramId, values.tierId, values.strategyId, values.complexityId, values.domainId, values.vendorId, values.lifecycleStatus, values.businessOwner,
-       values.technicalOwner, values.slaAvailability, values.slaRto, values.slaRpo,
-       values.goLiveDate, values.retirementDate, values.appUrl, values.docUrl, values.contractEndDate, values.contractAmount,
-       values.notes, user.id, user.name]
-    );
+    await withTransaction(async (tx) => {
+      await tx.execute(
+        `INSERT INTO assets
+           (id, name, short_code, description, type, category, icon, hero_diagram_id, tier_id, strategy_id, complexity_id, domain_id, vendor_id, lifecycle_status,
+            business_owner, technical_owner, sla_availability, sla_rto, sla_rpo,
+            go_live_date, retirement_date, app_url, doc_url, contract_end_date, contract_amount, notes, created_by_id, created_by_name)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+        [id, values.name, values.shortCode, values.description, values.type, values.category,
+         values.icon, values.heroDiagramId, values.tierId, values.strategyId, values.complexityId, values.domainId, values.vendorId, values.lifecycleStatus, values.businessOwner,
+         values.technicalOwner, values.slaAvailability, values.slaRto, values.slaRpo,
+         values.goLiveDate, values.retirementDate, values.appUrl, values.docUrl, values.contractEndDate, values.contractAmount,
+         values.notes, user.id, user.name]
+      );
 
-    // Insert junction rows
-    for (const deptId of values.departmentIds) {
-      await db.execute(
-        "INSERT IGNORE INTO asset_departments (asset_id, department_id) VALUES (?, ?)",
-        [id, deptId]
-      );
-    }
-    // Insert architect junction rows (fetch user names from users table)
-    for (const uid of values.architectIds) {
-      const [uRows] = await db.execute<mysql.RowDataPacket[]>(
-        "SELECT name FROM users WHERE id = ? LIMIT 1", [uid]
-      );
-      if (uRows[0]) {
-        await db.execute(
-          "INSERT IGNORE INTO asset_architects (asset_id, user_id, user_name) VALUES (?, ?, ?)",
-          [id, uid, uRows[0].name]
+      // Insert junction rows
+      for (const deptId of values.departmentIds) {
+        await tx.execute(
+          "INSERT IGNORE INTO asset_departments (asset_id, department_id) VALUES (?, ?)",
+          [id, deptId]
         );
       }
-    }
-    // Insert capability junction rows
-    for (const capId of values.capabilityIds) {
-      await db.execute(
-        "INSERT IGNORE INTO asset_capabilities (asset_id, business_capability_id) VALUES (?, ?)",
-        [id, capId]
-      );
-    }
+      // Insert architect junction rows (fetch user names from users table)
+      for (const uid of values.architectIds) {
+        const [uRows] = await tx.execute<mysql.RowDataPacket[]>(
+          "SELECT name FROM users WHERE id = ? LIMIT 1", [uid]
+        );
+        if (uRows[0]) {
+          await tx.execute(
+            "INSERT IGNORE INTO asset_architects (asset_id, user_id, user_name) VALUES (?, ?, ?)",
+            [id, uid, uRows[0].name]
+          );
+        }
+      }
+      // Insert capability junction rows
+      for (const capId of values.capabilityIds) {
+        await tx.execute(
+          "INSERT IGNORE INTO asset_capabilities (asset_id, business_capability_id) VALUES (?, ?)",
+          [id, capId]
+        );
+      }
+    });
 
     await writeAudit({
       tableName: "assets", recordId: id, action: "CREATE",
@@ -210,7 +212,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ id }, { status: 201 });
   } catch (err) {
-    console.error("[POST /api/assets]", err);
+    logger.error({ err, route: "POST /api/assets" }, "request failed");
     return NextResponse.json({ error: "Failed to create asset." }, { status: 500 });
   }
 }

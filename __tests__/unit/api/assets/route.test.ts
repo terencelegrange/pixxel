@@ -1,9 +1,12 @@
 ﻿import { NextRequest, NextResponse } from 'next/server'
 
+const mockExecute = jest.fn()
+
 jest.mock('@/lib/db', () => ({
   setupDatabase: jest.fn().mockResolvedValue(undefined),
   getDb: jest.fn(),
   resetPool: jest.fn(),
+  withTransaction: jest.fn((cb: (tx: { execute: jest.Mock }) => unknown) => cb({ execute: mockExecute })),
 }))
 jest.mock('@/lib/audit', () => ({ writeAudit: jest.fn().mockResolvedValue(undefined) }))
 jest.mock('@/lib/require-user', () => ({
@@ -14,7 +17,6 @@ import { getDb } from '@/lib/db'
 import { requireUser } from '@/lib/require-user'
 import { GET, POST } from '@/app/api/assets/route'
 
-const mockExecute = jest.fn()
 beforeEach(() => {
   jest.clearAllMocks()
   ;(getDb as jest.Mock).mockReturnValue({ execute: mockExecute })

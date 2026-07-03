@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import logger from "@/lib/logger";
 import bcrypt from "bcryptjs";
 import { randomUUID } from "crypto";
 import { getDb, setupDatabase } from "@/lib/db";
@@ -78,7 +79,7 @@ export async function POST(req: NextRequest) {
     });
     return res;
   } catch (err) {
-    console.error("[/api/auth/register]", err);
+    logger.error({ err, route: "/api/auth/register" }, "request failed");
     return NextResponse.json(
       { error: "An unexpected error occurred. Please try again." },
       { status: 500 }

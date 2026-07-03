@@ -105,7 +105,7 @@ function DomainModal({
 // Page
 // ---------------------------------------------------------------------------
 export default function DomainsPage() {
-  const { user } = useAuth();
+  const { user, canWrite } = useAuth();
   const [domains, setDomains] = useState<Domain[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
@@ -181,9 +181,11 @@ export default function DomainsPage() {
             Architectural and business domains that assets are grouped under.
           </p>
         </div>
-        <Button onClick={() => { setEditing(null); setModalOpen(true); }}>
-          <Plus className="h-4 w-4" /> Add Domain
-        </Button>
+        {canWrite && (
+          <Button onClick={() => { setEditing(null); setModalOpen(true); }}>
+            <Plus className="h-4 w-4" /> Add Domain
+          </Button>
+        )}
       </div>
 
       {/* Search */}
@@ -215,7 +217,7 @@ export default function DomainsPage() {
             <p className="text-sm font-medium">
               {domains.length === 0 ? "No domains added yet" : "No domains match your search"}
             </p>
-            {domains.length === 0 && (
+            {domains.length === 0 && canWrite && (
               <Button size="sm" onClick={() => { setEditing(null); setModalOpen(true); }}>
                 <Plus className="h-4 w-4" /> Add Domain
               </Button>
@@ -254,20 +256,24 @@ export default function DomainsPage() {
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center justify-end gap-2">
-                        <button
-                          onClick={() => { setEditing(domain); setModalOpen(true); }}
-                          className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-300 transition-colors"
-                          aria-label={`Edit ${domain.name}`}
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </button>
-                        <button
-                          onClick={() => { setDeleteTarget(domain); setDeleteError(null); }}
-                          className="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/40 dark:hover:text-red-400 transition-colors"
-                          aria-label={`Delete ${domain.name}`}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
+                        {canWrite && (
+                          <>
+                            <button
+                              onClick={() => { setEditing(domain); setModalOpen(true); }}
+                              className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-300 transition-colors"
+                              aria-label={`Edit ${domain.name}`}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </button>
+                            <button
+                              onClick={() => { setDeleteTarget(domain); setDeleteError(null); }}
+                              className="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/40 dark:hover:text-red-400 transition-colors"
+                              aria-label={`Delete ${domain.name}`}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </>
+                        )}
                       </div>
                     </td>
                   </tr>

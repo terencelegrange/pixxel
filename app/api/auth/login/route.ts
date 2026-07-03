@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import logger from "@/lib/logger";
 import bcrypt from "bcryptjs";
 import mysql from "mysql2/promise";
 import { getDb, setupDatabase } from "@/lib/db";
@@ -75,7 +76,7 @@ export async function POST(req: NextRequest) {
     });
     return res;
   } catch (err) {
-    console.error("[/api/auth/login]", err);
+    logger.error({ err, route: "/api/auth/login" }, "request failed");
     return NextResponse.json(
       { error: "An unexpected error occurred. Please try again." },
       { status: 500 }

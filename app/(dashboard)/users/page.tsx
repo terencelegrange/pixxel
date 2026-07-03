@@ -207,6 +207,7 @@ function EditUserModal({
 // ---------------------------------------------------------------------------
 export default function UsersPage() {
   const { user } = useAuth();
+  const isAdmin = user?.role === "Admin";
   const [users, setUsers] = useState<UserRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
@@ -296,9 +297,11 @@ export default function UsersPage() {
             Manage user accounts and roles. New users can also register via the sign-up page.
           </p>
         </div>
-        <Button onClick={() => setCreateOpen(true)}>
-          <Plus className="h-4 w-4" /> Add User
-        </Button>
+        {isAdmin && (
+          <Button onClick={() => setCreateOpen(true)}>
+            <Plus className="h-4 w-4" /> Add User
+          </Button>
+        )}
       </div>
 
       {/* Search */}
@@ -372,21 +375,25 @@ export default function UsersPage() {
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center justify-end gap-2">
-                        <button
-                          onClick={() => setEditTarget(u)}
-                          className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors"
-                          aria-label={`Edit ${u.name}`}
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </button>
-                        <button
-                          onClick={() => { setDeleteTarget(u); setDeleteError(null); }}
-                          disabled={u.id === user?.id}
-                          className="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-                          aria-label={`Delete ${u.name}`}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
+                        {isAdmin && (
+                          <>
+                            <button
+                              onClick={() => setEditTarget(u)}
+                              className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors"
+                              aria-label={`Edit ${u.name}`}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </button>
+                            <button
+                              onClick={() => { setDeleteTarget(u); setDeleteError(null); }}
+                              disabled={u.id === user?.id}
+                              className="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                              aria-label={`Delete ${u.name}`}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </>
+                        )}
                       </div>
                     </td>
                   </tr>

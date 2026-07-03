@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import logger from "@/lib/logger";
 import mysql from "mysql2/promise";
 import { getDb, setupDatabase } from "@/lib/db";
 import { writeAudit } from "@/lib/audit";
@@ -7,7 +8,7 @@ import { requireUser } from "@/lib/require-user";
 // PUT /api/asset-strategy/[id]
 export async function PUT(req: NextRequest, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
-  const auth = requireUser(req);
+  const auth = requireUser(req, ["Admin", "Member"]);
   if (!auth.ok) return auth.response;
   const { user } = auth;
   try {
@@ -46,7 +47,7 @@ export async function PUT(req: NextRequest, props: { params: Promise<{ id: strin
 
     return NextResponse.json({ success: true });
   } catch (err) {
-    console.error("[PUT /api/asset-strategy/:id]", err);
+    logger.error({ err, route: "PUT /api/asset-strategy/:id" }, "request failed");
     return NextResponse.json({ error: "Failed to update strategy." }, { status: 500 });
   }
 }
@@ -54,7 +55,7 @@ export async function PUT(req: NextRequest, props: { params: Promise<{ id: strin
 // DELETE /api/asset-strategy/[id]
 export async function DELETE(req: NextRequest, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
-  const auth = requireUser(req);
+  const auth = requireUser(req, ["Admin", "Member"]);
   if (!auth.ok) return auth.response;
   const { user } = auth;
   try {
@@ -80,7 +81,7 @@ export async function DELETE(req: NextRequest, props: { params: Promise<{ id: st
 
     return NextResponse.json({ success: true });
   } catch (err) {
-    console.error("[DELETE /api/asset-strategy/:id]", err);
+    logger.error({ err, route: "DELETE /api/asset-strategy/:id" }, "request failed");
     return NextResponse.json({ error: "Failed to delete strategy." }, { status: 500 });
   }
 }

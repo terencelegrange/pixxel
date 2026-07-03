@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import logger from "@/lib/logger";
 import { randomUUID } from "crypto";
 import mysql from "mysql2/promise";
 import { getDb, setupDatabase } from "@/lib/db";
@@ -31,14 +32,14 @@ export async function GET(req: NextRequest) {
     );
     return NextResponse.json({ domains: rows.map(rowToDomain) });
   } catch (err) {
-    console.error("[GET /api/domains]", err);
+    logger.error({ err, route: "GET /api/domains" }, "request failed");
     return NextResponse.json({ error: "Failed to load domains." }, { status: 500 });
   }
 }
 
 // POST /api/domains
 export async function POST(req: NextRequest) {
-  const auth = requireUser(req);
+  const auth = requireUser(req, ["Admin", "Member"]);
   if (!auth.ok) return auth.response;
   const { user } = auth;
   try {
@@ -69,7 +70,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ id }, { status: 201 });
   } catch (err) {
-    console.error("[POST /api/domains]", err);
+    logger.error({ err, route: "POST /api/domains" }, "request failed");
     return NextResponse.json({ error: "Failed to create domain." }, { status: 500 });
   }
 }
