@@ -16,6 +16,7 @@ interface DbUserRow {
   password: string;
   role: string;
   created_at: Date;
+  token_version: number;
 }
 
 export async function POST(req: NextRequest) {
@@ -31,7 +32,7 @@ export async function POST(req: NextRequest) {
 
     const db = getDb();
     const [rows] = await db.execute<mysql.RowDataPacket[]>(
-      "SELECT id, name, email, password, role, created_at FROM users WHERE email = ? LIMIT 1",
+      "SELECT id, name, email, password, role, created_at, token_version FROM users WHERE email = ? LIMIT 1",
       [email]
     );
 
@@ -64,7 +65,7 @@ export async function POST(req: NextRequest) {
         : String(row.created_at),
     };
 
-    const token = signJwt({ sub: user.id, name: user.name, email: user.email, role: user.role });
+    const token = signJwt({ sub: user.id, name: user.name, email: user.email, role: user.role, tokenVersion: row.token_version });
 
     const res = NextResponse.json({ user, token }, { status: 200 });
     res.cookies.set("authToken", token, {

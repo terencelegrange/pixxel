@@ -12,7 +12,7 @@ const VALID_STATUSES: LifecycleStatus[] = ["Proposed", "Approved", "In Developme
 // GET /api/assets/[id] — fetch a single asset with aggregated departments
 export async function GET(req: NextRequest, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
-  const auth = requireUser(req);
+  const auth = await requireUser(req);
   if (!auth.ok) return auth.response;
   try {
     await setupDatabase();
@@ -102,7 +102,7 @@ export async function GET(req: NextRequest, props: { params: Promise<{ id: strin
 // PUT /api/assets/[id] — update an asset
 export async function PUT(req: NextRequest, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
-  const auth = requireUser(req, ["Admin", "Member"]);
+  const auth = await requireUser(req, ["Admin", "Member"]);
   if (!auth.ok) return auth.response;
   const { user } = auth;
   try {
@@ -251,7 +251,7 @@ export async function PUT(req: NextRequest, props: { params: Promise<{ id: strin
 // DELETE /api/assets/[id] — delete an asset and its department links
 export async function DELETE(req: NextRequest, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
-  const auth = requireUser(req, ["Admin", "Member"]);
+  const auth = await requireUser(req, ["Admin", "Member"]);
   if (!auth.ok) return auth.response;
   const { user } = auth;
   try {

@@ -2,23 +2,26 @@
  * lib/require-user.ts  —  SERVER ONLY
  *
  * Call at the top of every protected API route handler.
- * Reads the HttpOnly authToken cookie, verifies the JWT, and returns
- * the authenticated user or a ready-made 401 response.
+ * Reads the HttpOnly authToken cookie, verifies the JWT (signature, expiry,
+ * and — for state-changing requests — same-origin), and returns the
+ * authenticated user or a ready-made error response.
  *
  * Usage:
- *   const auth = requireUser(req);
+ *   const auth = await requireUser(req);
  *   if (!auth.ok) return auth.response;
  *   const { user } = auth;  // { id, name, email, role }
  *
  * Role guard:
- *   const auth = requireUser(req, "Admin");
+ *   const auth = await requireUser(req, "Admin");
  *   if (!auth.ok) return auth.response;  // returns 403 if role doesn't match
  *
- *   const auth = requireUser(req, ["Admin", "Member"]);
+ *   const auth = await requireUser(req, ["Admin", "Member"]);
  *   if (!auth.ok) return auth.response;  // returns 403 unless role is one of these
  */
 import { NextRequest, NextResponse } from "next/server";
+import mysql from "mysql2/promise";
 import { verifyJwt } from "@/lib/jwt";
+import { getDb } from "@/lib/db";
 
 export interface AuthUser {
   id: string;
@@ -31,7 +34,40 @@ type RequireUserResult =
   | { ok: true; user: AuthUser }
   | { ok: false; response: NextResponse };
 
-export function requireUser(req: NextRequest, requiredRole?: string | string[]): RequireUserResult {
+const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
+
+// CSRF defense-in-depth for the SameSite=Lax auth cookie: state-changing
+// requests must present an Origin/Referer matching this app's own origin.
+// Requests with neither header (non-browser clients) are allowed through —
+// SameSite=Lax already blocks the classic cross-site form-POST vector.
+function isTrustedOrigin(req: NextRequest): boolean {
+  const expected = req.nextUrl.origin;
+  const origin = req.headers.get("origin");
+  if (origin) return origin === expected;
+
+  const referer = req.headers.get("referer");
+  if (referer) {
+    try {
+      return new URL(referer).origin === expected;
+    } catch {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+export async function requireUser(req: NextRequest, requiredRole?: string | string[]): Promise<RequireUserResult> {
+  if (!SAFE_METHODS.has(req.method) && !isTrustedOrigin(req)) {
+    return {
+      ok: false,
+      response: NextResponse.json(
+        { error: "Cross-site request blocked." },
+        { status: 403 }
+      ),
+    };
+  }
+
   const token = req.cookies.get("authToken")?.value;
 
   if (!token) {
@@ -46,6 +82,21 @@ export function requireUser(req: NextRequest, requiredRole?: string | string[]):
 
   const payload = verifyJwt(token);
   if (!payload) {
+    return {
+      ok: false,
+      response: NextResponse.json(
+        { error: "Session expired. Please log in again." },
+        { status: 401 }
+      ),
+    };
+  }
+
+  const db = getDb();
+  const [rows] = await db.execute<mysql.RowDataPacket[]>(
+    "SELECT token_version FROM users WHERE id = ? LIMIT 1", [payload.sub]
+  );
+  const currentVersion = rows[0]?.token_version;
+  if (currentVersion == null || currentVersion !== payload.tokenVersion) {
     return {
       ok: false,
       response: NextResponse.json(

@@ -10,12 +10,9 @@ git push → Gitea → webhook → Jenkins → Docker build → running containe
 
 **Infrastructure**
 
-| Component | Address |
-|-----------|---------|
-| Gitea (source) | `http://192.168.100.151:3000` |
-| Jenkins | `http://192.168.100.151:8080` |
-| Docker host | `192.168.100.227` |
-| App (live) | `http://192.168.100.227:3000` |
+Internal hostnames/IPs and the webhook token are intentionally not listed here —
+this is a public repo. See the internal wiki / password manager for actual
+values. Placeholders used below: `<GITEA_HOST>`, `<JENKINS_HOST>`, `<DOCKER_HOST>`.
 
 ---
 
@@ -30,8 +27,12 @@ git push origin main
 Gitea fires a webhook to Jenkins on every push to `main`. The webhook URL is:
 
 ```
-http://192.168.100.151:8080/generic-webhook-trigger/invoke?token=gxkhsonsjafbmlbcqrauryeomwjksgsb
+http://<JENKINS_HOST>/generic-webhook-trigger/invoke?token=<WEBHOOK_TOKEN>
 ```
+
+The token is stored as the `PIXXEL_WEBHOOK_TOKEN` credential in Jenkins
+(referenced via `tokenCredentialId` in the Jenkinsfile) and configured on the
+matching Gitea webhook — never committed to source.
 
 You can also trigger a build manually from the Jenkins UI at **pixxel → Build Now**, or via the API:
 
@@ -42,7 +43,7 @@ $base64 = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes("$JENKINS_US
 $headers = @{ Authorization = "Basic $base64" }
 $crumb = Invoke-RestMethod -Uri "$JENKINS_URL/crumbIssuer/api/json" -Headers $headers
 $headers[$crumb.crumbRequestField] = $crumb.crumb
-Invoke-WebRequest -Uri "$JENKINS_URL/generic-webhook-trigger/invoke?token=gxkhsonsjafbmlbcqrauryeomwjksgsb" -Method Post -Headers $headers
+Invoke-WebRequest -Uri "$JENKINS_URL/generic-webhook-trigger/invoke?token=$WEBHOOK_TOKEN" -Method Post -Headers $headers
 ```
 
 ### 2. Jenkins pipeline stages
@@ -82,7 +83,8 @@ These secrets must exist in the Jenkins credentials store before the pipeline ca
 | `PIXXEL_DB_PASSWORD` | Secret text | Database password |
 | `PIXXEL_DB_NAME` | Secret text | Database name |
 | `PIXXEL_NEXTAUTH_SECRET` | Secret text | NextAuth secret |
-| `PIXXEL_NEXTAUTH_URL` | Secret text | NextAuth URL (e.g. `http://192.168.100.227:3000`) |
+| `PIXXEL_NEXTAUTH_URL` | Secret text | NextAuth URL (e.g. `http://<DOCKER_HOST>:3000`) |
+| `PIXXEL_WEBHOOK_TOKEN` | Secret text | Gitea → Jenkins webhook trigger token |
 
 To add or update a credential: Jenkins → Manage Jenkins → Credentials → (global).
 
@@ -115,7 +117,7 @@ NODE_ENV=production
 **Check the running container** (SSH to Docker host):
 
 ```bash
-ssh terence@192.168.100.227
+ssh terence@<DOCKER_HOST>
 docker ps                                      # confirm container is running
 docker logs $(docker ps -qf name=pixxel)       # tail app logs
 docker compose -f /home/pixxel/docker-compose.prod.yml logs -f
@@ -124,7 +126,7 @@ docker compose -f /home/pixxel/docker-compose.prod.yml logs -f
 **Health endpoint:**
 
 ```bash
-curl http://192.168.100.227:3000/api/health
+curl http://<DOCKER_HOST>:3000/api/health
 # → {"status":"ok"}
 ```
 

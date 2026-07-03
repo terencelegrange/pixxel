@@ -23,7 +23,7 @@ function rowToComplexity(row: mysql.RowDataPacket): AssetComplexity {
 
 // GET /api/asset-complexity
 export async function GET(req: NextRequest) {
-  const auth = requireUser(req);
+  const auth = await requireUser(req);
   if (!auth.ok) return auth.response;
   try {
     await setupDatabase();
@@ -40,7 +40,7 @@ export async function GET(req: NextRequest) {
 
 // POST /api/asset-complexity
 export async function POST(req: NextRequest) {
-  const auth = requireUser(req, ["Admin", "Member"]);
+  const auth = await requireUser(req, ["Admin", "Member"]);
   if (!auth.ok) return auth.response;
   const { user } = auth;
   try {

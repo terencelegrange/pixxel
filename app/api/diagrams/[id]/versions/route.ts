@@ -12,7 +12,7 @@ const toISO = (v: unknown) =>
 // GET /api/diagrams/[id]/versions — list all versions (no content)
 export async function GET(req: NextRequest, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
-  const auth = requireUser(req);
+  const auth = await requireUser(req);
   if (!auth.ok) return auth.response;
   try {
     await setupDatabase();
@@ -38,7 +38,7 @@ export async function GET(req: NextRequest, props: { params: Promise<{ id: strin
 // POST /api/diagrams/[id]/versions — save a new version
 export async function POST(req: NextRequest, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
-  const auth = requireUser(req, ["Admin", "Member"]);
+  const auth = await requireUser(req, ["Admin", "Member"]);
   if (!auth.ok) return auth.response;
   const { user } = auth;
   try {

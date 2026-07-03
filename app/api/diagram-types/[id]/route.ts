@@ -8,7 +8,7 @@ import { requireUser } from "@/lib/require-user";
 // PUT /api/diagram-types/[id]
 export async function PUT(req: NextRequest, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
-  const auth = requireUser(req, ["Admin", "Member"]);
+  const auth = await requireUser(req, ["Admin", "Member"]);
   if (!auth.ok) return auth.response;
   const { user } = auth;
   try {
@@ -45,7 +45,7 @@ export async function PUT(req: NextRequest, props: { params: Promise<{ id: strin
 // DELETE /api/diagram-types/[id]
 export async function DELETE(req: NextRequest, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
-  const auth = requireUser(req, ["Admin", "Member"]);
+  const auth = await requireUser(req, ["Admin", "Member"]);
   if (!auth.ok) return auth.response;
   const { user } = auth;
   try {

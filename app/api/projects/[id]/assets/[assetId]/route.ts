@@ -9,7 +9,7 @@ export async function PATCH(
   props: { params: Promise<{ id: string; assetId: string }> }
 ) {
   const params = await props.params;
-  const auth = requireUser(req, ["Admin", "Member"]);
+  const auth = await requireUser(req, ["Admin", "Member"]);
   if (!auth.ok) return auth.response;
   try {
     await setupDatabase();
@@ -38,7 +38,7 @@ export async function DELETE(
   props: { params: Promise<{ id: string; assetId: string }> }
 ) {
   const params = await props.params;
-  const auth = requireUser(req, ["Admin", "Member"]);
+  const auth = await requireUser(req, ["Admin", "Member"]);
   if (!auth.ok) return auth.response;
   try {
     await setupDatabase();

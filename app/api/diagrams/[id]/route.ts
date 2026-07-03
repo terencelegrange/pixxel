@@ -11,7 +11,7 @@ const toISO = (v: unknown) =>
 // GET /api/diagrams/[id] — fetch diagram metadata + latest version content
 export async function GET(req: NextRequest, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
-  const auth = requireUser(req);
+  const auth = await requireUser(req);
   if (!auth.ok) return auth.response;
   try {
     await setupDatabase();
@@ -52,7 +52,7 @@ export async function GET(req: NextRequest, props: { params: Promise<{ id: strin
 // PUT /api/diagrams/[id] — update metadata only (name, description)
 export async function PUT(req: NextRequest, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
-  const auth = requireUser(req, ["Admin", "Member"]);
+  const auth = await requireUser(req, ["Admin", "Member"]);
   if (!auth.ok) return auth.response;
   const { user } = auth;
   try {
@@ -89,7 +89,7 @@ export async function PUT(req: NextRequest, props: { params: Promise<{ id: strin
 // DELETE /api/diagrams/[id]
 export async function DELETE(req: NextRequest, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
-  const auth = requireUser(req, ["Admin", "Member"]);
+  const auth = await requireUser(req, ["Admin", "Member"]);
   if (!auth.ok) return auth.response;
   const { user } = auth;
   try {

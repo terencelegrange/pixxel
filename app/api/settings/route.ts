@@ -4,7 +4,7 @@ import mysql from "mysql2/promise";
 import { requireUser } from "@/lib/require-user";
 
 export async function GET(req: NextRequest) {
-  const auth = requireUser(req);
+  const auth = await requireUser(req);
   if (!auth.ok) return auth.response;
   await setupDatabase();
   const db = getDb();
@@ -15,7 +15,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function PUT(req: NextRequest) {
-  const auth = requireUser(req, "Admin");
+  const auth = await requireUser(req, "Admin");
   if (!auth.ok) return auth.response;
   await setupDatabase();
   const db = getDb();

@@ -10,7 +10,7 @@ type SupportStatus = typeof VALID_STATUSES[number];
 // PATCH /api/support/[id] — update status
 export async function PATCH(req: NextRequest, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
-  const auth = requireUser(req, "Admin");
+  const auth = await requireUser(req, "Admin");
   if (!auth.ok) return auth.response;
   try {
     await setupDatabase();

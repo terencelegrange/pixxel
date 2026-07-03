@@ -39,6 +39,7 @@ const dbUser = {
   password: '$2a$12$hashedpassword',
   role: 'Member',
   created_at: new Date('2025-01-01'),
+  token_version: 3,
 }
 
 describe('POST /api/auth/login', () => {
@@ -90,6 +91,14 @@ describe('POST /api/auth/login', () => {
       avatarInitials: 'JS',
     })
     expect(body.user.password).toBeUndefined()
+  })
+
+  it('embeds the user\'s current token_version in the signed JWT', async () => {
+    const { signJwt } = jest.requireMock('@/lib/jwt')
+    mockExecute.mockResolvedValueOnce([[dbUser]])
+    ;(bcrypt.compare as jest.Mock).mockResolvedValueOnce(true)
+    await POST(makeReq({ email: 'jane@example.com', password: 'correct' }))
+    expect(signJwt).toHaveBeenCalledWith(expect.objectContaining({ tokenVersion: 3 }))
   })
 
   it('returns 500 when DB throws', async () => {

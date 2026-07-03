@@ -25,7 +25,7 @@ function rowToRole(row: mysql.RowDataPacket) {
 
 // GET /api/roles — Admin only
 export async function GET(req: NextRequest) {
-  const auth = requireUser(req, "Admin");
+  const auth = await requireUser(req, "Admin");
   if (!auth.ok) return auth.response;
   try {
     await setupDatabase();
@@ -42,7 +42,7 @@ export async function GET(req: NextRequest) {
 
 // POST /api/roles
 export async function POST(req: NextRequest) {
-  const auth = requireUser(req, "Admin");
+  const auth = await requireUser(req, "Admin");
   if (!auth.ok) return auth.response;
   const { user } = auth;
   try {

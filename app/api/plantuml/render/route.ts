@@ -2,6 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import zlib from "zlib";
 import { requireUser } from "@/lib/require-user";
 
+// Diagram source is sent to this server for rendering. Defaults to the public
+// plantuml.com service — for enterprise/confidential diagrams, point
+// PLANTUML_SERVER_URL at a self-hosted PlantUML server instead (see docs).
+const PLANTUML_SERVER_URL = (process.env.PLANTUML_SERVER_URL ?? "https://www.plantuml.com/plantuml").replace(/\/$/, "");
+const MAX_SOURCE_LENGTH = 20_000;
+
 function encodePlantUML(source: string): string {
   const ALPHABET = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz-_";
   const deflated = zlib.deflateRawSync(Buffer.from(source, "utf-8"));
@@ -17,13 +23,16 @@ function encodePlantUML(source: string): string {
 }
 
 export async function POST(req: NextRequest) {
-  const auth = requireUser(req);
+  const auth = await requireUser(req);
   if (!auth.ok) return auth.response;
   const { source } = await req.json();
   if (!source) return NextResponse.json({ error: "No source" }, { status: 400 });
+  if (source.length > MAX_SOURCE_LENGTH) {
+    return NextResponse.json({ error: `Diagram source exceeds the ${MAX_SOURCE_LENGTH}-character limit.` }, { status: 413 });
+  }
   try {
     const encoded = encodePlantUML(source);
-    const res = await fetch(`https://www.plantuml.com/plantuml/svg/${encoded}`, {
+    const res = await fetch(`${PLANTUML_SERVER_URL}/svg/${encoded}`, {
       headers: { Accept: "image/svg+xml" },
     });
     if (!res.ok) return NextResponse.json({ error: "PlantUML render failed" }, { status: 502 });

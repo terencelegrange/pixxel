@@ -5,7 +5,7 @@ import { getDb, setupDatabase } from "@/lib/db";
 import { requireUser } from "@/lib/require-user";
 
 export async function GET(req: NextRequest) {
-  const auth = requireUser(req);
+  const auth = await requireUser(req);
   if (!auth.ok) return auth.response;
   try {
     await setupDatabase();

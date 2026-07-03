@@ -10,7 +10,7 @@ const VALID_ROLES = ["Admin", "Member", "Viewer"];
 // PUT /api/users/[id] — update name and/or role (Admin only)
 export async function PUT(req: NextRequest, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
-  const auth = requireUser(req, "Admin");
+  const auth = await requireUser(req, "Admin");
   if (!auth.ok) return auth.response;
   const { user } = auth;
   try {
@@ -29,8 +29,14 @@ export async function PUT(req: NextRequest, props: { params: Promise<{ id: strin
     if (!current) return NextResponse.json({ error: "User not found." }, { status: 404 });
 
     const trimmedName = name.trim();
+    // Bump token_version when the role actually changes so the user's existing
+    // sessions are invalidated immediately instead of keeping the old role
+    // until their JWT naturally expires.
+    const roleChanged = role !== current.role;
     await db.execute(
-      "UPDATE users SET name = ?, role = ? WHERE id = ?",
+      roleChanged
+        ? "UPDATE users SET name = ?, role = ?, token_version = token_version + 1 WHERE id = ?"
+        : "UPDATE users SET name = ?, role = ? WHERE id = ?",
       [trimmedName, role, params.id]
     );
 
@@ -51,7 +57,7 @@ export async function PUT(req: NextRequest, props: { params: Promise<{ id: strin
 // DELETE /api/users/[id] (Admin only)
 export async function DELETE(req: NextRequest, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
-  const auth = requireUser(req, "Admin");
+  const auth = await requireUser(req, "Admin");
   if (!auth.ok) return auth.response;
   const { user } = auth;
   try {

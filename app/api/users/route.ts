@@ -11,7 +11,7 @@ import { CreateUserSchema } from "@/lib/schemas";
 
 // GET /api/users — list all users (Admin only)
 export async function GET(req: NextRequest) {
-  const auth = requireUser(req, "Admin");
+  const auth = await requireUser(req, "Admin");
   if (!auth.ok) return auth.response;
   try {
     await setupDatabase();
@@ -40,7 +40,7 @@ export async function GET(req: NextRequest) {
 
 // POST /api/users — create a new user (Admin only)
 export async function POST(req: NextRequest) {
-  const auth = requireUser(req, "Admin");
+  const auth = await requireUser(req, "Admin");
   if (!auth.ok) return auth.response;
   const { user } = auth;
   try {

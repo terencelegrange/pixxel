@@ -19,12 +19,14 @@ interface WindowEntry {
 const store = new Map<string, WindowEntry>();
 
 // Prune expired entries periodically so the map doesn't grow unbounded.
-setInterval(() => {
+// unref() so this timer alone doesn't keep the process (or a Jest run) alive.
+const pruneInterval = setInterval(() => {
   const now = Date.now();
   for (const [key, entry] of store) {
     if (entry.resetAt <= now) store.delete(key);
   }
 }, 60_000);
+pruneInterval.unref();
 
 interface Options {
   limit: number;

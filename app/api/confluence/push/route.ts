@@ -33,28 +33,39 @@ async function uploadAttachment(
   }
 }
 
+// Confluence storage format is XHTML — asset fields are user-editable, so
+// escape them before interpolating to prevent stored markup/macro injection.
+function escapeHtml(value: unknown): string {
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 function buildBody(asset: mysql.RowDataPacket, withImage: boolean): string {
   const imageBlock = withImage
     ? `<h3>Architecture</h3><ac:image ac:align="center" ac:width="760"><ri:attachment ri:filename="${ATTACHMENT_NAME}" /></ac:image>`
     : "";
   return `<h2>Asset Details</h2>
 <table><tbody>
-<tr><th>Name</th><td>${asset.name}</td></tr>
-<tr><th>Short Code</th><td>${asset.short_code ?? "—"}</td></tr>
-<tr><th>Type</th><td>${asset.type}</td></tr>
-<tr><th>Category</th><td>${asset.category}</td></tr>
-<tr><th>Lifecycle</th><td>${asset.lifecycle_status}</td></tr>
-<tr><th>Business Owner</th><td>${asset.business_owner ?? "—"}</td></tr>
-<tr><th>Technical Owner</th><td>${asset.technical_owner ?? "—"}</td></tr>
+<tr><th>Name</th><td>${escapeHtml(asset.name)}</td></tr>
+<tr><th>Short Code</th><td>${asset.short_code ? escapeHtml(asset.short_code) : "—"}</td></tr>
+<tr><th>Type</th><td>${escapeHtml(asset.type)}</td></tr>
+<tr><th>Category</th><td>${escapeHtml(asset.category)}</td></tr>
+<tr><th>Lifecycle</th><td>${escapeHtml(asset.lifecycle_status)}</td></tr>
+<tr><th>Business Owner</th><td>${asset.business_owner ? escapeHtml(asset.business_owner) : "—"}</td></tr>
+<tr><th>Technical Owner</th><td>${asset.technical_owner ? escapeHtml(asset.technical_owner) : "—"}</td></tr>
 </tbody></table>
-${asset.description ? `<h2>Description</h2><p>${asset.description}</p>` : ""}
+${asset.description ? `<h2>Description</h2><p>${escapeHtml(asset.description)}</p>` : ""}
 ${imageBlock}
-${asset.notes ? `<h2>Notes</h2><p>${asset.notes}</p>` : ""}
+${asset.notes ? `<h2>Notes</h2><p>${escapeHtml(asset.notes)}</p>` : ""}
 <p><em>Last synced from Pixxel EA Repository.</em></p>`;
 }
 
 export async function POST(req: NextRequest) {
-  const auth = requireUser(req, ["Admin", "Member"]);
+  const auth = await requireUser(req, ["Admin", "Member"]);
   if (!auth.ok) return auth.response;
   await setupDatabase();
   const db = getDb();

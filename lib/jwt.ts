@@ -13,6 +13,7 @@ export interface JwtPayload {
   name: string;
   email: string;
   role: string;
+  tokenVersion: number;
   iat: number;
   exp: number;
 }
@@ -20,7 +21,7 @@ export interface JwtPayload {
 const HEADER = Buffer.from(JSON.stringify({ alg: "HS256", typ: "JWT" })).toString("base64url");
 
 export function signJwt(
-  user: Pick<JwtPayload, "sub" | "name" | "email" | "role">,
+  user: Pick<JwtPayload, "sub" | "name" | "email" | "role" | "tokenVersion">,
   expiresInSec = 7 * 24 * 3600
 ): string {
   const secret = process.env.JWT_SECRET!;

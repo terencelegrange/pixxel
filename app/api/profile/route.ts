@@ -7,7 +7,7 @@ import { requireUser } from "@/lib/require-user";
 
 // PUT /api/profile — update the current user's name and/or email
 export async function PUT(req: NextRequest) {
-  const auth = requireUser(req);
+  const auth = await requireUser(req);
   if (!auth.ok) return auth.response;
   const { user } = auth;
   try {

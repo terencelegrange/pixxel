@@ -7,7 +7,7 @@ import { requireUser } from "@/lib/require-user";
 
 // GET /api/assets/my-assets?userId=<id> — assets where user is an assigned architect
 export async function GET(req: NextRequest) {
-  const auth = requireUser(req);
+  const auth = await requireUser(req);
   if (!auth.ok) return auth.response;
   try {
     await setupDatabase();

@@ -67,7 +67,7 @@ export async function POST(req: NextRequest) {
       createdAt: new Date().toISOString(),
     };
 
-    const token = signJwt({ sub: user.id, name: user.name, email: user.email, role: user.role });
+    const token = signJwt({ sub: user.id, name: user.name, email: user.email, role: user.role, tokenVersion: 1 });
 
     const res = NextResponse.json({ user, token }, { status: 201 });
     res.cookies.set("authToken", token, {

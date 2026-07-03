@@ -369,6 +369,9 @@ async function runSetup(): Promise<void> {
   `);
 
   await addColIfMissing(db, 'users', 'role_id', 'CHAR(36) NULL AFTER role');
+  // Bumped whenever a user's role changes; embedded in the JWT so requireUser
+  // can reject tokens issued before the bump, invalidating existing sessions.
+  await addColIfMissing(db, 'users', 'token_version', 'INT UNSIGNED NOT NULL DEFAULT 1 AFTER role_id');
 
   // Migrate status column: widen to VARCHAR first so remapping works,
   // then apply the final ENUM definition

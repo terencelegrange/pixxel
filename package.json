@@ -33,7 +33,13 @@
   },
   "overrides": {
     "nanoid": "^3.3.8",
-    "glob": "^10.4.5"
+    "lodash-es": "^4.18.1",
+    "rimraf": {
+      "glob": "^10.4.5"
+    },
+    "@excalidraw/mermaid-to-excalidraw": {
+      "nanoid": "^3.3.8"
+    }
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^6.9.1",

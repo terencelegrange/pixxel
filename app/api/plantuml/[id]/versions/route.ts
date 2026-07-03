@@ -6,7 +6,7 @@ import { requireUser } from "@/lib/require-user";
 
 export async function GET(req: NextRequest, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
-  const auth = requireUser(req);
+  const auth = await requireUser(req);
   if (!auth.ok) return auth.response;
   await setupDatabase();
   const db = getDb();
@@ -18,7 +18,7 @@ export async function GET(req: NextRequest, props: { params: Promise<{ id: strin
 
 export async function POST(req: NextRequest, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
-  const auth = requireUser(req, ["Admin", "Member"]);
+  const auth = await requireUser(req, ["Admin", "Member"]);
   if (!auth.ok) return auth.response;
   const { user } = auth;
   await setupDatabase();

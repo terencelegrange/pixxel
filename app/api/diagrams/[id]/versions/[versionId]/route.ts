@@ -13,7 +13,7 @@ export async function GET(
   props: { params: Promise<{ id: string; versionId: string }> }
 ) {
   const params = await props.params;
-  const auth = requireUser(req);
+  const auth = await requireUser(req);
   if (!auth.ok) return auth.response;
   try {
     await setupDatabase();

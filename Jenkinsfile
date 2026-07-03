@@ -10,7 +10,7 @@ pipeline {
 
     triggers {
         GenericTrigger(
-            token: 'gxkhsonsjafbmlbcqrauryeomwjksgsb'
+            tokenCredentialId: 'PIXXEL_WEBHOOK_TOKEN'
         )
     }
 
@@ -27,7 +27,7 @@ pipeline {
                     npm ci
                     npx tsc --noEmit
                     npm run lint
-                    npm test
+                    npm run test:coverage
                 """
             }
         }

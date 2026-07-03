@@ -13,7 +13,7 @@ import { requireUser } from "@/lib/require-user";
 //   action    — filter by action: CREATE | UPDATE | DELETE (optional)
 //   performer — partial match on performed_by_name (optional)
 export async function GET(req: NextRequest) {
-  const auth = requireUser(req, "Admin");
+  const auth = await requireUser(req, "Admin");
   if (!auth.ok) return auth.response;
   try {
     await setupDatabase();

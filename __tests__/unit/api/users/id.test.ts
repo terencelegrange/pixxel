@@ -74,6 +74,22 @@ describe('PUT /api/users/[id]', () => {
       newValues: { name: 'New Name', role: 'Admin' },
     }))
   })
+
+  it('bumps token_version when the role changes, invalidating existing sessions', async () => {
+    mockExecute.mockResolvedValueOnce([[dbUser]])  // SELECT current (role: Member)
+    mockExecute.mockResolvedValueOnce([{}])         // UPDATE
+    await PUT(makePutReq({ name: 'New Name', role: 'Admin', userId: 'u1', userName: 'Admin' }), params)
+    const updateCall = mockExecute.mock.calls[1]
+    expect(updateCall[0]).toContain('token_version = token_version + 1')
+  })
+
+  it('does not bump token_version when the role is unchanged', async () => {
+    mockExecute.mockResolvedValueOnce([[dbUser]])  // SELECT current (role: Member)
+    mockExecute.mockResolvedValueOnce([{}])         // UPDATE
+    await PUT(makePutReq({ name: 'New Name', role: 'Member', userId: 'u1', userName: 'Admin' }), params)
+    const updateCall = mockExecute.mock.calls[1]
+    expect(updateCall[0]).not.toContain('token_version')
+  })
 })
 
 describe('DELETE /api/users/[id]', () => {
