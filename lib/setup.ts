@@ -8,7 +8,26 @@
 import fs from "fs";
 import path from "path";
 
-export interface DbConfig {
+export type DbDialect = "mysql" | "sqlite";
+
+export interface MysqlDbConfig {
+  dialect: "mysql";
+  host: string;
+  port: number;
+  user: string;
+  password: string;
+  name: string;
+}
+
+export interface SqliteDbConfig {
+  dialect: "sqlite";
+  file: string;
+}
+
+export type DbConfig = MysqlDbConfig | SqliteDbConfig;
+
+// Shape written by setup wizards before this change — no `dialect` key.
+interface LegacyDbConfig {
   host: string;
   port: number;
   user: string;
@@ -25,6 +44,11 @@ export interface SiteConfig {
 
 const CONFIG_PATH = path.join(process.cwd(), "site.config.json");
 
+function normalizeDbConfig(db: DbConfig | LegacyDbConfig): DbConfig {
+  if ("dialect" in db) return db;
+  return { dialect: "mysql", ...db };
+}
+
 export function isSetupComplete(): boolean {
   try {
     const raw = fs.readFileSync(CONFIG_PATH, "utf-8");
@@ -38,7 +62,8 @@ export function isSetupComplete(): boolean {
 export function getSiteConfig(): SiteConfig | null {
   try {
     const raw = fs.readFileSync(CONFIG_PATH, "utf-8");
-    return JSON.parse(raw) as SiteConfig;
+    const parsed = JSON.parse(raw) as SiteConfig;
+    return { ...parsed, db: normalizeDbConfig(parsed.db) };
   } catch {
     return null;
   }
