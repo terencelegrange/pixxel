@@ -7,11 +7,13 @@ import { useRouter } from "next/navigation";
 // Types
 // ---------------------------------------------------------------------------
 interface DbForm {
+  dialect: "mysql" | "sqlite";
   host: string;
   port: string;
   user: string;
   password: string;
   name: string;
+  sqliteFile: string;
 }
 
 interface AppForm {
@@ -179,12 +181,14 @@ function StepDatabase({
 
   function validate() {
     const e: typeof errors = {};
-    if (!form.host.trim()) e.host = "Host is required.";
-    if (!form.user.trim()) e.user = "Username is required.";
-    if (!form.name.trim()) e.name = "Database name is required.";
-    const port = Number(form.port);
-    if (form.port && (isNaN(port) || port < 1 || port > 65535))
-      e.port = "Port must be between 1 and 65535.";
+    if (form.dialect === "mysql") {
+      if (!form.host.trim()) e.host = "Host is required.";
+      if (!form.user.trim()) e.user = "Username is required.";
+      if (!form.name.trim()) e.name = "Database name is required.";
+      const port = Number(form.port);
+      if (form.port && (isNaN(port) || port < 1 || port > 65535))
+        e.port = "Port must be between 1 and 65535.";
+    }
     setErrors(e);
     return Object.keys(e).length === 0;
   }
@@ -198,11 +202,13 @@ function StepDatabase({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          dialect: form.dialect,
           host: form.host.trim(),
           port: Number(form.port) || 3306,
           user: form.user.trim(),
           password: form.password,
           name: form.name.trim(),
+          file: form.sqliteFile.trim(),
         }),
       });
       const data = await res.json();
@@ -231,59 +237,75 @@ function StepDatabase({
         connect to this database and create all required tables automatically.
       </p>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <div className="sm:col-span-2">
-          <Field
-            label="Host"
-            id="db-host"
-            value={form.host}
-            onChange={(v) => { onChange({ host: v }); setTestState("idle"); }}
-            placeholder="localhost"
-            error={errors.host}
-          />
-        </div>
-        <Field
-          label="Port"
-          id="db-port"
-          value={form.port}
-          onChange={(v) => { onChange({ port: v }); setTestState("idle"); }}
-          placeholder="3306"
-          error={errors.port}
-        />
+      <div className="mb-6 grid grid-cols-2 gap-3">
+        <button
+          type="button"
+          onClick={() => { onChange({ dialect: "mysql" }); setTestState("idle"); }}
+          className={`rounded-lg border-2 px-4 py-3 text-left text-sm font-medium transition-colors ${
+            form.dialect === "mysql" ? "border-brand-600 bg-brand-50 text-brand-900" : "border-slate-200 text-slate-600 hover:border-slate-300"
+          }`}
+        >
+          MySQL / MariaDB
+          <span className="mt-1 block text-xs font-normal text-slate-400">Connect to an existing database server.</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => { onChange({ dialect: "sqlite" }); setTestState("idle"); }}
+          className={`rounded-lg border-2 px-4 py-3 text-left text-sm font-medium transition-colors ${
+            form.dialect === "sqlite" ? "border-brand-600 bg-brand-50 text-brand-900" : "border-slate-200 text-slate-600 hover:border-slate-300"
+          }`}
+        >
+          SQLite (Trial Mode)
+          <span className="mt-1 block text-xs font-normal text-slate-400">Single file, no separate database container needed.</span>
+        </button>
       </div>
 
-      <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+      {form.dialect === "sqlite" ? (
         <Field
-          label="Username"
-          id="db-user"
-          value={form.user}
-          onChange={(v) => { onChange({ user: v }); setTestState("idle"); }}
-          placeholder="root"
-          error={errors.user}
+          label="Database File Path"
+          id="sqlite-file"
+          value={form.sqliteFile}
+          onChange={(v) => { onChange({ sqliteFile: v }); setTestState("idle"); }}
+          placeholder="data/pixxel.db"
+          hint="Stored inside the container. Mount a volume at this path to persist data across restarts."
         />
-        <Field
-          label="Password"
-          id="db-password"
-          type={showPassword ? "text" : "password"}
-          value={form.password}
-          onChange={(v) => { onChange({ password: v }); setTestState("idle"); }}
-          placeholder="Leave blank if none"
-          showToggle
-          onToggle={() => setShowPassword((s) => !s)}
-        />
-      </div>
-
-      <div className="mt-4">
-        <Field
-          label="Database Name"
-          id="db-name"
-          value={form.name}
-          onChange={(v) => { onChange({ name: v }); setTestState("idle"); }}
-          placeholder="saas_app"
-          hint="Will be created if it does not exist."
-          error={errors.name}
-        />
-      </div>
+      ) : (
+        <>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <div className="sm:col-span-2">
+              <Field
+                label="Host" id="db-host" value={form.host}
+                onChange={(v) => { onChange({ host: v }); setTestState("idle"); }}
+                placeholder="localhost" error={errors.host}
+              />
+            </div>
+            <Field
+              label="Port" id="db-port" value={form.port}
+              onChange={(v) => { onChange({ port: v }); setTestState("idle"); }}
+              placeholder="3306" error={errors.port}
+            />
+          </div>
+          <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <Field
+              label="Username" id="db-user" value={form.user}
+              onChange={(v) => { onChange({ user: v }); setTestState("idle"); }}
+              placeholder="root" error={errors.user}
+            />
+            <Field
+              label="Password" id="db-password" type={showPassword ? "text" : "password"} value={form.password}
+              onChange={(v) => { onChange({ password: v }); setTestState("idle"); }}
+              placeholder="Leave blank if none" showToggle onToggle={() => setShowPassword((s) => !s)}
+            />
+          </div>
+          <div className="mt-4">
+            <Field
+              label="Database Name" id="db-name" value={form.name}
+              onChange={(v) => { onChange({ name: v }); setTestState("idle"); }}
+              placeholder="saas_app" hint="Will be created if it does not exist." error={errors.name}
+            />
+          </div>
+        </>
+      )}
 
       {/* Test connection feedback */}
       {testState === "ok" && (
@@ -532,11 +554,13 @@ function StepReview({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           db: {
+            dialect: db.dialect,
             host: db.host.trim(),
             port: Number(db.port) || 3306,
             user: db.user.trim(),
             password: db.password,
             name: db.name.trim(),
+            file: db.sqliteFile.trim(),
           },
           appName: app.appName.trim(),
           orgName: app.orgName.trim(),
@@ -584,10 +608,20 @@ function StepReview({
           Database
         </p>
         <div className="divide-y divide-slate-100">
-          <Row label="Host" value={`${db.host}:${db.port || 3306}`} />
-          <Row label="Username" value={db.user} />
-          <Row label="Password" value="••••••••" />
-          <Row label="Database" value={db.name} />
+          {db.dialect === "sqlite" ? (
+            <>
+              <Row label="Type" value="SQLite (Trial Mode)" />
+              <Row label="File" value={db.sqliteFile} />
+            </>
+          ) : (
+            <>
+              <Row label="Type" value="MySQL / MariaDB" />
+              <Row label="Host" value={`${db.host}:${db.port || 3306}`} />
+              <Row label="Username" value={db.user} />
+              <Row label="Password" value="••••••••" />
+              <Row label="Database" value={db.name} />
+            </>
+          )}
         </div>
       </div>
 
@@ -657,11 +691,13 @@ export default function SetupPage() {
   const [step, setStep] = useState<Step>(1);
 
   const [db, setDb] = useState<DbForm>({
+    dialect: "mysql",
     host: "localhost",
     port: "3306",
     user: "root",
     password: "",
     name: "saas_app",
+    sqliteFile: "data/pixxel.db",
   });
   const [app, setApp] = useState<AppForm>({ appName: "", orgName: "" });
   const [admin, setAdmin] = useState<AdminForm>({
