@@ -42,9 +42,9 @@ function makeClient(conn: DatabaseSync): DbClient {
     async execute<T = unknown>(sqlText: string, params: unknown[] = []): Promise<[T, unknown]> {
       const stmt = conn.prepare(sqlText);
       if (isSelectLike(sqlText)) {
-        return [stmt.all(...params) as T, undefined];
+        return [stmt.all(...(params as any[])) as T, undefined];
       }
-      stmt.run(...params);
+      stmt.run(...(params as any[]));
       return [[] as unknown as T, undefined];
     },
   };
@@ -109,7 +109,7 @@ async function runSqliteSetup(filePath: string): Promise<void> {
   }
 
   const insertIgnore = (sqlText: string, params: unknown[]) => {
-    conn.prepare(sqlText).run(...params);
+    conn.prepare(sqlText).run(...(params as any[]));
   };
 
   for (const t of SEED_DIAGRAM_TYPES) {
