@@ -1,9 +1,29 @@
 import { NextResponse } from "next/server";
 import mysql from "mysql2/promise";
+import fs from "fs";
+import path from "path";
 
 export async function POST(req: Request) {
-  const { host, port, user, password, name } = await req.json();
+  const body = await req.json();
+  const { dialect } = body;
 
+  if (dialect === "sqlite") {
+    const file = (body.file as string)?.trim();
+    if (!file) {
+      return NextResponse.json({ success: false, error: "A file path is required." }, { status: 400 });
+    }
+    try {
+      const dir = path.dirname(path.join(process.cwd(), file));
+      fs.mkdirSync(dir, { recursive: true });
+      fs.accessSync(dir, fs.constants.W_OK);
+      return NextResponse.json({ success: true });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Path is not writable.";
+      return NextResponse.json({ success: false, error: message }, { status: 400 });
+    }
+  }
+
+  const { host, port, user, password, name } = body;
   if (!host || !user || !name) {
     return NextResponse.json(
       { success: false, error: "Host, user, and database name are required." },

@@ -3,7 +3,7 @@ import bcrypt from "bcryptjs";
 import { randomUUID } from "crypto";
 import fs from "fs";
 import path from "path";
-import { isSetupComplete, writeSiteConfig } from "@/lib/setup";
+import { isSetupComplete, writeSiteConfig, type DbConfig } from "@/lib/setup";
 
 export async function POST(req: Request) {
   // Guard: prevent re-running setup
@@ -18,9 +18,21 @@ export async function POST(req: Request) {
   const { db, appName, orgName, admin } = body;
 
   // Validate
-  if (!db?.host || !db?.user || !db?.name) {
+  if (!db?.dialect) {
     return NextResponse.json(
       { error: "Missing database configuration." },
+      { status: 400 }
+    );
+  }
+  if (db.dialect === "mysql" && (!db.host || !db.user || !db.name)) {
+    return NextResponse.json(
+      { error: "Missing database configuration." },
+      { status: 400 }
+    );
+  }
+  if (db.dialect === "sqlite" && !db.file?.trim()) {
+    return NextResponse.json(
+      { error: "A SQLite file path is required." },
       { status: 400 }
     );
   }
@@ -37,13 +49,17 @@ export async function POST(req: Request) {
     );
   }
 
-  const dbConfig = {
-    host: db.host.trim(),
-    port: Number(db.port) || 3306,
-    user: db.user.trim(),
-    password: db.password ?? "",
-    name: db.name.trim(),
-  };
+  const dbConfig: DbConfig =
+    db.dialect === "sqlite"
+      ? { dialect: "sqlite", file: db.file.trim() }
+      : {
+          dialect: "mysql",
+          host: db.host.trim(),
+          port: Number(db.port) || 3306,
+          user: db.user.trim(),
+          password: db.password ?? "",
+          name: db.name.trim(),
+        };
 
   // 1. Write site.config.json (setupComplete: false for now so the DB
   //    pool can read credentials but setup isn't marked done yet)
@@ -55,14 +71,20 @@ export async function POST(req: Request) {
   });
 
   // 2. Write .env.local so credentials survive server restarts
-  const envContent = [
-    `DB_HOST=${dbConfig.host}`,
-    `DB_PORT=${dbConfig.port}`,
-    `DB_USER=${dbConfig.user}`,
-    `DB_PASSWORD=${dbConfig.password}`,
-    `DB_NAME=${dbConfig.name}`,
-    "",
-  ].join("\n");
+  const envContent = (
+    dbConfig.dialect === "sqlite"
+      ? [`DB_TYPE=sqlite`, `DB_FILE=${dbConfig.file}`]
+      : [
+          `DB_TYPE=mysql`,
+          `DB_HOST=${dbConfig.host}`,
+          `DB_PORT=${dbConfig.port}`,
+          `DB_USER=${dbConfig.user}`,
+          `DB_PASSWORD=${dbConfig.password}`,
+          `DB_NAME=${dbConfig.name}`,
+        ]
+  )
+    .concat("")
+    .join("\n");
 
   fs.writeFileSync(
     path.join(process.cwd(), ".env.local"),
