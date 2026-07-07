@@ -44,8 +44,10 @@ COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static    ./.next/static
 
-# Migration SQL files — read from disk at boot via drizzle-orm's migrate(),
-# not bundled automatically by Next's standalone output tracing.
+# Migration SQL files — read from disk at boot, not bundled automatically by
+# Next's standalone output tracing. MySQL migrations (drizzle/migrations) are
+# applied via drizzle-orm's migrate(); SQLite migrations (drizzle/migrations-sqlite)
+# are applied by a custom runner in lib/db-sqlite.ts (runSqliteSetup), not drizzle-orm's migrator.
 COPY --from=builder --chown=nextjs:nodejs /app/drizzle/migrations ./drizzle/migrations
 COPY --from=builder --chown=nextjs:nodejs /app/drizzle/migrations-sqlite ./drizzle/migrations-sqlite
 

@@ -12,8 +12,16 @@ export async function POST(req: Request) {
     if (!file) {
       return NextResponse.json({ success: false, error: "A file path is required." }, { status: 400 });
     }
+    if (path.isAbsolute(file) || !path.resolve(process.cwd(), file).startsWith(process.cwd())) {
+      return NextResponse.json(
+        { success: false, error: "Database file path must be a relative path within the project directory." },
+        { status: 400 }
+      );
+    }
     try {
-      const dir = path.dirname(path.join(process.cwd(), file));
+      // Mirror lib/db-sqlite.ts's getConnection(), which derives the directory
+      // directly from the raw filePath (not joined with process.cwd() first).
+      const dir = path.dirname(file);
       fs.mkdirSync(dir, { recursive: true });
       fs.accessSync(dir, fs.constants.W_OK);
       return NextResponse.json({ success: true });

@@ -27,9 +27,42 @@ describe('POST /api/setup/test-db', () => {
     expect(mysql.createConnection).not.toHaveBeenCalled()
   })
 
+  it('derives the writability check directory the same way lib/db-sqlite.ts derives it (path.dirname(file), not joined with cwd)', async () => {
+    const mkdirSync = jest.fn()
+    ;(fs.mkdirSync as jest.Mock) = mkdirSync
+    ;(fs.accessSync as jest.Mock) = jest.fn()
+    await POST(makeReq({ dialect: 'sqlite', file: 'data/pixxel.db' }))
+    expect(mkdirSync).toHaveBeenCalledWith('data', { recursive: true })
+  })
+
+  it('rejects an absolute sqlite file path', async () => {
+    const res = await POST(makeReq({ dialect: 'sqlite', file: '/etc/pixxel.db' }))
+    const body = await res.json()
+    expect(res.status).toBe(400)
+    expect(body.success).toBe(false)
+    expect(body.error).toContain('relative path')
+  })
+
+  it('rejects a sqlite file path that traverses outside the project directory', async () => {
+    const res = await POST(makeReq({ dialect: 'sqlite', file: '../../etc/pixxel.db' }))
+    const body = await res.json()
+    expect(res.status).toBe(400)
+    expect(body.success).toBe(false)
+    expect(body.error).toContain('relative path')
+  })
+
+  it('still accepts a normal relative sqlite file path', async () => {
+    ;(fs.accessSync as jest.Mock) = jest.fn()
+    ;(fs.mkdirSync as jest.Mock) = jest.fn()
+    const res = await POST(makeReq({ dialect: 'sqlite', file: 'data/pixxel.db' }))
+    const body = await res.json()
+    expect(res.status).toBe(200)
+    expect(body.success).toBe(true)
+  })
+
   it('reports failure when the sqlite directory cannot be created', async () => {
     ;(fs.mkdirSync as jest.Mock) = jest.fn(() => { throw new Error('EACCES: permission denied'); })
-    const res = await POST(makeReq({ dialect: 'sqlite', file: '/root/no-access/pixxel.db' }))
+    const res = await POST(makeReq({ dialect: 'sqlite', file: 'no-access/pixxel.db' }))
     const body = await res.json()
     expect(body.success).toBe(false)
     expect(body.error).toContain('permission denied')

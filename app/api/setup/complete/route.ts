@@ -36,6 +36,15 @@ export async function POST(req: Request) {
       { status: 400 }
     );
   }
+  if (db.dialect === "sqlite") {
+    const file = db.file.trim();
+    if (path.isAbsolute(file) || !path.resolve(process.cwd(), file).startsWith(process.cwd())) {
+      return NextResponse.json(
+        { error: "Database file path must be a relative path within the project directory." },
+        { status: 400 }
+      );
+    }
+  }
   if (!appName?.trim() || !orgName?.trim()) {
     return NextResponse.json(
       { error: "Application name and organisation name are required." },

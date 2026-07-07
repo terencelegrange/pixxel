@@ -61,6 +61,25 @@ describe('POST /api/setup/complete', () => {
     expect(res.status).toBe(400)
   })
 
+  it('returns 400 when sqlite file path is absolute', async () => {
+    const res = await POST(makeReq({ db: { dialect: 'sqlite', file: '/etc/pixxel.db' }, appName: 'App', orgName: 'Org', admin: validAdmin }))
+    const body = await res.json()
+    expect(res.status).toBe(400)
+    expect(body.error).toContain('relative path')
+  })
+
+  it('returns 400 when sqlite file path traverses outside the project directory', async () => {
+    const res = await POST(makeReq({ db: { dialect: 'sqlite', file: '../../etc/pixxel.db' }, appName: 'App', orgName: 'Org', admin: validAdmin }))
+    const body = await res.json()
+    expect(res.status).toBe(400)
+    expect(body.error).toContain('relative path')
+  })
+
+  it('accepts a normal relative sqlite file path', async () => {
+    const res = await POST(makeReq({ db: sqliteDb, appName: 'App', orgName: 'Org', admin: validAdmin }))
+    expect(res.status).toBe(200)
+  })
+
   it('returns 400 when appName or orgName missing', async () => {
     const res = await POST(makeReq({ db: mysqlDb, appName: '', orgName: 'Org', admin: validAdmin }))
     expect(res.status).toBe(400)
