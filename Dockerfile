@@ -44,6 +44,10 @@ COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static    ./.next/static
 
+# Migration SQL files — read from disk at boot via drizzle-orm's migrate(),
+# not bundled automatically by Next's standalone output tracing.
+COPY --from=builder --chown=nextjs:nodejs /app/drizzle/migrations ./drizzle/migrations
+
 # Allow the app to write config/state files to /app at runtime
 RUN chown nextjs:nodejs /app
 

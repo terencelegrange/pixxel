@@ -4,11 +4,13 @@ import Link from "next/link";
 import { ArrowLeft, ExternalLink, Check, Eye, EyeOff } from "lucide-react";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
+import { MASKED_VALUE } from "@/lib/secretSettings";
 
 interface ConfluenceSettings {
   base_url: string;
   user_email: string;
-  api_token: string;
+  /** Only ever holds a NEW token the admin typed — never the saved secret. */
+  api_token_input: string;
   space_key: string;
 }
 
@@ -16,9 +18,10 @@ export default function IntegrationsPage() {
   const [settings, setSettings] = useState<ConfluenceSettings>({
     base_url: "",
     user_email: "",
-    api_token: "",
+    api_token_input: "",
     space_key: "",
   });
+  const [hasSavedToken, setHasSavedToken] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
@@ -26,25 +29,33 @@ export default function IntegrationsPage() {
   const [showToken, setShowToken] = useState(false);
 
   useEffect(() => {
+    // Guard against a stale response clobbering newer state — e.g. React
+    // Strict Mode's dev-time double effect invocation fires this fetch
+    // twice; without this, whichever resolves last wins even if the admin
+    // already started editing the form in between.
+    let cancelled = false;
     async function loadSettings() {
       try {
         const res = await fetch("/api/settings");
         if (!res.ok) throw new Error("Failed to load settings.");
         const data = await res.json();
+        if (cancelled) return;
         const s = data.settings ?? {};
         setSettings({
           base_url: s["confluence.base_url"] ?? "",
           user_email: s["confluence.user_email"] ?? "",
-          api_token: s["confluence.api_token"] ?? "",
+          api_token_input: "",
           space_key: s["confluence.space_key"] ?? "",
         });
+        setHasSavedToken(s["confluence.api_token"] === MASKED_VALUE);
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to load settings.");
+        if (!cancelled) setError(err instanceof Error ? err.message : "Failed to load settings.");
       } finally {
-        setIsLoading(false);
+        if (!cancelled) setIsLoading(false);
       }
     }
     loadSettings();
+    return () => { cancelled = true; };
   }, []);
 
   async function handleSave(e: React.FormEvent) {
@@ -60,13 +71,17 @@ export default function IntegrationsPage() {
           settings: {
             "confluence.base_url": settings.base_url,
             "confluence.user_email": settings.user_email,
-            "confluence.api_token": settings.api_token,
+            "confluence.api_token": settings.api_token_input || (hasSavedToken ? MASKED_VALUE : ""),
             "confluence.space_key": settings.space_key,
           },
         }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Save failed.");
+      if (settings.api_token_input) {
+        setHasSavedToken(true);
+        setSettings((s) => ({ ...s, api_token_input: "" }));
+      }
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 3000);
     } catch (err) {
@@ -158,9 +173,9 @@ export default function IntegrationsPage() {
                 <div className="relative">
                   <Input
                     type={showToken ? "text" : "password"}
-                    value={settings.api_token}
-                    onChange={(e) => setSettings((s) => ({ ...s, api_token: e.target.value }))}
-                    placeholder="Your Atlassian API token"
+                    value={settings.api_token_input}
+                    onChange={(e) => setSettings((s) => ({ ...s, api_token_input: e.target.value }))}
+                    placeholder={hasSavedToken ? "•••••••• (unchanged — type to replace)" : "Your Atlassian API token"}
                     className="pr-10"
                   />
                   <button

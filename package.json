@@ -19,6 +19,7 @@
     "@excalidraw/excalidraw": "^0.18.0",
     "@tailwindcss/typography": "^0.5.19",
     "bcryptjs": "^2.4.3",
+    "drizzle-orm": "^0.45.2",
     "lucide-react": "^0.400.0",
     "mysql2": "^3.20.0",
     "next": "^15.5.19",
@@ -37,6 +38,9 @@
     "rimraf": {
       "glob": "^10.4.5"
     },
+    "@esbuild-kit/core-utils": {
+      "esbuild": "^0.25.4"
+    },
     "@excalidraw/mermaid-to-excalidraw": {
       "nanoid": "^3.3.8"
     }
@@ -52,6 +56,7 @@
     "@types/react-dom": "^18",
     "autoprefixer": "^10.0.1",
     "dotenv": "^17.4.2",
+    "drizzle-kit": "^0.31.10",
     "eslint": "^8",
     "eslint-config-next": "^15.5.19",
     "jest": "^29.7.0",

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Settings, Bell, Lock, Globe, ShieldCheck, MessageSquare, ChevronRight, Layers, GitBranch, Gauge, Building2, Network, Target, Package2, BarChart2, ScrollText, MapPin, Users, ClipboardList } from "lucide-react";
+import { Settings, Bell, Lock, Globe, ShieldCheck, MessageSquare, ChevronRight, Layers, GitBranch, Gauge, Building2, Network, Target, Package2, BarChart2, ScrollText, MapPin, Users, ClipboardList, Activity } from "lucide-react";
 
 // ---------------------------------------------------------------------------
 // Clickable settings tile
@@ -203,6 +203,13 @@ export default function SettingsPage() {
           iconBg="bg-sky-500"
           title="Integrations"
           description="Connect third-party services and manage API keys."
+        />
+        <SettingsTile
+          href="/settings/observability"
+          icon={Activity}
+          iconBg="bg-cyan-500"
+          title="Observability"
+          description="Forward application logs to an external log collector."
         />
         </div>
       </div>
