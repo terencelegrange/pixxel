@@ -41,3 +41,6 @@ backups/
 
 # Local scripts — not for source control
 scripts/
+
+# SQLite trial-mode database files
+data/
