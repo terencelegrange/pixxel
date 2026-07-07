@@ -12,7 +12,8 @@
     "test:coverage": "jest --selectProjects unit ui --passWithNoTests --coverage",
     "test:integration": "jest --selectProjects integration --passWithNoTests",
     "test:all": "jest --passWithNoTests",
-    "seed:demo": "ts-node --project tsconfig.seed.json scripts/seed-demo.ts"
+    "seed:demo": "ts-node --project tsconfig.seed.json scripts/seed-demo.ts",
+    "db:generate:sqlite": "drizzle-kit generate --config drizzle.config.sqlite.ts"
   },
   "dependencies": {
     "@dagrejs/dagre": "^3.0.0",

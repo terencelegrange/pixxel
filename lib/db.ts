@@ -13,9 +13,14 @@
 import mysql, { Pool } from "mysql2/promise";
 import fs from "fs";
 import path from "path";
+import { randomUUID } from "crypto";
 import { drizzle } from "drizzle-orm/mysql2";
 import { migrate } from "drizzle-orm/mysql2/migrator";
 import { getSiteConfig, type DbDialect } from "@/lib/setup";
+import {
+  SEED_DIAGRAM_TYPES, SEED_INDUSTRY_SECTORS, SEED_TELECOM_CAPABILITIES,
+  SEED_UTILITY_CAPABILITIES, SEED_INVESTMENT_CLASSIFICATIONS,
+} from "@/lib/db-seed-data";
 
 // ---------------------------------------------------------------------------
 // Dialect and SQLite path resolution
@@ -166,46 +171,21 @@ async function runSetup(): Promise<void> {
   // Seed data below is reference/lookup data, not schema — it stays here as
   // idempotent inserts rather than migration files.
 
-  await db.execute(`
-    INSERT IGNORE INTO diagram_types (id, name, description, sort_order, created_by_id, created_by_name) VALUES
-      ('dtype000-0000-0000-0000-000000000001', 'Domain',   'High-level domain architecture overview',        1, 'system', 'System'),
-      ('dtype000-0000-0000-0000-000000000002', 'Program',  'Program-level architecture diagram',             2, 'system', 'System'),
-      ('dtype000-0000-0000-0000-000000000003', 'Solution', 'Solution architecture diagram',                  3, 'system', 'System'),
-      ('dtype000-0000-0000-0000-000000000004', 'Detailed', 'Detailed technical architecture diagram',        4, 'system', 'System')
-  `);
+  for (const t of SEED_DIAGRAM_TYPES) {
+    await db.execute(
+      "INSERT IGNORE INTO diagram_types (id, name, description, sort_order, created_by_id, created_by_name) VALUES (?, ?, ?, ?, 'system', 'System')",
+      [t.id, t.name, t.description, t.sortOrder]
+    );
+  }
 
-  // Seed: Telecommunications industry sector
-  await db.execute(`
-    INSERT IGNORE INTO industry_sectors (id, name, description, created_by_id, created_by_name)
-    VALUES ('00000001-ind-0000-0000-000000000001', 'Telecommunications',
-      'Providers of voice, data, and broadband connectivity services.',
-      'system', 'System')
-  `);
+  for (const s of SEED_INDUSTRY_SECTORS) {
+    await db.execute(
+      "INSERT IGNORE INTO industry_sectors (id, name, description, created_by_id, created_by_name) VALUES (?, ?, ?, 'system', 'System')",
+      [s.id, s.name, s.description]
+    );
+  }
 
-  // Seed: Utilities (Energy) industry sector
-  await db.execute(`
-    INSERT IGNORE INTO industry_sectors (id, name, description, created_by_id, created_by_name)
-    VALUES ('00000001-ind-0000-0000-000000000002', 'Utilities (Energy)',
-      'Providers of electricity, gas, and water distribution services.',
-      'system', 'System')
-  `);
-
-  // Seed: Telecommunications business capabilities
-  const telecoCaps = [
-    ['00000002-cap-0000-0000-000000000001', 'Network Management',              'Planning, provisioning, and operating the core and access network.',          1],
-    ['00000002-cap-0000-0000-000000000002', 'Voice & Calling Services',         'Management of voice, conferencing, and unified communications products.',     2],
-    ['00000002-cap-0000-0000-000000000003', 'Data & Connectivity Services',     'Broadband, mobile data, and enterprise connectivity offerings.',              3],
-    ['00000002-cap-0000-0000-000000000004', 'Customer Management',              'Acquisition, onboarding, retention, and care of customers.',                  4],
-    ['00000002-cap-0000-0000-000000000005', 'Billing & Revenue Management',     'Rating, billing, collections, and revenue assurance.',                        5],
-    ['00000002-cap-0000-0000-000000000006', 'Product Management',               'Design, launch, and lifecycle management of products and services.',          6],
-    ['00000002-cap-0000-0000-000000000007', 'Service Assurance',                'Monitoring, fault management, and SLA performance management.',               7],
-    ['00000002-cap-0000-0000-000000000008', 'Network Planning & Engineering',   'Capacity planning, design, and technology evolution of the network.',         8],
-    ['00000002-cap-0000-0000-000000000009', 'Field Operations',                 'Installation, maintenance, and repair of physical infrastructure.',           9],
-    ['00000002-cap-0000-0000-000000000010', 'Digital Channels & Self-Service',  'Web, mobile, and API-driven customer interaction channels.',                 10],
-    ['00000002-cap-0000-0000-000000000011', 'Wholesale & Interconnect',         'Carrier relations, roaming, and inter-operator settlement.',                 11],
-    ['00000002-cap-0000-0000-000000000012', 'Regulatory & Compliance',          'Licence management, regulatory reporting, and legal compliance.',            12],
-  ];
-  for (const [id, name, description, sortOrder] of telecoCaps) {
+  for (const [id, name, description, sortOrder] of SEED_TELECOM_CAPABILITIES) {
     await db.execute(
       `INSERT IGNORE INTO business_capabilities
          (id, name, description, industry_sector_id, sort_order, created_by_id, created_by_name)
@@ -214,22 +194,7 @@ async function runSetup(): Promise<void> {
     );
   }
 
-  // Seed: Utilities (Energy) business capabilities
-  const utilityCaps = [
-    ['00000003-cap-0000-0000-000000000001', 'Energy Generation',                  'Operation of power plants and renewable energy assets.',                     1],
-    ['00000003-cap-0000-0000-000000000002', 'Energy Transmission',                'High-voltage bulk power transmission across the grid.',                      2],
-    ['00000003-cap-0000-0000-000000000003', 'Energy Distribution',                'Low-voltage distribution of electricity to end consumers.',                  3],
-    ['00000003-cap-0000-0000-000000000004', 'Metering & Smart Grid',              'Smart meter deployment, data collection, and grid intelligence.',            4],
-    ['00000003-cap-0000-0000-000000000005', 'Customer Operations',                'Customer acquisition, service requests, and complaint management.',          5],
-    ['00000003-cap-0000-0000-000000000006', 'Billing & Revenue Management',       'Energy usage billing, tariff management, and debt recovery.',                6],
-    ['00000003-cap-0000-0000-000000000007', 'Asset Management',                   'Lifecycle management of physical grid and generation assets.',               7],
-    ['00000003-cap-0000-0000-000000000008', 'Field Operations',                   'Inspection, maintenance, and emergency response for infrastructure.',        8],
-    ['00000003-cap-0000-0000-000000000009', 'Energy Trading & Risk Management',   'Wholesale energy procurement, trading, and market risk management.',         9],
-    ['00000003-cap-0000-0000-000000000010', 'Regulatory & Compliance',            'Licence obligations, safety reporting, and environmental compliance.',      10],
-    ['00000003-cap-0000-0000-000000000011', 'Environmental Management',           'Emissions tracking, sustainability reporting, and carbon management.',      11],
-    ['00000003-cap-0000-0000-000000000012', 'Network Planning & Investment',      'Grid investment planning, capacity modelling, and project delivery.',       12],
-  ];
-  for (const [id, name, description, sortOrder] of utilityCaps) {
+  for (const [id, name, description, sortOrder] of SEED_UTILITY_CAPABILITIES) {
     await db.execute(
       `INSERT IGNORE INTO business_capabilities
          (id, name, description, industry_sector_id, sort_order, created_by_id, created_by_name)
@@ -238,16 +203,17 @@ async function runSetup(): Promise<void> {
     );
   }
 
-  await db.execute(`
-    INSERT INTO investment_classifications (id, name, color, sort_order, created_by_id, created_by_name)
-    SELECT * FROM (
-      SELECT UUID() AS id, 'Invest' AS name, '#22c55e' AS color, 1 AS sort_order, 'system' AS created_by_id, 'System' AS created_by_name UNION ALL
-      SELECT UUID(), 'Experiment',   '#3b82f6', 2, 'system', 'System' UNION ALL
-      SELECT UUID(), 'Contain',      '#eab308', 3, 'system', 'System' UNION ALL
-      SELECT UUID(), 'Decommission', '#ef4444', 4, 'system', 'System'
-    ) AS seed
-    WHERE NOT EXISTS (SELECT 1 FROM investment_classifications LIMIT 1)
-  `);
+  const [[{ count }]] = [
+    (await db.execute<mysql.RowDataPacket[]>("SELECT COUNT(*) AS count FROM investment_classifications"))[0],
+  ];
+  if (Number(count) === 0) {
+    for (const c of SEED_INVESTMENT_CLASSIFICATIONS) {
+      await db.execute(
+        "INSERT INTO investment_classifications (id, name, color, sort_order, created_by_id, created_by_name) VALUES (?, ?, ?, ?, 'system', 'System')",
+        [randomUUID(), c.name, c.color, c.sortOrder]
+      );
+    }
+  }
 
   } finally {
     await db.execute("SELECT RELEASE_LOCK('pixxel_db_setup')");
