@@ -3,6 +3,7 @@
 jest.mock('@/lib/db', () => ({
   setupDatabase: jest.fn().mockResolvedValue(undefined),
   getDb: jest.fn(),
+  getDbDialect: jest.fn().mockReturnValue('mysql'),
   resetPool: jest.fn(),
 }))
 jest.mock('@/lib/audit', () => ({ writeAudit: jest.fn().mockResolvedValue(undefined) }))
@@ -10,7 +11,7 @@ jest.mock('@/lib/require-user', () => ({
   requireUser: jest.fn().mockReturnValue({ ok: true, user: { id: 'u1', name: 'Test User', email: 'test@example.com', role: 'Admin' } }),
 }))
 
-import { getDb } from '@/lib/db'
+import { getDb, getDbDialect } from '@/lib/db'
 import { GET, POST } from '@/app/api/projects/route'
 
 const mockExecute = jest.fn()
@@ -49,5 +50,15 @@ describe('POST /api/projects', () => {
     mockExecute.mockResolvedValueOnce([{}])
     const res = await POST(makeReq({ name: 'Migration Project', status: 'Active', userId: 'u1', userName: 'Admin' }))
     expect(res.status).toBe(201)
+  })
+
+  it('uses CURRENT_TIMESTAMP instead of NOW() for sqlite dialect', async () => {
+    ;(getDbDialect as jest.Mock).mockReturnValue('sqlite')
+    mockExecute.mockResolvedValueOnce([{}])
+    const res = await POST(makeReq({ name: 'Test Project', status: 'Active' }))
+    expect(res.status).toBe(201)
+    const insertCall = mockExecute.mock.calls.find(([sql]) => sql.includes('INSERT INTO projects'))
+    expect(insertCall[0]).toContain('CURRENT_TIMESTAMP, CURRENT_TIMESTAMP')
+    expect(insertCall[0]).not.toContain('NOW()')
   })
 })

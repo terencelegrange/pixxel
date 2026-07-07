@@ -3,7 +3,8 @@ import logger from "@/lib/logger";
 import { randomUUID } from "crypto";
 import bcrypt from "bcryptjs";
 import mysql from "mysql2/promise";
-import { getDb, setupDatabase } from "@/lib/db";
+import { getDb, setupDatabase, getDbDialect } from "@/lib/db";
+import { nowSql } from "@/lib/sql-compat";
 import { writeAudit } from "@/lib/audit";
 import { requireUser } from "@/lib/require-user";
 import { validate } from "@/lib/validate";
@@ -60,8 +61,9 @@ export async function POST(req: NextRequest) {
     const id = randomUUID();
     const hashed = await bcrypt.hash(password, 12);
 
+    const now = nowSql(getDbDialect());
     await db.execute(
-      "INSERT INTO users (id, name, email, password, role, created_at, updated_at) VALUES (?,?,?,?,?, NOW(), NOW())",
+      `INSERT INTO users (id, name, email, password, role, created_at, updated_at) VALUES (?,?,?,?,?, ${now}, ${now})`,
       [id, name, email, hashed, role]
     );
 

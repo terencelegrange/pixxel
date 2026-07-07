@@ -3,6 +3,7 @@
 jest.mock('@/lib/db', () => ({
   setupDatabase: jest.fn().mockResolvedValue(undefined),
   getDb: jest.fn(),
+  getDbDialect: jest.fn().mockReturnValue('mysql'),
   resetPool: jest.fn(),
 }))
 jest.mock('@/lib/audit', () => ({ writeAudit: jest.fn().mockResolvedValue(undefined) }))
@@ -11,7 +12,7 @@ jest.mock('@/lib/require-user', () => ({
 }))
 jest.mock('bcryptjs', () => ({ hash: jest.fn().mockResolvedValue('$hashed') }))
 
-import { getDb } from '@/lib/db'
+import { getDb, getDbDialect } from '@/lib/db'
 import { GET, POST } from '@/app/api/users/route'
 
 const mockExecute = jest.fn()
@@ -67,5 +68,16 @@ describe('POST /api/users', () => {
     mockExecute.mockResolvedValueOnce([{}])   // INSERT
     const res = await POST(makeReq({ name: 'New User', email: 'new@b.com', password: 'password1', role: 'Member', userId: 'u1', userName: 'Admin' }))
     expect(res.status).toBe(201)
+  })
+
+  it('uses CURRENT_TIMESTAMP instead of NOW() for sqlite dialect', async () => {
+    ;(getDbDialect as jest.Mock).mockReturnValue('sqlite')
+    mockExecute.mockResolvedValueOnce([[]])   // no existing
+    mockExecute.mockResolvedValueOnce([{}])   // INSERT
+    const res = await POST(makeReq({ name: 'Jane', email: 'jane@example.com', password: 'password123', role: 'Member' }))
+    expect(res.status).toBe(201)
+    const insertCall = mockExecute.mock.calls.find(([sql]) => sql.includes('INSERT INTO users'))
+    expect(insertCall[0]).toContain('CURRENT_TIMESTAMP, CURRENT_TIMESTAMP')
+    expect(insertCall[0]).not.toContain('NOW()')
   })
 })

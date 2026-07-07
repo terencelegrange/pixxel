@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import logger from "@/lib/logger";
 import { randomUUID } from "crypto";
 import mysql from "mysql2/promise";
-import { getDb, setupDatabase } from "@/lib/db";
+import { getDb, setupDatabase, getDbDialect } from "@/lib/db";
+import { nowSql } from "@/lib/sql-compat";
 import { writeAudit } from "@/lib/audit";
 import { requireUser } from "@/lib/require-user";
 
@@ -66,10 +67,11 @@ export async function POST(req: NextRequest) {
     const trimmedName = name.trim();
     const resolvedStatus = status ?? "Active";
 
+    const now = nowSql(getDbDialect());
     const db = getDb();
     await db.execute(
       `INSERT INTO projects (id, name, description, status, start_date, end_date, created_by_id, created_by_name, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ${now}, ${now})`,
       [id, trimmedName, description?.trim() || null, resolvedStatus, startDate || null, endDate || null, user.id, user.name]
     );
 
