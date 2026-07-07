@@ -6,16 +6,16 @@ jest.mock('@/lib/db', () => ({
 
 import { getDb } from '@/lib/db'
 
-const mockQuery = jest.fn()
+const mockExecute = jest.fn()
 
 beforeEach(() => {
   jest.clearAllMocks()
-  ;(getDb as jest.Mock).mockReturnValue({ query: mockQuery })
+  ;(getDb as jest.Mock).mockReturnValue({ execute: mockExecute })
 })
 
 describe('GET /api/health', () => {
   it('returns 200 ok when the database responds', async () => {
-    mockQuery.mockResolvedValueOnce([[{ '1': 1 }]])
+    mockExecute.mockResolvedValueOnce([[{ '1': 1 }]])
     const res = await GET()
     expect(res.status).toBe(200)
     const body = await res.json()
@@ -23,7 +23,7 @@ describe('GET /api/health', () => {
   })
 
   it('returns 503 when the database is unreachable', async () => {
-    mockQuery.mockRejectedValueOnce(new Error('connect ECONNREFUSED'))
+    mockExecute.mockRejectedValueOnce(new Error('connect ECONNREFUSED'))
     const res = await GET()
     expect(res.status).toBe(503)
     const body = await res.json()
