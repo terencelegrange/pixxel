@@ -18,6 +18,10 @@ import { drizzle } from "drizzle-orm/mysql2";
 import { migrate } from "drizzle-orm/mysql2/migrator";
 import { getSiteConfig, type DbDialect } from "@/lib/setup";
 import {
+  getSqliteDb, setupSqliteDatabase, withSqliteTransaction, resetSqlitePool,
+  type DbClient,
+} from "@/lib/db-sqlite";
+import {
   SEED_DIAGRAM_TYPES, SEED_INDUSTRY_SECTORS, SEED_TELECOM_CAPABILITIES,
   SEED_UTILITY_CAPABILITIES, SEED_INVESTMENT_CLASSIFICATIONS,
 } from "@/lib/db-seed-data";
@@ -106,13 +110,17 @@ function getPool(): Pool {
   return g._dbPool;
 }
 
-export function getDb(): Pool {
-  return getPool();
+export function getDb(): DbClient {
+  if (getDbDialect() === "sqlite") {
+    return getSqliteDb(getSqliteFilePath());
+  }
+  return getPool() as unknown as DbClient;
 }
 
 export function resetPool(): void {
   g._dbPool = undefined;
   g._dbInitPromise = null;
+  resetSqlitePool();
 }
 
 // ---------------------------------------------------------------------------
@@ -125,8 +133,11 @@ export function resetPool(): void {
 // (e.g. after a transient connection error).
 // ---------------------------------------------------------------------------
 export function setupDatabase(): Promise<void> {
+  if (getDbDialect() === "sqlite") {
+    return setupSqliteDatabase(getSqliteFilePath());
+  }
   if (!g._dbInitPromise) {
-    g._dbInitPromise = runSetup().catch((err) => {
+    g._dbInitPromise = runMysqlSetup().catch((err) => {
       g._dbInitPromise = null; // allow retry on next invocation
       return Promise.reject(err);
     });
@@ -134,7 +145,7 @@ export function setupDatabase(): Promise<void> {
   return g._dbInitPromise;
 }
 
-async function runSetup(): Promise<void> {
+async function runMysqlSetup(): Promise<void> {
   const creds = getDbCredentials();
   if (!creds) {
     throw new Error("Cannot run database setup: no credentials configured.");
@@ -230,12 +241,15 @@ async function runSetup(): Promise<void> {
 //   });
 // ---------------------------------------------------------------------------
 export async function withTransaction<T>(
-  callback: (conn: mysql.Connection) => Promise<T>
+  callback: (conn: DbClient) => Promise<T>
 ): Promise<T> {
+  if (getDbDialect() === "sqlite") {
+    return withSqliteTransaction(getSqliteFilePath(), callback);
+  }
   const conn = await getPool().getConnection();
   await conn.beginTransaction();
   try {
-    const result = await callback(conn);
+    const result = await callback(conn as unknown as DbClient);
     await conn.commit();
     return result;
   } catch (err) {
