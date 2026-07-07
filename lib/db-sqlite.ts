@@ -28,6 +28,12 @@ function isSelectLike(sqlText: string): boolean {
   return /^\s*(SELECT|PRAGMA|WITH)/i.test(sqlText);
 }
 
+/**
+ * Returns the cached single DatabaseSync connection for this process.
+ * Trial mode uses a single shared connection by design (no pooling, no locking).
+ * Acceptable for expected single-admin, low-traffic usage; not suitable for
+ * concurrent production workloads.
+ */
 function getConnection(filePath: string): DatabaseSync {
   if (!g._sqliteConn) {
     fs.mkdirSync(path.dirname(filePath), { recursive: true });
@@ -60,6 +66,14 @@ export function resetSqlitePool(): void {
   g._sqliteInitPromise = null;
 }
 
+/**
+ * Execute a callback within a SQLite transaction. Reuses the global shared connection
+ * with no concurrency control. Concurrent calls to this function are not safe: if two
+ * callers invoke withSqliteTransaction simultaneously, the second caller's BEGIN will
+ * run against an already-open transaction on the same connection, which SQLite will
+ * reject. This is an acceptable limitation for trial mode's single-admin use case; a
+ * production backend would require a write queue or connection pool.
+ */
 export async function withSqliteTransaction<T>(
   filePath: string,
   callback: (tx: DbClient) => Promise<T>
