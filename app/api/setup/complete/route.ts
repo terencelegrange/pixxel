@@ -38,7 +38,10 @@ export async function POST(req: Request) {
   }
   if (db.dialect === "sqlite") {
     const file = db.file.trim();
-    if (path.isAbsolute(file) || !path.resolve(process.cwd(), file).startsWith(process.cwd())) {
+    const resolved = path.resolve(process.cwd(), file);
+    const cwd = process.cwd();
+    const outsideProject = resolved !== cwd && !resolved.startsWith(cwd + path.sep);
+    if (path.isAbsolute(file) || outsideProject) {
       return NextResponse.json(
         { error: "Database file path must be a relative path within the project directory." },
         { status: 400 }

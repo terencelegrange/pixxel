@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server'
 import fs from 'fs'
+import path from 'path'
 
 jest.mock('fs')
 jest.mock('@/lib/setup', () => ({
@@ -70,6 +71,18 @@ describe('POST /api/setup/complete', () => {
 
   it('returns 400 when sqlite file path traverses outside the project directory', async () => {
     const res = await POST(makeReq({ db: { dialect: 'sqlite', file: '../../etc/pixxel.db' }, appName: 'App', orgName: 'Org', admin: validAdmin }))
+    const body = await res.json()
+    expect(res.status).toBe(400)
+    expect(body.error).toContain('relative path')
+  })
+
+  it('returns 400 when sqlite file path resolves to a sibling directory sharing a prefix with the project directory (bare startsWith bypass)', async () => {
+    // e.g. cwd "/app" + file "../app-secrets/db.sqlite" resolves to "/app-secrets/db.sqlite",
+    // which a bare `.startsWith(cwd)` check would wrongly accept since
+    // "/app-secrets/db.sqlite".startsWith("/app") is true, even though it is
+    // a sibling directory entirely outside the project root.
+    const siblingFile = `../${path.basename(process.cwd())}-secrets/db.sqlite`
+    const res = await POST(makeReq({ db: { dialect: 'sqlite', file: siblingFile }, appName: 'App', orgName: 'Org', admin: validAdmin }))
     const body = await res.json()
     expect(res.status).toBe(400)
     expect(body.error).toContain('relative path')
