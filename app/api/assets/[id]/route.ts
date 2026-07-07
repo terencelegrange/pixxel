@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import logger from "@/lib/logger";
 import mysql from "mysql2/promise";
-import { getDb, setupDatabase, withTransaction } from "@/lib/db";
+import { getDb, setupDatabase, withTransaction, getDbDialect } from "@/lib/db";
+import { insertIgnoreSql } from "@/lib/sql-compat";
 import { writeAudit } from "@/lib/audit";
 import { Asset, AssetCategory, AssetType, LifecycleStatus } from "@/types";
 import { requireUser } from "@/lib/require-user";
@@ -171,6 +172,7 @@ export async function PUT(req: NextRequest, props: { params: Promise<{ id: strin
     };
 
     await withTransaction(async (tx) => {
+      const dialect = getDbDialect();
       await tx.execute(
         `UPDATE assets SET
            name=?, short_code=?, description=?, type=?, category=?, icon=?, hero_diagram_id=?, tier_id=?, strategy_id=?, complexity_id=?, domain_id=?, vendor_id=?,
@@ -190,7 +192,7 @@ export async function PUT(req: NextRequest, props: { params: Promise<{ id: strin
       await tx.execute("DELETE FROM asset_departments WHERE asset_id = ?", [params.id]);
       for (const deptId of values.departmentIds) {
         await tx.execute(
-          "INSERT IGNORE INTO asset_departments (asset_id, department_id) VALUES (?, ?)",
+          insertIgnoreSql("asset_departments", ["asset_id", "department_id"], dialect),
           [params.id, deptId]
         );
       }
@@ -202,7 +204,7 @@ export async function PUT(req: NextRequest, props: { params: Promise<{ id: strin
         );
         if (uRows[0]) {
           await tx.execute(
-            "INSERT IGNORE INTO asset_architects (asset_id, user_id, user_name) VALUES (?, ?, ?)",
+            insertIgnoreSql("asset_architects", ["asset_id", "user_id", "user_name"], dialect),
             [params.id, uid, uRows[0].name]
           );
         }
@@ -211,7 +213,7 @@ export async function PUT(req: NextRequest, props: { params: Promise<{ id: strin
       await tx.execute("DELETE FROM asset_capabilities WHERE asset_id = ?", [params.id]);
       for (const capId of values.capabilityIds) {
         await tx.execute(
-          "INSERT IGNORE INTO asset_capabilities (asset_id, business_capability_id) VALUES (?, ?)",
+          insertIgnoreSql("asset_capabilities", ["asset_id", "business_capability_id"], dialect),
           [params.id, capId]
         );
       }

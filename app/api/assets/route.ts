@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import logger from "@/lib/logger";
 import { randomUUID } from "crypto";
 import mysql from "mysql2/promise";
-import { getDb, setupDatabase, withTransaction } from "@/lib/db";
+import { getDb, setupDatabase, withTransaction, getDbDialect } from "@/lib/db";
+import { insertIgnoreSql } from "@/lib/sql-compat";
 import { writeAudit } from "@/lib/audit";
 import { Asset, AssetCategory, AssetType, LifecycleStatus } from "@/types";
 import { requireUser } from "@/lib/require-user";
@@ -163,6 +164,7 @@ export async function POST(req: NextRequest) {
     };
 
     await withTransaction(async (tx) => {
+      const dialect = getDbDialect();
       await tx.execute(
         `INSERT INTO assets
            (id, name, short_code, description, type, category, icon, hero_diagram_id, tier_id, strategy_id, complexity_id, domain_id, vendor_id, lifecycle_status,
@@ -179,7 +181,7 @@ export async function POST(req: NextRequest) {
       // Insert junction rows
       for (const deptId of values.departmentIds) {
         await tx.execute(
-          "INSERT IGNORE INTO asset_departments (asset_id, department_id) VALUES (?, ?)",
+          insertIgnoreSql("asset_departments", ["asset_id", "department_id"], dialect),
           [id, deptId]
         );
       }
@@ -190,7 +192,7 @@ export async function POST(req: NextRequest) {
         );
         if (uRows[0]) {
           await tx.execute(
-            "INSERT IGNORE INTO asset_architects (asset_id, user_id, user_name) VALUES (?, ?, ?)",
+            insertIgnoreSql("asset_architects", ["asset_id", "user_id", "user_name"], dialect),
             [id, uid, uRows[0].name]
           );
         }
@@ -198,7 +200,7 @@ export async function POST(req: NextRequest) {
       // Insert capability junction rows
       for (const capId of values.capabilityIds) {
         await tx.execute(
-          "INSERT IGNORE INTO asset_capabilities (asset_id, business_capability_id) VALUES (?, ?)",
+          insertIgnoreSql("asset_capabilities", ["asset_id", "business_capability_id"], dialect),
           [id, capId]
         );
       }

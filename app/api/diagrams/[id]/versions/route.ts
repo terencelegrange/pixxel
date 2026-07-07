@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import logger from "@/lib/logger";
 import { randomUUID } from "crypto";
 import mysql from "mysql2/promise";
-import { getDb, setupDatabase } from "@/lib/db";
+import { getDb, setupDatabase, getDbDialect } from "@/lib/db";
+import { insertIgnoreSql, nowSql } from "@/lib/sql-compat";
 import { writeAudit } from "@/lib/audit";
 import { requireUser } from "@/lib/require-user";
 
@@ -67,15 +68,17 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
       [versionId, params.id, nextVersion, content, user.id, user.name]
     );
 
+    const dialect = getDbDialect();
+
     // Update diagram.updated_at
-    await db.execute("UPDATE diagrams SET updated_at = NOW() WHERE id = ?", [params.id]);
+    await db.execute(`UPDATE diagrams SET updated_at = ${nowSql(dialect)} WHERE id = ?`, [params.id]);
 
     // Replace diagram_assets junction
     await db.execute("DELETE FROM diagram_assets WHERE diagram_id = ?", [params.id]);
     const ids = Array.isArray(assetIds) ? assetIds as string[] : [];
     for (const assetId of ids) {
       await db.execute(
-        "INSERT IGNORE INTO diagram_assets (diagram_id, asset_id) VALUES (?,?)",
+        insertIgnoreSql("diagram_assets", ["diagram_id", "asset_id"], dialect),
         [params.id, assetId]
       );
     }

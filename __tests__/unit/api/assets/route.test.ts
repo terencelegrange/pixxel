@@ -7,13 +7,14 @@ jest.mock('@/lib/db', () => ({
   getDb: jest.fn(),
   resetPool: jest.fn(),
   withTransaction: jest.fn((cb: (tx: { execute: jest.Mock }) => unknown) => cb({ execute: mockExecute })),
+  getDbDialect: jest.fn().mockReturnValue('mysql'),
 }))
 jest.mock('@/lib/audit', () => ({ writeAudit: jest.fn().mockResolvedValue(undefined) }))
 jest.mock('@/lib/require-user', () => ({
   requireUser: jest.fn().mockReturnValue({ ok: true, user: { id: 'u1', name: 'Test User', email: 'test@example.com', role: 'Admin' } }),
 }))
 
-import { getDb } from '@/lib/db'
+import { getDb, getDbDialect } from '@/lib/db'
 import { requireUser } from '@/lib/require-user'
 import { GET, POST } from '@/app/api/assets/route'
 
@@ -163,5 +164,14 @@ describe('POST /api/assets', () => {
     mockExecute.mockRejectedValueOnce(new Error('db error'))
     const res = await POST(makeReq(valid))
     expect(res.status).toBe(500)
+  })
+
+  it('uses INSERT OR IGNORE for junction rows when dialect is sqlite', async () => {
+    ;(getDbDialect as jest.Mock).mockReturnValue('sqlite')
+    mockExecute.mockResolvedValue([{}])
+    const res = await POST(makeReq(valid))
+    expect(res.status).toBe(201)
+    const junctionCall = mockExecute.mock.calls.find(([sql]) => sql.includes('asset_departments'))
+    expect(junctionCall?.[0]).toBe('INSERT OR IGNORE INTO asset_departments (asset_id, department_id) VALUES (?, ?)')
   })
 })
