@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 jest.mock('@/lib/db', () => ({
   setupDatabase: jest.fn().mockResolvedValue(undefined),
   getDb: jest.fn(),
+  getDbDialect: jest.fn().mockReturnValue('mysql'),
   resetPool: jest.fn(),
 }))
 jest.mock('@/lib/require-user', () => ({
@@ -12,7 +13,7 @@ jest.mock('@/lib/observability/config', () => ({
   refreshObservabilityConfig: jest.fn(),
 }))
 
-import { getDb } from '@/lib/db'
+import { getDb, getDbDialect } from '@/lib/db'
 import { requireUser } from '@/lib/require-user'
 import { GET, PUT } from '@/app/api/settings/route'
 import { MASKED_VALUE } from '@/lib/secretSettings'
@@ -72,5 +73,15 @@ describe('PUT /api/settings', () => {
     const res = await PUT(makeReq({ 'observability.api_key': 'brand-new-token' }))
     expect(res.status).toBe(200)
     expect(mockExecute).toHaveBeenCalledWith(expect.any(String), ['observability.api_key', 'brand-new-token'])
+  })
+
+  it('uses ON CONFLICT DO UPDATE for sqlite dialect', async () => {
+    ;(getDbDialect as jest.Mock).mockReturnValue('sqlite')
+    const res = await PUT(makeReq({ 'confluence.base_url': 'https://x.example' }))
+    expect(res.status).toBe(200)
+    expect(mockExecute).toHaveBeenCalledWith(
+      'INSERT INTO app_settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value',
+      ['confluence.base_url', 'https://x.example']
+    )
   })
 })

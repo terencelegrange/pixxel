@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getDb, setupDatabase } from "@/lib/db";
+import { getDb, setupDatabase, getDbDialect } from "@/lib/db";
 import mysql from "mysql2/promise";
 import { requireUser } from "@/lib/require-user";
+import { upsertSql } from "@/lib/sql-compat";
 
 export async function POST(req: NextRequest, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
@@ -40,9 +41,7 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
     matchedParticipants.add(matchedParticipant.toLowerCase());
 
     await db.execute(
-      `INSERT INTO plantuml_diagram_assets (diagram_id, asset_id, matched_on)
-       VALUES (?, ?, ?)
-       ON DUPLICATE KEY UPDATE matched_on = VALUES(matched_on)`,
+      upsertSql("plantuml_diagram_assets", ["diagram_id", "asset_id", "matched_on"], "matched_on", getDbDialect()),
       [params.id, asset.id, matchedOn]
     );
     tagged.push({ id: asset.id, name: asset.name, shortCode: asset.shortCode, matchedOn });

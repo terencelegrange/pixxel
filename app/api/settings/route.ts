@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getDb, setupDatabase } from "@/lib/db";
+import { getDb, setupDatabase, getDbDialect } from "@/lib/db";
 import mysql from "mysql2/promise";
 import { requireUser } from "@/lib/require-user";
 import { MASKED_VALUE, SECRET_SETTING_KEYS, maskSecretSettings } from "@/lib/secretSettings";
 import { refreshObservabilityConfig } from "@/lib/observability/config";
+import { upsertSql } from "@/lib/sql-compat";
 
 // Admin-only: these are integration credentials, not general app config.
 export async function GET(req: NextRequest) {
@@ -30,7 +31,7 @@ export async function PUT(req: NextRequest) {
     // touch — skip those so we don't overwrite the real stored value.
     if (SECRET_SETTING_KEYS.has(key) && value === MASKED_VALUE) continue;
     await db.execute(
-      "INSERT INTO app_settings (`key`, `value`) VALUES (?, ?) ON DUPLICATE KEY UPDATE `value` = VALUES(`value`)",
+      upsertSql("app_settings", ["key", "value"], "value", getDbDialect()),
       [key, value]
     );
   }
