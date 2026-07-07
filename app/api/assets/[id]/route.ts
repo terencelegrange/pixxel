@@ -18,38 +18,63 @@ export async function GET(req: NextRequest, props: { params: Promise<{ id: strin
   try {
     await setupDatabase();
     const db = getDb();
-    const [rows] = await db.execute<mysql.RowDataPacket[]>(
-      `SELECT
-         a.*,
-         GROUP_CONCAT(DISTINCT ad.department_id ORDER BY d.name SEPARATOR ',')  AS department_ids,
-         GROUP_CONCAT(DISTINCT d.name           ORDER BY d.name SEPARATOR '|')  AS department_names,
-         GROUP_CONCAT(DISTINCT aa.user_id       ORDER BY aa.user_name SEPARATOR ',') AS architect_ids,
-         GROUP_CONCAT(DISTINCT aa.user_name     ORDER BY aa.user_name SEPARATOR '|') AS architect_names,
-         GROUP_CONCAT(DISTINCT ac.business_capability_id ORDER BY bc.name SEPARATOR ',') AS capability_ids,
-         GROUP_CONCAT(DISTINCT bc.name                   ORDER BY bc.name SEPARATOR '|') AS capability_names,
-         v.name AS vendor_name,
-         dom.name AS domain_name,
-         s.name AS strategy_name,
-         c.name AS complexity_name,
-         t.name AS tier_name,
-         hd.name AS hero_diagram_name
-       FROM assets a
-       LEFT JOIN asset_departments ad  ON ad.asset_id = a.id
-       LEFT JOIN departments d         ON d.id = ad.department_id
-       LEFT JOIN asset_architects aa   ON aa.asset_id = a.id
-       LEFT JOIN asset_capabilities ac    ON ac.asset_id = a.id
-       LEFT JOIN business_capabilities bc ON bc.id = ac.business_capability_id
-       LEFT JOIN vendors v             ON v.id = a.vendor_id
-       LEFT JOIN domains dom           ON dom.id = a.domain_id
-       LEFT JOIN asset_strategies s    ON s.id = a.strategy_id
-       LEFT JOIN asset_complexities c  ON c.id = a.complexity_id
-       LEFT JOIN tiers t               ON t.id = a.tier_id
-       LEFT JOIN diagrams hd           ON hd.id = a.hero_diagram_id
-       WHERE a.id = ?
-       GROUP BY a.id
-       LIMIT 1`,
-      [params.id]
-    );
+    const dialect = getDbDialect();
+    const query = dialect === "sqlite" ? `
+      SELECT
+        a.*,
+        (SELECT GROUP_CONCAT(department_id, ',') FROM (SELECT ad.department_id AS department_id FROM asset_departments ad JOIN departments d ON d.id = ad.department_id WHERE ad.asset_id = a.id ORDER BY d.name)) AS department_ids,
+        (SELECT GROUP_CONCAT(name, '|') FROM (SELECT d.name AS name FROM asset_departments ad JOIN departments d ON d.id = ad.department_id WHERE ad.asset_id = a.id ORDER BY d.name)) AS department_names,
+        (SELECT GROUP_CONCAT(user_id, ',') FROM (SELECT aa.user_id AS user_id FROM asset_architects aa WHERE aa.asset_id = a.id ORDER BY aa.user_name)) AS architect_ids,
+        (SELECT GROUP_CONCAT(user_name, '|') FROM (SELECT aa.user_name AS user_name FROM asset_architects aa WHERE aa.asset_id = a.id ORDER BY aa.user_name)) AS architect_names,
+        (SELECT GROUP_CONCAT(business_capability_id, ',') FROM (SELECT ac.business_capability_id AS business_capability_id FROM asset_capabilities ac JOIN business_capabilities bc ON bc.id = ac.business_capability_id WHERE ac.asset_id = a.id ORDER BY bc.name)) AS capability_ids,
+        (SELECT GROUP_CONCAT(name, '|') FROM (SELECT bc.name AS name FROM asset_capabilities ac JOIN business_capabilities bc ON bc.id = ac.business_capability_id WHERE ac.asset_id = a.id ORDER BY bc.name)) AS capability_names,
+        v.name AS vendor_name,
+        dom.name AS domain_name,
+        s.name AS strategy_name,
+        c.name AS complexity_name,
+        t.name AS tier_name,
+        hd.name AS hero_diagram_name
+      FROM assets a
+      LEFT JOIN vendors v             ON v.id = a.vendor_id
+      LEFT JOIN domains dom           ON dom.id = a.domain_id
+      LEFT JOIN asset_strategies s    ON s.id = a.strategy_id
+      LEFT JOIN asset_complexities c  ON c.id = a.complexity_id
+      LEFT JOIN tiers t               ON t.id = a.tier_id
+      LEFT JOIN diagrams hd           ON hd.id = a.hero_diagram_id
+      WHERE a.id = ?
+      LIMIT 1
+    ` : `
+      SELECT
+        a.*,
+        GROUP_CONCAT(DISTINCT ad.department_id ORDER BY d.name SEPARATOR ',')  AS department_ids,
+        GROUP_CONCAT(DISTINCT d.name           ORDER BY d.name SEPARATOR '|')  AS department_names,
+        GROUP_CONCAT(DISTINCT aa.user_id       ORDER BY aa.user_name SEPARATOR ',') AS architect_ids,
+        GROUP_CONCAT(DISTINCT aa.user_name     ORDER BY aa.user_name SEPARATOR '|') AS architect_names,
+        GROUP_CONCAT(DISTINCT ac.business_capability_id ORDER BY bc.name SEPARATOR ',') AS capability_ids,
+        GROUP_CONCAT(DISTINCT bc.name                   ORDER BY bc.name SEPARATOR '|') AS capability_names,
+        v.name AS vendor_name,
+        dom.name AS domain_name,
+        s.name AS strategy_name,
+        c.name AS complexity_name,
+        t.name AS tier_name,
+        hd.name AS hero_diagram_name
+      FROM assets a
+      LEFT JOIN asset_departments ad  ON ad.asset_id = a.id
+      LEFT JOIN departments d         ON d.id = ad.department_id
+      LEFT JOIN asset_architects aa   ON aa.asset_id = a.id
+      LEFT JOIN asset_capabilities ac    ON ac.asset_id = a.id
+      LEFT JOIN business_capabilities bc ON bc.id = ac.business_capability_id
+      LEFT JOIN vendors v             ON v.id = a.vendor_id
+      LEFT JOIN domains dom           ON dom.id = a.domain_id
+      LEFT JOIN asset_strategies s    ON s.id = a.strategy_id
+      LEFT JOIN asset_complexities c  ON c.id = a.complexity_id
+      LEFT JOIN tiers t               ON t.id = a.tier_id
+      LEFT JOIN diagrams hd           ON hd.id = a.hero_diagram_id
+      WHERE a.id = ?
+      GROUP BY a.id
+      LIMIT 1
+    `;
+    const [rows] = await db.execute<mysql.RowDataPacket[]>(query, [params.id]);
     if (!rows[0]) return NextResponse.json({ error: "Asset not found." }, { status: 404 });
 
     const row = rows[0];

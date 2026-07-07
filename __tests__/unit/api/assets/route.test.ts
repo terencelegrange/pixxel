@@ -90,6 +90,17 @@ describe('GET /api/assets', () => {
     const res = await GET(new NextRequest('http://localhost/'))
     expect(res.status).toBe(500)
   })
+
+  it('uses correlated-subquery GROUP_CONCAT (no DISTINCT/SEPARATOR) for sqlite dialect', async () => {
+    ;(getDbDialect as jest.Mock).mockReturnValue('sqlite')
+    mockExecute.mockResolvedValueOnce([[]])
+    const res = await GET(new NextRequest('http://localhost/api/assets'))
+    expect(res.status).toBe(200)
+    const sql = mockExecute.mock.calls[0][0] as string
+    expect(sql).not.toMatch(/SEPARATOR/)
+    expect(sql).not.toMatch(/DISTINCT/)
+    expect(sql).toMatch(/GROUP_CONCAT\(department_id, ','\)/)
+  })
 })
 
 describe('POST /api/assets', () => {
