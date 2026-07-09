@@ -8,8 +8,8 @@ import { writeAudit } from "@/lib/audit";
 import { Asset, AssetCategory, AssetType, LifecycleStatus } from "@/types";
 import { requireUser } from "@/lib/require-user";
 
-const VALID_TYPES: AssetType[] = ["SaaS", "On-Premise", "Hybrid", "Cloud", "Open Source", "Other"];
-const VALID_STATUSES: LifecycleStatus[] = ["Proposed", "Approved", "In Development", "Production", "Sunset", "Retired"];
+export const VALID_TYPES: AssetType[] = ["SaaS", "On-Premise", "Hybrid", "Cloud", "Open Source", "Other"];
+export const VALID_STATUSES: LifecycleStatus[] = ["Proposed", "Approved", "In Development", "Production", "Sunset", "Retired"];
 
 function rowToAsset(row: mysql.RowDataPacket): Asset {
   const toISO = (v: unknown) => v instanceof Date ? v.toISOString() : v ? String(v) : null;
