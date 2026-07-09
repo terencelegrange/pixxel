@@ -37,7 +37,7 @@ describe('POST /api/setup/complete', () => {
     jest.clearAllMocks()
     ;(isSetupComplete as jest.Mock).mockReturnValue(false)
     ;(getDb as jest.Mock).mockReturnValue({ execute: mockExecute })
-    mockExecute.mockResolvedValue([{}])
+    mockExecute.mockResolvedValue([[{ count: 0 }]])
     ;(fs.writeFileSync as jest.Mock) = jest.fn()
   })
 
@@ -98,8 +98,25 @@ describe('POST /api/setup/complete', () => {
     expect(res.status).toBe(400)
   })
 
-  it('returns 400 when admin fields missing', async () => {
+  it('returns 400 when admin fields missing on a fresh database', async () => {
+    mockExecute.mockResolvedValueOnce([[{ count: 0 }]]) // SELECT COUNT(*) FROM users -> fresh
     const res = await POST(makeReq({ db: mysqlDb, appName: 'App', orgName: 'Org', admin: { name: '', email: '', password: '' } }))
+    expect(res.status).toBe(400)
+  })
+
+  it('reuses an existing installation: 200, no admin insert, existingDatabase: true, when users already has rows and no admin field is supplied', async () => {
+    mockExecute.mockResolvedValueOnce([[{ count: 1 }]]) // SELECT COUNT(*) FROM users -> existing rows
+    const res = await POST(makeReq({ db: mysqlDb, appName: 'App', orgName: 'Org' }))
+    const body = await res.json()
+    expect(res.status).toBe(200)
+    expect(body.existingDatabase).toBe(true)
+    const insertCall = mockExecute.mock.calls.find(([sql]) => typeof sql === 'string' && sql.includes('INSERT INTO users'))
+    expect(insertCall).toBeUndefined()
+  })
+
+  it('returns 400 for a fresh database with no admin field supplied', async () => {
+    mockExecute.mockResolvedValueOnce([[{ count: 0 }]]) // SELECT COUNT(*) FROM users -> fresh
+    const res = await POST(makeReq({ db: mysqlDb, appName: 'App', orgName: 'Org' }))
     expect(res.status).toBe(400)
   })
 

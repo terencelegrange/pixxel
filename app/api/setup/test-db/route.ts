@@ -27,7 +27,9 @@ export async function POST(req: Request) {
       const dir = path.dirname(file);
       fs.mkdirSync(dir, { recursive: true });
       fs.accessSync(dir, fs.constants.W_OK);
-      return NextResponse.json({ success: true });
+      // No existing-install detection for sqlite: the wizard always creates
+      // a fresh file at this step, so there is no pre-existing-install concept.
+      return NextResponse.json({ success: true, existingDatabase: false });
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Path is not writable.";
       return NextResponse.json({ success: false, error: message }, { status: 400 });
@@ -56,8 +58,34 @@ export async function POST(req: Request) {
     await connection.execute(
       `CREATE DATABASE IF NOT EXISTS \`${name}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`
     );
+    await connection.end().catch(() => {});
+    connection = undefined;
 
-    return NextResponse.json({ success: true });
+    // Detect whether this is an existing installation: reopen a connection
+    // scoped to the target database and check for a populated `users` table.
+    let existingDatabase = false;
+    const scoped = await mysql.createConnection({
+      host,
+      port: Number(port) || 3306,
+      user,
+      password: password ?? "",
+      database: name,
+      connectTimeout: 8000,
+    });
+    try {
+      const [tables] = await scoped.execute<mysql.RowDataPacket[]>(
+        "SELECT COUNT(*) AS count FROM information_schema.tables WHERE table_schema = ? AND table_name = 'users'",
+        [name]
+      );
+      if (Number(tables[0].count) > 0) {
+        const [rows] = await scoped.execute<mysql.RowDataPacket[]>("SELECT COUNT(*) AS count FROM users");
+        existingDatabase = Number(rows[0].count) > 0;
+      }
+    } finally {
+      await scoped.end().catch(() => {});
+    }
+
+    return NextResponse.json({ success: true, existingDatabase });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Connection failed.";
     return NextResponse.json({ success: false, error: message }, { status: 400 });

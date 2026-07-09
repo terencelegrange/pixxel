@@ -28,6 +28,14 @@ describe('POST /api/setup/test-db', () => {
     expect(mysql.createConnection).not.toHaveBeenCalled()
   })
 
+  it('reports existingDatabase: false for sqlite (fresh file created by the wizard)', async () => {
+    ;(fs.accessSync as jest.Mock) = jest.fn()
+    ;(fs.mkdirSync as jest.Mock) = jest.fn()
+    const res = await POST(makeReq({ dialect: 'sqlite', file: 'data/pixxel.db' }))
+    const body = await res.json()
+    expect(body.existingDatabase).toBe(false)
+  })
+
   it('derives the writability check directory the same way lib/db-sqlite.ts derives it (path.dirname(file), not joined with cwd)', async () => {
     const mkdirSync = jest.fn()
     ;(fs.mkdirSync as jest.Mock) = mkdirSync
@@ -85,12 +93,44 @@ describe('POST /api/setup/test-db', () => {
   it('still opens a mysql connection for the mysql dialect', async () => {
     const mockEnd = jest.fn().mockResolvedValue(undefined);
     (mysql.createConnection as jest.Mock).mockResolvedValue({
-      execute: jest.fn().mockResolvedValue([[]]),
+      execute: jest.fn().mockResolvedValue([[{ count: 0 }]]),
       end: mockEnd,
     })
     const res = await POST(makeReq({ dialect: 'mysql', host: 'localhost', port: 3306, user: 'root', password: '', name: 'saas_app' }))
     const body = await res.json()
     expect(body.success).toBe(true)
     expect(mysql.createConnection).toHaveBeenCalled()
+  })
+
+  it('reports existingDatabase: true when the users table exists and has rows', async () => {
+    const bootstrapConn = { execute: jest.fn().mockResolvedValue([{}]), end: jest.fn().mockResolvedValue(undefined) }
+    const scopedConn = {
+      execute: jest.fn()
+        .mockResolvedValueOnce([[{ count: 1 }]]) // information_schema.tables check
+        .mockResolvedValueOnce([[{ count: 1 }]]), // SELECT COUNT(*) FROM users
+      end: jest.fn().mockResolvedValue(undefined),
+    };
+    (mysql.createConnection as jest.Mock)
+      .mockResolvedValueOnce(bootstrapConn)
+      .mockResolvedValueOnce(scopedConn)
+    const res = await POST(makeReq({ dialect: 'mysql', host: 'localhost', port: 3306, user: 'root', password: '', name: 'saas_app' }))
+    const body = await res.json()
+    expect(body.success).toBe(true)
+    expect(body.existingDatabase).toBe(true)
+  })
+
+  it('reports existingDatabase: false when there is no users table', async () => {
+    const bootstrapConn = { execute: jest.fn().mockResolvedValue([{}]), end: jest.fn().mockResolvedValue(undefined) }
+    const scopedConn = {
+      execute: jest.fn().mockResolvedValueOnce([[{ count: 0 }]]), // information_schema.tables check: no users table
+      end: jest.fn().mockResolvedValue(undefined),
+    };
+    (mysql.createConnection as jest.Mock)
+      .mockResolvedValueOnce(bootstrapConn)
+      .mockResolvedValueOnce(scopedConn)
+    const res = await POST(makeReq({ dialect: 'mysql', host: 'localhost', port: 3306, user: 'root', password: '', name: 'saas_app' }))
+    const body = await res.json()
+    expect(body.success).toBe(true)
+    expect(body.existingDatabase).toBe(false)
   })
 })

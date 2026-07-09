@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import { randomUUID } from "crypto";
 import fs from "fs";
 import path from "path";
+import type { RowDataPacket } from "mysql2/promise";
 import { isSetupComplete, writeSiteConfig, type DbConfig } from "@/lib/setup";
 
 export async function POST(req: Request) {
@@ -54,12 +55,9 @@ export async function POST(req: Request) {
       { status: 400 }
     );
   }
-  if (!admin?.name?.trim() || !admin?.email?.trim() || !admin?.password) {
-    return NextResponse.json(
-      { error: "Admin name, email, and password are required." },
-      { status: 400 }
-    );
-  }
+  // Admin fields are validated further down, once we know whether this is a
+  // fresh database (admin required) or an existing installation being reused
+  // (admin optional — no new admin row is created).
 
   const dbConfig: DbConfig =
     db.dialect === "sqlite"
@@ -112,23 +110,39 @@ export async function POST(req: Request) {
     resetPool();
     await setupDatabase();
 
-    // 4. Create the first admin user
-    const hashedPassword = await bcrypt.hash(admin.password, 12);
-    const userId = randomUUID();
+    // 4. Detect whether this is an existing installation being reused: if
+    //    `users` already has rows, skip admin validation and creation
+    //    entirely — there is nothing to seed and no dialect-specific SQL
+    //    difference for a plain COUNT(*), so one query covers both dialects.
     const db_pool = getDb();
+    const [existingRows] = await db_pool.execute<RowDataPacket[]>("SELECT COUNT(*) AS count FROM users");
+    const existingDatabase = Number(existingRows[0].count) > 0;
 
-    await db_pool.execute(
-      `INSERT INTO users (id, name, email, password, role)
-       VALUES (?, ?, ?, ?, 'Admin')`,
-      [
-        userId,
-        admin.name.trim(),
-        admin.email.toLowerCase().trim(),
-        hashedPassword,
-      ]
-    );
+    if (!existingDatabase) {
+      if (!admin?.name?.trim() || !admin?.email?.trim() || !admin?.password) {
+        return NextResponse.json(
+          { error: "Admin name, email, and password are required." },
+          { status: 400 }
+        );
+      }
 
-    // 5. Mark setup complete
+      // 5. Create the first admin user
+      const hashedPassword = await bcrypt.hash(admin.password, 12);
+      const userId = randomUUID();
+
+      await db_pool.execute(
+        `INSERT INTO users (id, name, email, password, role)
+         VALUES (?, ?, ?, ?, 'Admin')`,
+        [
+          userId,
+          admin.name.trim(),
+          admin.email.toLowerCase().trim(),
+          hashedPassword,
+        ]
+      );
+    }
+
+    // 6. Mark setup complete
     writeSiteConfig({
       setupComplete: true,
       appName: appName.trim(),
@@ -136,7 +150,7 @@ export async function POST(req: Request) {
       db: dbConfig,
     });
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, existingDatabase });
   } catch (err: unknown) {
     // Roll back site.config.json to incomplete state so the user can retry
     writeSiteConfig({
