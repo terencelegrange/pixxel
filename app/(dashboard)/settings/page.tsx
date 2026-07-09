@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Settings, Bell, Lock, Globe, ShieldCheck, MessageSquare, ChevronRight, Layers, GitBranch, Gauge, Building2, Network, Target, Package2, BarChart2, ScrollText, MapPin, Users, ClipboardList, Activity } from "lucide-react";
+import { Settings, Bell, Lock, Globe, ShieldCheck, MessageSquare, ChevronRight, Layers, GitBranch, Gauge, Building2, Network, Target, Package2, BarChart2, ScrollText, MapPin, Users, ClipboardList, Activity, Upload } from "lucide-react";
 
 // ---------------------------------------------------------------------------
 // Clickable settings tile
@@ -113,6 +113,13 @@ export default function SettingsPage() {
             iconBg="bg-amber-500"
             title="Tiers"
             description="Set criticality tiers to capture SLA expectations and support obligations."
+          />
+          <SettingsTile
+            href="/settings/bulk-upload-assets"
+            icon={Upload}
+            iconBg="bg-teal-500"
+            title="Bulk Upload Assets"
+            description="Import multiple assets at once from a CSV file."
           />
         </div>
       </div>
