@@ -205,6 +205,39 @@ export interface ProjectAsset {
   notes: string | null;
 }
 
+export type ServiceStatus = "Planned" | "Active" | "Degraded" | "Retired";
+export type ServiceRole = "Core" | "Supporting" | "Dependency";
+
+export interface Service {
+  id: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  status: ServiceStatus;
+  tierId: string | null;
+  tierName: string | null;
+  domainId: string | null;
+  domainName: string | null;
+  businessOwner: string | null;
+  technicalOwner: string | null;
+  assetCount?: number;
+  createdById: string;
+  createdByName: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ServiceAsset {
+  assetId: string;
+  assetName: string;
+  assetType: string;
+  assetIcon: string | null;
+  lifecycleStatus: string;
+  tierName: string | null;
+  role: ServiceRole;
+  notes: string | null;
+}
+
 export interface AuditLog {
   id: string;
   tableName: string;
