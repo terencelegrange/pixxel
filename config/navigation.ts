@@ -17,6 +17,16 @@ export const navigationConfig: NavGroup[] = [
     ],
   },
   {
+    title: "Business Services",
+    items: [
+      {
+        label: "Service Catalogue",
+        href: "/services",
+        icon: "Layers",
+      },
+    ],
+  },
+  {
     title: "Assets",
     items: [
       {
