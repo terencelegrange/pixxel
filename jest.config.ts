@@ -26,7 +26,12 @@ const config: Config = {
     {
       displayName: 'unit',
       testEnvironment: 'node',
-      testMatch: ['<rootDir>/__tests__/unit/**/*.test.ts'],
+      // testRegex (not testMatch): testMatch runs its glob through
+      // micromatch, which mis-escapes the literal ".claude" path segment
+      // when <rootDir> sits under a .claude/worktrees/* checkout on
+      // Windows, silently matching zero files. testRegex applies directly
+      // to the normalized path string and isn't affected.
+      testRegex: '__tests__/unit/.*\\.test\\.ts$',
       transform: { '^.+\\.tsx?$': ['ts-jest', { tsconfig: 'tsconfig.test.json' }] },
       moduleNameMapper: { '^@/(.*)$': '<rootDir>/$1' },
       // Avoid haste-map collisions with the standalone build's copied
@@ -36,7 +41,7 @@ const config: Config = {
     {
       displayName: 'integration',
       testEnvironment: 'node',
-      testMatch: ['<rootDir>/__tests__/integration/**/*.test.ts'],
+      testRegex: '__tests__/integration/.*\\.test\\.ts$',
       transform: { '^.+\\.tsx?$': ['ts-jest', { tsconfig: 'tsconfig.test.json' }] },
       moduleNameMapper: { '^@/(.*)$': '<rootDir>/$1' },
       // Avoid haste-map collisions with the standalone build's copied
@@ -46,7 +51,7 @@ const config: Config = {
     {
       displayName: 'ui',
       testEnvironment: 'jsdom',
-      testMatch: ['<rootDir>/__tests__/ui/**/*.test.tsx'],
+      testRegex: '__tests__/ui/.*\\.test\\.tsx$',
       transform: { '^.+\\.tsx?$': ['ts-jest', { tsconfig: 'tsconfig.test.json' }] },
       moduleNameMapper: {
         '^@/(.*)$': '<rootDir>/$1',
