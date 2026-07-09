@@ -8,6 +8,13 @@
       "when": 1783132003172,
       "tag": "0000_initial_schema",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "5",
+      "when": 1783587801977,
+      "tag": "0001_wooden_tomorrow_man",
+      "breakpoints": true
     }
   ]
 }

@@ -388,6 +388,31 @@ export const assetDependencies = mysqlTable("asset_dependencies", {
   index("idx_dep_target").on(t.targetAssetId),
 ]);
 
+export const services = mysqlTable("services", {
+  id: char("id", { length: 36 }).primaryKey(),
+  name: varchar("name", { length: 255 }).notNull(),
+  slug: varchar("slug", { length: 255 }).notNull().unique("uq_services_slug"),
+  description: text("description"),
+  status: mysqlEnum("status", ["Planned", "Active", "Degraded", "Retired"]).notNull().default("Planned"),
+  tierId: char("tier_id", { length: 36 }),
+  domainId: char("domain_id", { length: 36 }),
+  businessOwner: varchar("business_owner", { length: 255 }),
+  technicalOwner: varchar("technical_owner", { length: 255 }),
+  ...createdBy(),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+});
+
+export const serviceAssets = mysqlTable("service_assets", {
+  serviceId: char("service_id", { length: 36 }).notNull(),
+  assetId: char("asset_id", { length: 36 }).notNull(),
+  role: mysqlEnum("role", ["Core", "Supporting", "Dependency"]).notNull().default("Supporting"),
+  notes: text("notes"),
+}, (t) => [
+  primaryKey({ columns: [t.serviceId, t.assetId] }),
+  index("idx_service_assets_asset").on(t.assetId),
+]);
+
 // Referenced above only so `sql` stays imported for future defaults that need
 // raw SQL (e.g. seed data migrations) — harmless if unused by a given table.
 void sql;

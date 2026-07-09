@@ -384,3 +384,28 @@ export const assetDependencies = sqliteTable("asset_dependencies", {
   index("idx_dep_source").on(t.sourceAssetId),
   index("idx_dep_target").on(t.targetAssetId),
 ]);
+
+export const services = sqliteTable("services", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  slug: text("slug").notNull().unique("uq_services_slug"),
+  description: text("description"),
+  status: text("status", { enum: ["Planned", "Active", "Degraded", "Retired"] }).notNull().default("Planned"),
+  tierId: text("tier_id"),
+  domainId: text("domain_id"),
+  businessOwner: text("business_owner"),
+  technicalOwner: text("technical_owner"),
+  ...createdBy(),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+});
+
+export const serviceAssets = sqliteTable("service_assets", {
+  serviceId: text("service_id").notNull(),
+  assetId: text("asset_id").notNull(),
+  role: text("role", { enum: ["Core", "Supporting", "Dependency"] }).notNull().default("Supporting"),
+  notes: text("notes"),
+}, (t) => [
+  primaryKey({ columns: [t.serviceId, t.assetId] }),
+  index("idx_service_assets_asset").on(t.assetId),
+]);
