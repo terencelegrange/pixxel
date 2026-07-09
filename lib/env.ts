@@ -4,22 +4,18 @@
  * Validates required environment variables at startup.
  * Call from instrumentation.ts so failures surface before the first request.
  *
- * DB credentials are optional when site.config.json is present and valid,
- * because the setup wizard writes credentials there. JWT_SECRET is always
- * required — it must be set in .env.local (never in site.config.json).
+ * DB credentials are optional on a brand-new, unconfigured instance — that's
+ * the documented zero-env-var path where the server boots straight into the
+ * /setup wizard, which writes site.config.json (mysql or sqlite) on
+ * completion. Once setup has completed, isSetupComplete() is the
+ * dialect-agnostic source of truth that DB access is configured, so DB env
+ * vars are only enforced pre-setup when the operator has started supplying
+ * them (a partial set is almost certainly a typo, e.g. missing DB_PASSWORD)
+ * — matching the pre-configured docker-compose deployment path.
+ * JWT_SECRET is always required — it must be set in .env.local (never in
+ * site.config.json).
  */
-import fs from "fs";
-import path from "path";
-
-function hasSiteConfig(): boolean {
-  try {
-    const raw = fs.readFileSync(path.join(process.cwd(), "site.config.json"), "utf-8");
-    const cfg = JSON.parse(raw);
-    return !!(cfg?.db?.host && cfg?.db?.password !== undefined);
-  } catch {
-    return false;
-  }
-}
+import { isSetupComplete } from "@/lib/setup";
 
 export function validateEnv(): void {
   const errors: string[] = [];
@@ -32,16 +28,18 @@ export function validateEnv(): void {
     errors.push(`JWT_SECRET is too short (${secret.length} chars — need ≥ 32)`);
   }
 
-  // DB credentials are only required when site.config.json isn't available.
-  if (!hasSiteConfig()) {
-    const required: [string, string][] = [
+  if (!isSetupComplete()) {
+    const dbEnv: [string, string][] = [
       ["DB_HOST", process.env.DB_HOST ?? ""],
       ["DB_USER", process.env.DB_USER ?? ""],
       ["DB_PASSWORD", process.env.DB_PASSWORD ?? ""],
       ["DB_NAME", process.env.DB_NAME ?? ""],
     ];
-    for (const [name, value] of required) {
-      if (!value) errors.push(`${name} is not set (and no site.config.json was found)`);
+    const anyDbEnvSet = dbEnv.some(([, value]) => value !== "");
+    if (anyDbEnvSet) {
+      for (const [name, value] of dbEnv) {
+        if (!value) errors.push(`${name} is not set`);
+      }
     }
   }
 
