@@ -60,7 +60,10 @@ saas-boilerplate/
 │   │   ├── projects/
 │   │   │   ├── page.tsx          # Projects list — create/edit/delete; status filter; links to detail
 │   │   │   └── [id]/page.tsx     # Project detail — hero card + asset dependency panel (List / Flow tab)
-│   │   ├── organisations/page.tsx # Department CRUD
+│   │   ├── services/
+│   │   ├── page.tsx          # Business Services list — create/edit/delete; status filter; auto-slug preview
+│   │   └── [id]/page.tsx     # Service detail — hero card + member panel grouped by role (List / Flow tab)
+│   ├── organisations/page.tsx # Department CRUD
 │   │   ├── vendors/page.tsx      # Vendor CRUD — contact details, address, primary contact + role
 │   │   ├── domains/page.tsx      # Domain CRUD
 │   │   ├── asset-strategy/page.tsx # Asset Strategy CRUD (with sort_order)
@@ -75,7 +78,8 @@ saas-boilerplate/
 │   │   └── settings/
 │   │       ├── page.tsx          # Settings hub — Appearance toggle; tile grid linking to sub-pages
 │   │       ├── roles/page.tsx    # Roles CRUD — name, description, permission level (read-only/member/admin)
-│   │       └── feedback/page.tsx # Feedback viewer (admin) — status filter, inline status update
+│   │       ├── feedback/page.tsx # Feedback viewer (admin) — status filter, inline status update
+│   │       └── bulk-upload-assets/page.tsx # CSV bulk asset import — quote-aware client parser, preview, per-row results
 │   ├── api/
 │   │   ├── auth/
 │   │   │   ├── login/route.ts    # POST /api/auth/login
@@ -84,6 +88,7 @@ saas-boilerplate/
 │   │   │   └── stats/route.ts    # GET — published departments + assets by tier (LEFT JOIN tiers)
 │   │   ├── assets/
 │   │   │   ├── route.ts          # GET (list + GROUP_CONCAT dept + vendor/domain/strategy/tier JOINs) + POST
+│   │   │   ├── bulk/route.ts     # POST — CSV bulk import; per-row transaction, name→ID lookups, warnings vs. hard failures
 │   │   │   └── [id]/
 │   │   │       ├── route.ts      # GET single + PUT (update) + DELETE
 │   │   │       └── history/route.ts # GET audit_log entries for this asset
@@ -111,13 +116,21 @@ saas-boilerplate/
 │   │   ├── support/
 │   │   │   ├── route.ts          # GET (all submissions) + POST (create, status defaults to 'New')
 │   │   │   └── [id]/route.ts     # PATCH (update status)
-│   │   └── projects/
-│   │       ├── route.ts          # GET (list with asset count) + POST
+│   │   ├── projects/
+│   │   │   ├── route.ts          # GET (list with asset count) + POST
+│   │   │   └── [id]/
+│   │   │       ├── route.ts      # PUT + DELETE (cascades project_assets)
+│   │   │       └── assets/
+│   │   │           ├── route.ts          # GET (linked assets with metadata) + POST (link asset)
+│   │   │           └── [assetId]/route.ts # PATCH (update dependency_type/notes) + DELETE (unlink)
+│   │   └── services/
+│   │       ├── route.ts          # GET (list with tier/domain JOINs + asset count) + POST (slug via slugify/uniqueSlug)
+│   │       ├── by-slug/[slug]/route.ts # GET only — composed read via getComposedService(), auth-gated
 │   │       └── [id]/
-│   │           ├── route.ts      # PUT + DELETE (cascades project_assets)
+│   │           ├── route.ts      # GET (composed) + PUT (slug only changes if explicitly supplied) + DELETE (cascades service_assets)
 │   │           └── assets/
-│   │               ├── route.ts          # GET (linked assets with metadata) + POST (link asset)
-│   │               └── [assetId]/route.ts # PATCH (update dependency_type/notes) + DELETE (unlink)
+│   │               ├── route.ts          # GET (members, via getComposedService) + POST (link asset; 409 if already linked)
+│   │               └── [assetId]/route.ts # PATCH (update role/notes) + DELETE (unlink); both 404 if membership absent
 │   ├── globals.css
 │   ├── layout.tsx                # Root layout — mounts ThemeProvider + AuthProvider; inline script for no-FOUC dark mode
 │   └── page.tsx                  # Root redirect → /dashboard or /login
@@ -133,6 +146,8 @@ saas-boilerplate/
 │   │   └── AssetModal.tsx        # Full create/edit modal; exports AssetIcon + LIFECYCLE_STATUSES; includes tier/strategy/domain/vendor dropdowns
 │   ├── projects/
 │   │   └── DependencyFlow.tsx    # ReactFlow diagram — project hub node + upstream/downstream asset nodes; lazy-loaded (ssr: false)
+│   ├── services/
+│   │   └── ServiceFlow.tsx       # ReactFlow diagram — service hub node + member asset nodes; edges colour-coded by role; lazy-loaded (ssr: false)
 │   └── ui/
 │       ├── Button.tsx            # Variants: primary / secondary / ghost / danger
 │       ├── Input.tsx             # Label, error, hint, showToggle (show/hide password)
@@ -145,10 +160,15 @@ saas-boilerplate/
 ├── lib/
 │   ├── audit.ts                  # Server-only: writeAudit() helper — call after every write
 │   ├── auth.ts                   # Client-side: localStorage helpers + fetch to API routes
-│   └── db.ts                     # Server-only: mysql2 pool singleton + setupDatabase() (applies drizzle/ migrations, then seeds reference data)
+│   ├── db.ts                     # Server-only: mysql2 pool singleton + setupDatabase() (applies drizzle/ migrations, then seeds reference data)
+│   ├── slug.ts                   # slugify() + uniqueSlug() — used by services create/update for URL-safe, collision-free slugs
+│   ├── services.ts               # getComposedService(db, dialect, opts) — shared services+members read, used by 3 routes/pages
+│   └── csv.ts                    # parseCsv() — quote-aware client-side CSV parser (commas/newlines/escaped "" in quoted fields)
 ├── drizzle/
-│   ├── schema.ts                 # Schema source of truth (Drizzle TS DSL) — migrations only, not a query layer
-│   └── migrations/                # Generated by `npx drizzle-kit generate`; applied by setupDatabase() via migrate()
+│   ├── schema.ts                 # Schema source of truth (Drizzle TS DSL, MySQL) — migrations only, not a query layer
+│   ├── schema.sqlite.ts          # SQLite mirror of schema.ts — kept in lockstep for trial-mode dialect support
+│   ├── migrations/                # Generated by `npx drizzle-kit generate`; applied by setupDatabase() via migrate()
+│   └── migrations-sqlite/         # Generated by `npm run db:generate:sqlite`; applied for the SQLite dialect
 └── types/
     └── index.ts                  # Shared TypeScript interfaces (Asset, Project, ProjectAsset, Role, etc.)
 ```
@@ -158,11 +178,12 @@ saas-boilerplate/
 ## Navigation Structure
 
 ```
-(no group)     Dashboard, Profile
-Assets         Asset Registry, Projects
-Reports        Asset Strategy (matrix report: domains × strategies)
-Manage         Departments, Domains, Asset Strategy, Vendors, Tier, Users, Settings, Audit
-Resources      Documentation, Support
+(no group)         Dashboard, Profile
+Business Services  Service Catalogue
+Assets             Asset Registry, Projects
+Reports            Asset Strategy (matrix report: domains × strategies)
+Manage             Departments, Domains, Asset Strategy, Vendors, Tier, Users, Settings, Audit
+Resources          Documentation, Support
 ```
 
 Navigation is driven entirely by `config/navigation.ts`. Icons resolved dynamically from `lucide-react` by PascalCase name string. Sign-out in header avatar dropdown.
@@ -173,6 +194,7 @@ Navigation is driven entirely by `config/navigation.ts`. Icons resolved dynamica
 | Roles | `/settings/roles` | Live |
 | Feedback | `/settings/feedback` | Live — Admin only |
 | Changelog | `/settings/changelog` | Live |
+| Bulk Upload Assets | `/settings/bulk-upload-assets` | Live |
 | General | — | Placeholder |
 | Notifications | — | Placeholder |
 | Security | — | Placeholder |
@@ -291,6 +313,31 @@ DB_NAME=saas_app
 | `asset_id` | `CHAR(36)` PK (composite) | FK → `assets.id` |
 | `dependency_type` | `ENUM('upstream','downstream')` | Direction of the dependency |
 | `notes` | `TEXT` NULL | Description of the relationship |
+
+#### `services`
+| Column | Type | Notes |
+|---|---|---|
+| `id` | `CHAR(36)` PK | UUID |
+| `name` | `VARCHAR(255)` | |
+| `slug` | `VARCHAR(255)` UNIQUE | Via `slugify()` + `uniqueSlug()`; unaffected by name-only renames unless a new slug is explicitly supplied |
+| `description` | `TEXT` NULL | |
+| `status` | `ENUM('Planned','Active','Degraded','Retired')` | Default: `Planned` |
+| `tier_id` | `CHAR(36)` FK → `tiers.id` NULL | |
+| `domain_id` | `CHAR(36)` FK → `domains.id` NULL | |
+| `business_owner` | `VARCHAR(255)` NULL | |
+| `technical_owner` | `VARCHAR(255)` NULL | |
+| `created_by_id/name` | | Denormalised creator |
+| `created_at` / `updated_at` | `DATETIME` | Auto-managed |
+
+#### `service_assets`
+| Column | Type | Notes |
+|---|---|---|
+| `service_id` | `CHAR(36)` PK (composite) | FK → `services.id` |
+| `asset_id` | `CHAR(36)` PK (composite), indexed | FK → `assets.id` |
+| `role` | `ENUM('Core','Supporting','Dependency')` | Default: `Supporting` |
+| `notes` | `TEXT` NULL | |
+
+> Link/unlink on `service_assets` (`POST`/`PATCH`/`DELETE` under `/api/services/[id]/assets`) is **not** audited, matching the `project_assets` precedent.
 
 #### `audit_log`
 | Column | Type | Notes |
@@ -464,6 +511,25 @@ anywhere — add a new migration instead.
 
 ---
 
+## Business Services — Dependency Flow
+
+- **`/services`** — list page; status filter; create/edit modal with a live auto-slug preview (derived from `name` until the user manually edits the slug field, then it stops auto-updating)
+- **`/services/[id]`** — detail page with two views toggled via **List / Flow** buttons:
+  - **List view** — grouped into `Core` / `Supporting` / `Dependency` sections, inline edit (role/notes) and remove
+  - **Flow view** — ReactFlow diagram loaded client-side (`dynamic(() => ..., { ssr: false })`)
+- **`ServiceFlow` component** (`components/services/ServiceFlow.tsx`):
+  - Structurally mirrors `DependencyFlow` (custom hub/asset nodes, animated `smoothstep` edges, draggable/fit-to-view)
+  - Edges and role badges colour-coded by `role` instead of by direction: Core `#7c3aed`, Supporting `#0ea5e9`, Dependency `#94a3b8`
+- Reads go through `getComposedService()` (`lib/services.ts`), shared by the `[id]` GET, `by-slug/[slug]` GET, and `[id]/assets` GET routes to avoid duplicating the join
+
+## Setup Wizard — Reuse an Existing Database
+
+- `POST /api/setup/test-db` and `POST /api/setup/complete` both return `existingDatabase: boolean` — `true` when the target `users` table already has rows
+- When `true`, the wizard UI skips the **Admin Account** step (both forward and backward navigation) and omits the `admin` field from the completion payload — no new admin user is created, existing credentials are reused
+- SQLite trial mode always reports `existingDatabase: false` (the wizard creates a fresh file at that step, so there's no pre-existing-install concept for that dialect)
+
+---
+
 ## Implemented Features
 
 - [x] User registration + login (bcrypt, MariaDB)
@@ -499,6 +565,9 @@ anywhere — add a new migration instead.
 - [x] Project dependency flow diagram — ReactFlow visualisation; project hub + upstream/downstream asset nodes; animated directional edges; lazy-loaded
 - [x] Documentation page (`/docs`) — Server Component; renders `CLAUDE.md` via `react-markdown` + `remark-gfm`; sticky TOC sidebar built from `##` headings; custom component renderers for tables, code blocks, blockquotes
 - [x] Changelog (`/settings/changelog`) — CRUD for release notes; fields: version, title, type (feature/fix/improvement/breaking), release date, description; audited
+- [x] Bulk asset upload (`/settings/bulk-upload-assets`) — client-side CSV parsing/preview, `POST /api/assets/bulk`; resolves department/domain/vendor/tier/strategy/architect/capability names to IDs (creating new departments as needed, deduped); one DB transaction per row so a bad row doesn't roll back the batch; per-row created/failed/warnings summary
+- [x] Business Services module (`/services`) — CRUD for services (name, slug, description, status, tier, domain, owners); members linked to assets by role (Core/Supporting/Dependency) with notes; List/Flow detail views; `by-slug` composed read route; audited (link/unlink sub-resource excluded, matching `project_assets`)
+- [x] Setup wizard — reuse an existing database: detects a populated `users` table, skips Admin Account step, preserves existing credentials
 
 ## Test Suite
 
