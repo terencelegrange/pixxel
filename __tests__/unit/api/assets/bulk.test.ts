@@ -83,6 +83,45 @@ describe('POST /api/assets/bulk', () => {
     expect(body.results[1].status).toBe('created')
   })
 
+  it('isolates a per-row DB transaction failure without rolling back the other rows', async () => {
+    mockExecute.mockImplementation((sql: string, params?: unknown[]) => {
+      if (/SELECT.*FROM departments/is.test(sql)) return Promise.resolve([DEPARTMENTS])
+      if (/SELECT.*FROM domains/is.test(sql)) return Promise.resolve([EMPTY])
+      if (/SELECT.*FROM vendors/is.test(sql)) return Promise.resolve([EMPTY])
+      if (/SELECT.*FROM tiers/is.test(sql)) return Promise.resolve([TIERS])
+      if (/SELECT.*FROM asset_strategies/is.test(sql)) return Promise.resolve([EMPTY])
+      if (/SELECT.*FROM asset_complexities/is.test(sql)) return Promise.resolve([EMPTY])
+      if (/SELECT.*FROM diagrams/is.test(sql)) return Promise.resolve([EMPTY])
+      if (/SELECT.*FROM users/is.test(sql)) return Promise.resolve([EMPTY])
+      if (/SELECT.*FROM business_capabilities/is.test(sql)) return Promise.resolve([EMPTY])
+      // Simulate a genuine DB failure (e.g. connection lost) for the second row's insert only.
+      if (/INSERT INTO assets/i.test(sql) && params?.[1] === 'App Two') {
+        return Promise.reject(new Error('DB connection lost'))
+      }
+      return Promise.resolve([{}])
+    })
+
+    const res = await POST(makeReq([
+      { name: 'App One', department: 'IT' },
+      { name: 'App Two', department: 'IT' },
+      { name: 'App Three', department: 'IT' },
+    ]))
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.summary.total).toBe(3)
+    expect(body.summary.created).toBe(2)
+    expect(body.summary.failed).toBe(1)
+    expect(body.results[0].status).toBe('created')
+    expect(body.results[1].status).toBe('failed')
+    expect(body.results[1].error).toBe('Failed to create asset.')
+    expect(body.results[2].status).toBe('created')
+
+    // The other rows' inserts still fired despite the middle row's transaction throwing.
+    const insertAssetCalls = mockExecute.mock.calls.filter(([sql]: [string]) => /INSERT INTO assets/i.test(sql))
+    expect(insertAssetCalls).toHaveLength(3)
+    expect(writeAudit).toHaveBeenCalledTimes(2)
+  })
+
   it('creates a new department once and dedupes across rows referencing it', async () => {
     const res = await POST(makeReq([
       { name: 'App One', department: 'Finance' },
