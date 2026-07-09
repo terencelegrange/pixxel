@@ -40,10 +40,16 @@ const STEPS = [
   { number: 4, label: "Review" },
 ];
 
-function StepIndicator({ current }: { current: Step }) {
+function StepIndicator({
+  current,
+  steps,
+}: {
+  current: Step;
+  steps: typeof STEPS;
+}) {
   return (
     <div className="mb-8 flex items-center justify-center gap-0">
-      {STEPS.map((step, i) => {
+      {steps.map((step, i) => {
         const done = step.number < current;
         const active = step.number === current;
         return (
@@ -78,7 +84,7 @@ function StepIndicator({ current }: { current: Step }) {
                 {step.label}
               </span>
             </div>
-            {i < STEPS.length - 1 && (
+            {i < steps.length - 1 && (
               <div
                 className={`mb-5 h-px w-12 sm:w-20 ${
                   done ? "bg-brand-600" : "bg-slate-200"
@@ -169,10 +175,14 @@ function StepDatabase({
   form,
   onChange,
   onNext,
+  existingDb,
+  onExistingDbChange,
 }: {
   form: DbForm;
   onChange: (f: Partial<DbForm>) => void;
   onNext: () => void;
+  existingDb: boolean;
+  onExistingDbChange: (v: boolean) => void;
 }) {
   const [showPassword, setShowPassword] = useState(false);
   const [testState, setTestState] = useState<"idle" | "testing" | "ok" | "error">("idle");
@@ -214,13 +224,16 @@ function StepDatabase({
       const data = await res.json();
       if (data.success) {
         setTestState("ok");
+        onExistingDbChange(Boolean(data.existingDatabase));
       } else {
         setTestState("error");
         setTestError(data.error ?? "Connection failed.");
+        onExistingDbChange(false);
       }
     } catch {
       setTestState("error");
       setTestError("Network error — could not reach the server.");
+      onExistingDbChange(false);
     }
   }
 
@@ -240,7 +253,7 @@ function StepDatabase({
       <div className="mb-6 grid grid-cols-2 gap-3">
         <button
           type="button"
-          onClick={() => { onChange({ dialect: "mysql" }); setTestState("idle"); }}
+          onClick={() => { onChange({ dialect: "mysql" }); setTestState("idle"); onExistingDbChange(false); }}
           className={`rounded-lg border-2 px-4 py-3 text-left text-sm font-medium transition-colors ${
             form.dialect === "mysql" ? "border-brand-600 bg-brand-50 text-brand-900" : "border-slate-200 text-slate-600 hover:border-slate-300"
           }`}
@@ -250,7 +263,7 @@ function StepDatabase({
         </button>
         <button
           type="button"
-          onClick={() => { onChange({ dialect: "sqlite" }); setTestState("idle"); }}
+          onClick={() => { onChange({ dialect: "sqlite" }); setTestState("idle"); onExistingDbChange(false); }}
           className={`rounded-lg border-2 px-4 py-3 text-left text-sm font-medium transition-colors ${
             form.dialect === "sqlite" ? "border-brand-600 bg-brand-50 text-brand-900" : "border-slate-200 text-slate-600 hover:border-slate-300"
           }`}
@@ -265,7 +278,7 @@ function StepDatabase({
           label="Database File Path"
           id="sqlite-file"
           value={form.sqliteFile}
-          onChange={(v) => { onChange({ sqliteFile: v }); setTestState("idle"); }}
+          onChange={(v) => { onChange({ sqliteFile: v }); setTestState("idle"); onExistingDbChange(false); }}
           placeholder="data/pixxel.db"
           hint="Stored inside the container. Mount a volume at this path to persist data across restarts."
         />
@@ -275,32 +288,32 @@ function StepDatabase({
             <div className="sm:col-span-2">
               <Field
                 label="Host" id="db-host" value={form.host}
-                onChange={(v) => { onChange({ host: v }); setTestState("idle"); }}
+                onChange={(v) => { onChange({ host: v }); setTestState("idle"); onExistingDbChange(false); }}
                 placeholder="localhost" error={errors.host}
               />
             </div>
             <Field
               label="Port" id="db-port" value={form.port}
-              onChange={(v) => { onChange({ port: v }); setTestState("idle"); }}
+              onChange={(v) => { onChange({ port: v }); setTestState("idle"); onExistingDbChange(false); }}
               placeholder="3306" error={errors.port}
             />
           </div>
           <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Field
               label="Username" id="db-user" value={form.user}
-              onChange={(v) => { onChange({ user: v }); setTestState("idle"); }}
+              onChange={(v) => { onChange({ user: v }); setTestState("idle"); onExistingDbChange(false); }}
               placeholder="root" error={errors.user}
             />
             <Field
               label="Password" id="db-password" type={showPassword ? "text" : "password"} value={form.password}
-              onChange={(v) => { onChange({ password: v }); setTestState("idle"); }}
+              onChange={(v) => { onChange({ password: v }); setTestState("idle"); onExistingDbChange(false); }}
               placeholder="Leave blank if none" showToggle onToggle={() => setShowPassword((s) => !s)}
             />
           </div>
           <div className="mt-4">
             <Field
               label="Database Name" id="db-name" value={form.name}
-              onChange={(v) => { onChange({ name: v }); setTestState("idle"); }}
+              onChange={(v) => { onChange({ name: v }); setTestState("idle"); onExistingDbChange(false); }}
               placeholder="saas_app" hint="Will be created if it does not exist." error={errors.name}
             />
           </div>
@@ -314,6 +327,13 @@ function StepDatabase({
             <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
           </svg>
           Connection successful.
+        </div>
+      )}
+      {testState === "ok" && existingDb && (
+        <div className="mt-4 rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800">
+          Existing database detected — your data will be preserved and the
+          Admin Account step will be skipped. Sign in with your existing
+          credentials after setup completes.
         </div>
       )}
       {testState === "error" && (
@@ -533,12 +553,14 @@ function StepReview({
   db,
   app,
   admin,
+  existingDb,
   onBack,
   onComplete,
 }: {
   db: DbForm;
   app: AppForm;
   admin: AdminForm;
+  existingDb: boolean;
   onBack: () => void;
   onComplete: () => void;
 }) {
@@ -564,11 +586,15 @@ function StepReview({
           },
           appName: app.appName.trim(),
           orgName: app.orgName.trim(),
-          admin: {
-            name: admin.name.trim(),
-            email: admin.email.trim(),
-            password: admin.password,
-          },
+          ...(existingDb
+            ? {}
+            : {
+                admin: {
+                  name: admin.name.trim(),
+                  email: admin.email.trim(),
+                  password: admin.password,
+                },
+              }),
         }),
       });
       const data = await res.json();
@@ -637,16 +663,24 @@ function StepReview({
       </div>
 
       {/* Admin section */}
-      <div className="mb-6 rounded-lg border border-slate-200 px-4 py-1">
-        <p className="mb-1 mt-3 text-xs font-semibold uppercase tracking-wide text-slate-400">
-          Admin Account
-        </p>
-        <div className="divide-y divide-slate-100">
-          <Row label="Name" value={admin.name} />
-          <Row label="Email" value={admin.email} />
-          <Row label="Password" value="••••••••" />
+      {!existingDb && (
+        <div className="mb-6 rounded-lg border border-slate-200 px-4 py-1">
+          <p className="mb-1 mt-3 text-xs font-semibold uppercase tracking-wide text-slate-400">
+            Admin Account
+          </p>
+          <div className="divide-y divide-slate-100">
+            <Row label="Name" value={admin.name} />
+            <Row label="Email" value={admin.email} />
+            <Row label="Password" value="••••••••" />
+          </div>
         </div>
-      </div>
+      )}
+      {existingDb && (
+        <div className="mb-6 rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800">
+          Using existing database credentials — no new admin account will be
+          created.
+        </div>
+      )}
 
       {error && (
         <div className="mb-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700">
@@ -689,6 +723,7 @@ export default function SetupPage() {
   const router = useRouter();
   const [checking, setChecking] = useState(true);
   const [step, setStep] = useState<Step>(1);
+  const [existingDb, setExistingDb] = useState(false);
 
   const [db, setDb] = useState<DbForm>({
     dialect: "mysql",
@@ -726,15 +761,19 @@ export default function SetupPage() {
     );
   }
 
+  const steps = existingDb ? STEPS.filter((s) => s.number !== 3) : STEPS;
+
   return (
     <div>
-      <StepIndicator current={step} />
+      <StepIndicator current={step} steps={steps} />
 
       {step === 1 && (
         <StepDatabase
           form={db}
           onChange={(f) => setDb((d) => ({ ...d, ...f }))}
           onNext={() => setStep(2)}
+          existingDb={existingDb}
+          onExistingDbChange={setExistingDb}
         />
       )}
       {step === 2 && (
@@ -742,7 +781,7 @@ export default function SetupPage() {
           form={app}
           onChange={(f) => setApp((a) => ({ ...a, ...f }))}
           onBack={() => setStep(1)}
-          onNext={() => setStep(3)}
+          onNext={() => setStep(existingDb ? 4 : 3)}
         />
       )}
       {step === 3 && (
@@ -758,7 +797,8 @@ export default function SetupPage() {
           db={db}
           app={app}
           admin={admin}
-          onBack={() => setStep(3)}
+          existingDb={existingDb}
+          onBack={() => setStep(existingDb ? 2 : 3)}
           onComplete={() => router.push("/setup/complete")}
         />
       )}
