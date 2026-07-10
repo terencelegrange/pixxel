@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect, useCallback, FormEvent } from "react";
-import { Plus, Pencil, Trash2, AlertTriangle, ExternalLink, Package2 } from "lucide-react";
+import Link from "next/link";
+import { Plus, Pencil, Trash2, AlertTriangle, ExternalLink, Package2, FileText } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -419,6 +420,13 @@ export default function VendorsPage() {
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center justify-end gap-2">
+                        <Link
+                          href={`/contracts?vendor=${vendor.id}`}
+                          className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-300 transition-colors"
+                          aria-label={`View contracts for ${vendor.name}`}
+                        >
+                          <FileText className="h-4 w-4" />
+                        </Link>
                         {canWrite && (
                           <>
                             <button
