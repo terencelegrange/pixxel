@@ -10,7 +10,10 @@
 // pointing at this repo/branch with script path "Jenkinsfile.dockerhub".
 
 pipeline {
-    agent any
+    // Pinned to the agent with Docker installed. "agent any" previously let
+    // this land on the Jenkins controller's Built-In Node, which has no
+    // Docker, failing the Setup stage immediately.
+    agent { label 'ubuntu-agent' }
 
     environment {
         IMAGE_NAME = 'tlgrange/pixxel'
@@ -84,7 +87,17 @@ pipeline {
 
     post {
         always {
-            sh "docker rmi ${IMAGE_NAME}:${IMAGE_VERSION} ${IMAGE_NAME}:latest || true"
+            script {
+                // IMAGE_VERSION is only set once the Compute Version stage
+                // runs — if an earlier stage (e.g. Setup: Docker) fails
+                // first, it's never bound, and referencing it directly here
+                // would throw MissingPropertyException and mask the real
+                // failure. Skip cleanup entirely in that case; there's no
+                // image to remove.
+                if (env.IMAGE_VERSION) {
+                    sh "docker rmi ${IMAGE_NAME}:${IMAGE_VERSION} ${IMAGE_NAME}:latest || true"
+                }
+            }
             cleanWs()
         }
         success {
