@@ -7,7 +7,7 @@ import {
   ArrowUpDown, ArrowUp, ArrowDown, Target,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
-import { Asset, AssetComplexity, Domain, AssetStrategy } from "@/types";
+import { Asset, AssetComplexity, Domain, AssetStrategy, Contract } from "@/types";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -16,6 +16,28 @@ const USD = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD",
 
 function fmt(n: number | null): string {
   return n != null ? USD.format(n) : "—";
+}
+
+// Cost data now comes from the Contracts system (contracts.value / contracts.end_date)
+// rather than the retired assets.contract_amount / assets.contract_end_date columns.
+// An asset may have zero, one, or several linked contracts: total cost sums all linked
+// contract values; the displayed end date is the soonest upcoming expiry.
+type AssetCost = { amount: number | null; endDate: string | null };
+
+function buildCostMap(contracts: Contract[]): Map<string, AssetCost> {
+  const map = new Map<string, AssetCost>();
+  for (const c of contracts) {
+    if (!c.assetId) continue;
+    const existing = map.get(c.assetId) ?? { amount: null, endDate: null };
+    if (c.value != null) {
+      existing.amount = (existing.amount ?? 0) + c.value;
+    }
+    if (c.endDate && (!existing.endDate || c.endDate < existing.endDate)) {
+      existing.endDate = c.endDate;
+    }
+    map.set(c.assetId, existing);
+  }
+  return map;
 }
 
 type SortKey = "name" | "complexity" | "cost" | "lifecycle" | "domain" | "strategy";
@@ -35,18 +57,21 @@ function flagCandidates(
   complexities: AssetComplexity[],
   costThreshold: number,
   complexityIds: string[],
+  costMap: Map<string, AssetCost>,
 ): Set<string> {
   const half = Math.ceil(complexityIds.length / 2);
   const lowComplexityIds = new Set(complexityIds.slice(0, half));
   return new Set(
     rows
-      .filter(
-        (a) =>
-          a.contractAmount != null &&
-          a.contractAmount >= costThreshold &&
+      .filter((a) => {
+        const amount = costMap.get(a.id)?.amount ?? null;
+        return (
+          amount != null &&
+          amount >= costThreshold &&
           a.complexityId != null &&
-          lowComplexityIds.has(a.complexityId),
-      )
+          lowComplexityIds.has(a.complexityId)
+        );
+      })
       .map((a) => a.id),
   );
 }
@@ -81,6 +106,7 @@ export default function ComplexityCostReportPage() {
   const [complexities, setComplexities] = useState<AssetComplexity[]>([]);
   const [domains, setDomains] = useState<Domain[]>([]);
   const [strategies, setStrategies] = useState<AssetStrategy[]>([]);
+  const [contracts, setContracts] = useState<Contract[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
 
@@ -102,20 +128,22 @@ export default function ComplexityCostReportPage() {
     setIsLoading(true);
     setFetchError(null);
     try {
-      const [aRes, cRes, dRes, sRes] = await Promise.all([
+      const [aRes, cRes, dRes, sRes, ctrRes] = await Promise.all([
         fetch("/api/assets"),
         fetch("/api/asset-complexity"),
         fetch("/api/domains"),
         fetch("/api/asset-strategy"),
+        fetch("/api/contracts"),
       ]);
-      const [aData, cData, dData, sData] = await Promise.all([
-        aRes.json(), cRes.json(), dRes.json(), sRes.json(),
+      const [aData, cData, dData, sData, ctrData] = await Promise.all([
+        aRes.json(), cRes.json(), dRes.json(), sRes.json(), ctrRes.json(),
       ]);
       if (!aRes.ok) throw new Error(aData.error ?? "Failed to load assets.");
       setAssets(aData.assets ?? []);
       setComplexities(cData.complexities ?? []);
       setDomains(dData.domains ?? []);
       setStrategies(sData.strategies ?? []);
+      setContracts(ctrData.contracts ?? []);
     } catch (err) {
       setFetchError(err instanceof Error ? err.message : "Failed to load.");
     } finally {
@@ -130,19 +158,21 @@ export default function ComplexityCostReportPage() {
     [complexities],
   );
 
+  const costMap = useMemo(() => buildCostMap(contracts), [contracts]);
+
   const costThreshold = useMemo(() => {
     const costs = assets
-      .map((a) => a.contractAmount)
+      .map((a) => costMap.get(a.id)?.amount ?? null)
       .filter((v): v is number => v != null)
       .sort((a, b) => a - b);
     if (costs.length === 0) return 0;
     const mid = Math.floor(costs.length / 2);
     return costs.length % 2 === 0 ? (costs[mid - 1] + costs[mid]) / 2 : costs[mid];
-  }, [assets]);
+  }, [assets, costMap]);
 
   const candidateIds = useMemo(
-    () => flagCandidates(assets, complexities, costThreshold, orderedComplexityIds),
-    [assets, complexities, costThreshold, orderedComplexityIds],
+    () => flagCandidates(assets, complexities, costThreshold, orderedComplexityIds, costMap),
+    [assets, complexities, costThreshold, orderedComplexityIds, costMap],
   );
 
   const rows = useMemo(() => {
@@ -153,8 +183,9 @@ export default function ComplexityCostReportPage() {
       if (filterStrategy && a.strategyId !== filterStrategy) return false;
       if (filterType && a.type !== filterType) return false;
       if (filterCandidatesOnly && !candidateIds.has(a.id)) return false;
-      if (minCost !== "" && (a.contractAmount == null || a.contractAmount < Number(minCost))) return false;
-      if (maxCost !== "" && (a.contractAmount == null || a.contractAmount > Number(maxCost))) return false;
+      const amount = costMap.get(a.id)?.amount ?? null;
+      if (minCost !== "" && (amount == null || amount < Number(minCost))) return false;
+      if (maxCost !== "" && (amount == null || amount > Number(maxCost))) return false;
       return true;
     });
 
@@ -166,7 +197,7 @@ export default function ComplexityCostReportPage() {
       let cmp = 0;
       switch (sortKey) {
         case "name":       cmp = a.name.localeCompare(b.name); break;
-        case "cost":       cmp = (a.contractAmount ?? -1) - (b.contractAmount ?? -1); break;
+        case "cost":       cmp = (costMap.get(a.id)?.amount ?? -1) - (costMap.get(b.id)?.amount ?? -1); break;
         case "complexity": cmp = (complexityOrder[a.complexityId ?? ""] ?? 999) - (complexityOrder[b.complexityId ?? ""] ?? 999); break;
         case "lifecycle":  cmp = a.lifecycleStatus.localeCompare(b.lifecycleStatus); break;
         case "domain":     cmp = (a.domainName ?? "").localeCompare(b.domainName ?? ""); break;
@@ -177,19 +208,19 @@ export default function ComplexityCostReportPage() {
 
     return list;
   }, [assets, filterComplexity, filterLifecycle, filterDomain, filterStrategy, filterType,
-      filterCandidatesOnly, minCost, maxCost, sortKey, sortDir, complexities, candidateIds]);
+      filterCandidatesOnly, minCost, maxCost, sortKey, sortDir, complexities, candidateIds, costMap]);
 
   const totalCost = useMemo(
-    () => rows.reduce((s, a) => s + (a.contractAmount ?? 0), 0),
-    [rows],
+    () => rows.reduce((s, a) => s + (costMap.get(a.id)?.amount ?? 0), 0),
+    [rows, costMap],
   );
   const candidatesInView = useMemo(
     () => rows.filter((a) => candidateIds.has(a.id)),
     [rows, candidateIds],
   );
   const candidateCost = useMemo(
-    () => candidatesInView.reduce((s, a) => s + (a.contractAmount ?? 0), 0),
-    [candidatesInView],
+    () => candidatesInView.reduce((s, a) => s + (costMap.get(a.id)?.amount ?? 0), 0),
+    [candidatesInView, costMap],
   );
 
   const hasFilters = !!(filterComplexity || filterLifecycle || filterDomain ||
@@ -257,7 +288,7 @@ export default function ComplexityCostReportPage() {
             <StatCard
               label="Total licence cost"
               value={fmt(totalCost || null)}
-              sub={`${rows.filter((a) => a.contractAmount != null).length} with cost data`}
+              sub={`${rows.filter((a) => costMap.get(a.id)?.amount != null).length} with cost data`}
               colour="border-slate-200 bg-white text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
             />
             <StatCard
@@ -454,6 +485,8 @@ export default function ComplexityCostReportPage() {
                   <tbody className="divide-y divide-slate-100 bg-white dark:divide-slate-700 dark:bg-slate-800">
                     {rows.map((asset) => {
                       const isTarget = candidateIds.has(asset.id);
+                      const assetCost = costMap.get(asset.id)?.amount ?? null;
+                      const assetContractEndDate = costMap.get(asset.id)?.endDate ?? null;
                       return (
                         <tr
                           key={asset.id}
@@ -490,7 +523,7 @@ export default function ComplexityCostReportPage() {
 
                           {/* Cost */}
                           <td className="px-5 py-4 text-right">
-                            {asset.contractAmount != null ? (
+                            {assetCost != null ? (
                               <div className="flex flex-col items-end">
                                 <span className={[
                                   "text-sm font-semibold tabular-nums",
@@ -498,11 +531,11 @@ export default function ComplexityCostReportPage() {
                                     ? "text-rose-700 dark:text-rose-400"
                                     : "text-slate-800 dark:text-slate-200",
                                 ].join(" ")}>
-                                  {fmt(asset.contractAmount)}
+                                  {fmt(assetCost)}
                                 </span>
-                                {asset.contractEndDate && (
+                                {assetContractEndDate && (
                                   <span className="text-xs text-slate-400 dark:text-slate-500">
-                                    expires {new Date(asset.contractEndDate).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}
+                                    expires {new Date(assetContractEndDate).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}
                                   </span>
                                 )}
                               </div>
@@ -577,8 +610,8 @@ export default function ComplexityCostReportPage() {
           </div>
 
           <p className="text-xs text-slate-400 dark:text-slate-500">
-            Cost data sourced from the &ldquo;Contract amount&rdquo; field on each asset.
-            Assets without a contract amount are included in the report but excluded from cost totals.
+            Cost data sourced from linked Contracts (contract value, summed per asset).
+            Assets without a linked contract are included in the report but excluded from cost totals.
           </p>
         </>
       )}

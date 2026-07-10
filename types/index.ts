@@ -179,8 +179,6 @@ export interface Asset {
   retirementDate: string | null;
   appUrl: string | null;
   docUrl: string | null;
-  contractEndDate: string | null;
-  contractAmount: number | null;
   notes: string | null;
   createdById: string;
   createdByName: string;

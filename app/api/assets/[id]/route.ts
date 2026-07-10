@@ -111,8 +111,6 @@ export async function GET(req: NextRequest, props: { params: Promise<{ id: strin
       goLiveDate: toDate(row.go_live_date), retirementDate: toDate(row.retirement_date),
       appUrl: row.app_url ?? null,
       docUrl: row.doc_url ?? null,
-      contractEndDate: toDate(row.contract_end_date),
-      contractAmount: row.contract_amount != null ? Number(row.contract_amount) : null,
       notes: row.notes ?? null,
       createdById: row.created_by_id, createdByName: row.created_by_name,
       createdAt: toISO(row.created_at)!, updatedAt: toISO(row.updated_at)!,
@@ -138,7 +136,7 @@ export async function PUT(req: NextRequest, props: { params: Promise<{ id: strin
       name, shortCode, description, type, category, icon, lifecycleStatus,
       departmentIds, architectIds, capabilityIds, tierId, strategyId, complexityId, domainId, vendorId, businessOwner, technicalOwner,
       slaAvailability, slaRto, slaRpo,
-      goLiveDate, retirementDate, appUrl, docUrl, contractEndDate, contractAmount, notes,
+      goLiveDate, retirementDate, appUrl, docUrl, notes,
       heroDiagramId,
     } = body;
 
@@ -191,8 +189,6 @@ export async function PUT(req: NextRequest, props: { params: Promise<{ id: strin
       retirementDate: retirementDate || null,
       appUrl: appUrl?.trim() || null,
       docUrl: docUrl?.trim() || null,
-      contractEndDate: contractEndDate || null,
-      contractAmount: contractAmount != null && contractAmount !== "" ? Number(contractAmount) : null,
       notes: notes?.trim() || null,
     };
 
@@ -203,13 +199,13 @@ export async function PUT(req: NextRequest, props: { params: Promise<{ id: strin
            name=?, short_code=?, description=?, type=?, category=?, icon=?, hero_diagram_id=?, tier_id=?, strategy_id=?, complexity_id=?, domain_id=?, vendor_id=?,
            lifecycle_status=?, business_owner=?, technical_owner=?,
            sla_availability=?, sla_rto=?, sla_rpo=?,
-           go_live_date=?, retirement_date=?, app_url=?, doc_url=?, contract_end_date=?, contract_amount=?, notes=?
+           go_live_date=?, retirement_date=?, app_url=?, doc_url=?, notes=?
          WHERE id=?`,
         [values.name, values.shortCode, values.description, values.type, values.category,
          values.icon, values.heroDiagramId, values.tierId, values.strategyId, values.complexityId, values.domainId, values.vendorId, values.lifecycleStatus,
          values.businessOwner, values.technicalOwner,
          values.slaAvailability, values.slaRto, values.slaRpo,
-         values.goLiveDate, values.retirementDate, values.appUrl, values.docUrl, values.contractEndDate, values.contractAmount,
+         values.goLiveDate, values.retirementDate, values.appUrl, values.docUrl,
          values.notes, params.id]
       );
 
@@ -262,7 +258,6 @@ export async function PUT(req: NextRequest, props: { params: Promise<{ id: strin
         slaRto: current.sla_rto, slaRpo: current.sla_rpo,
         goLiveDate: toDate(current.go_live_date), retirementDate: toDate(current.retirement_date),
         appUrl: current.app_url, docUrl: current.doc_url,
-        contractEndDate: toDate(current.contract_end_date), contractAmount: current.contract_amount,
         notes: current.notes,
       },
       newValues: values,
