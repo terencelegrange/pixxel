@@ -13,6 +13,8 @@ Visual, interactive map of integrations and dependencies between assets — upst
 - UI: force-directed or layered graph view; filter by domain/tier; click node to open asset
 - Types: API, Database, File Transfer, Event, Message Queue, UI Embed
 
+> **Adjacent, in progress (branch `worktree-changes-2026-07-08`, not yet merged to main):** the **Business Services module** (`services`/`service_assets` tables, `/services`) groups assets into named services with a per-asset Core/Supporting/Dependency role and a ReactFlow view of the grouping. It's a *composition* layer (which assets make up a service), not a *dependency* layer (which assets call/depend on which) — this item and #23 (Business Process Mapping) are both still open and address different relationship types than Business Services covers.
+
 ### 2. Risk Register
 Per-asset risk tracking with severity, likelihood, impact, mitigation owner and status. Enables risk-weighted portfolio decisions.
 - Data model: `asset_risks` (asset_id, title, category, likelihood, impact, risk_score, mitigation, owner, status, due_date)
@@ -73,11 +75,14 @@ Horizontal timeline showing go-live and retirement dates for all assets in a sin
 
 ## Priority 3 — Operational Essentials
 
-### 11. Bulk Import (CSV / Excel)
+### 11. Bulk Import (CSV / Excel) — 🟡 in progress (open PR, not yet merged to main)
 Import assets, vendors, and dependencies from spreadsheets. The first thing every new customer needs — EA tools always start with a spreadsheet.
 - Upload CSV with column mapping wizard
 - Validation report before committing: duplicate names, missing required fields, unknown domain/tier values
 - Merge strategy: skip existing (by name), or update
+
+**In branch `worktree-changes-2026-07-08` (unmerged):** `POST /api/assets/bulk` + Settings → Bulk Upload Assets page — fixed-column CSV upload for new assets, name→ID lookup for department/domain/vendor/tier/strategy/architect/capability (creating new departments on the fly), per-row create/fail with warnings for unresolved lookups, one DB transaction per row.
+**Still missing even once merged:** column-mapping wizard (columns are fixed-name, not user-mapped), pre-commit validation report (validation currently happens per-row during the actual import, not as a separate preview/confirm step), and any skip-vs-update merge strategy — every row is a new asset; there's no dedupe-by-name against existing assets, so re-uploading the same CSV creates duplicates.
 
 ### 12. Global Search
 Search across assets, vendors, diagrams, projects, ADRs and radar entries from a single input. Currently each section has its own local filter.
@@ -183,7 +188,7 @@ Intake and triage of business demands (new capabilities, change requests) linked
 | 8 | Roadmap by Domain | P2 | S |
 | 9 | Sunset & Retirement Workflow | P2 | M |
 | 10 | Lifecycle Timeline View | P2 | M |
-| 11 | Bulk Import (CSV/Excel) | P3 | M |
+| 11 | Bulk Import (CSV/Excel) 🟡 open PR | P3 | M |
 | 12 | Global Search | P3 | M |
 | 13 | Export & Reporting | P3 | M |
 | 14 | Notifications & Alerts | P3 | S |
