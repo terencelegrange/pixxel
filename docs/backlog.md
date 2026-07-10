@@ -139,6 +139,13 @@ Score assets against configurable dimensions (security posture, documentation co
 - Data model: `scorecard_definitions` (dimensions JSON with weight); `asset_scores` (asset_id, scorecard_id, scores JSON, total, scored_at)
 - UI: scorecard summary on asset detail; portfolio-wide scorecard leaderboard
 
+### 26. Internationalisation — Multi-Currency & Locale Settings
+Every money field in Pixxel (`assets.contract_amount`, and the new `contracts.value` once shipped — see #4) is hard-coded to USD formatting with no currency concept anywhere in the app. A Settings page to configure the org's base currency (and optionally per-record currency) would let non-US customers see correctly formatted, correctly labelled amounts instead of everything rendered as `$`.
+- Data model: `org_settings` (or extend `site.config.json`) with `baseCurrency` (ISO 4217 code); if per-record currency is in scope, add a `currency` column to every money-bearing table (`assets`, `contracts`, ...), each nullable/defaulting to the org base currency
+- UI: Settings → Localization page — currency dropdown (ISO 4217 list), live preview of number formatting (`Intl.NumberFormat`); every existing `$X,XXX` display switches to locale-aware formatting driven by the configured currency
+- Scope decision needed at design time: single org-wide currency (simpler, no FX conversion) vs. per-record currency with no conversion (amounts just display in their own currency, no roll-up totals across currencies) vs. full multi-currency with FX rates (out of scope for a first pass — no exchange-rate data source exists in the app)
+- Explicitly deferred from #4 Contract Management: that item ships USD-only, matching today's `contract_amount` behavior, specifically so it doesn't have to solve this first
+
 ---
 
 ## Priority 5 — Advanced / Integrations
@@ -198,6 +205,7 @@ Intake and triage of business demands (new capabilities, change requests) linked
 | 18 | Tag System | P4 | S |
 | 19 | Architecture Principles Library | P4 | S |
 | 20 | Fitness Functions & Scorecards | P4 | L |
+| 26 | Internationalisation — Multi-Currency & Locale Settings | P4 | M |
 | 21 | ServiceNow CMDB Sync | P5 | L |
 | 22 | API & Webhooks | P5 | L |
 | 23 | Business Process Mapping | P5 | M |
