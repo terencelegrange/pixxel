@@ -132,6 +132,28 @@ export const vendors = sqliteTable("vendors", {
   updatedAt: updatedAt(),
 });
 
+export const contracts = sqliteTable("contracts", {
+  id: text("id").primaryKey(),
+  vendorId: text("vendor_id"),
+  assetId: text("asset_id"),
+  title: text("title").notNull(),
+  value: real("value"),
+  startDate: text("start_date"),
+  endDate: text("end_date"),
+  noticePeriodDays: integer("notice_period_days"),
+  autoRenews: integer("auto_renews", { mode: "boolean" }).notNull().default(false),
+  owner: text("owner"),
+  status: text("status", { enum: ["Active", "Terminated"] }).notNull().default("Active"),
+  docUrl: text("doc_url"),
+  notes: text("notes"),
+  ...createdBy(),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+}, (t) => [
+  index("idx_contracts_vendor").on(t.vendorId),
+  index("idx_contracts_asset").on(t.assetId),
+]);
+
 export const assetDepartments = sqliteTable("asset_departments", {
   assetId: text("asset_id").notNull(),
   departmentId: text("department_id").notNull(),

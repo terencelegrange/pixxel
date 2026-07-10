@@ -8,6 +8,13 @@
       "when": 1783132003172,
       "tag": "0000_initial_schema",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "5",
+      "when": 1783661025115,
+      "tag": "0001_fearless_deathstrike",
+      "breakpoints": true
     }
   ]
 }
