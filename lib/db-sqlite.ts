@@ -122,6 +122,18 @@ async function runSqliteSetup(filePath: string): Promise<void> {
     conn.prepare("INSERT INTO __pixxel_migrations (filename) VALUES (?)").run(file);
   }
 
+  // One-time backfill — see the matching comment in lib/db.ts's
+  // runMysqlSetup() for full rationale. SQLite equivalent: INSERT OR IGNORE,
+  // string concatenation via ||.
+  conn.exec(
+    `INSERT OR IGNORE INTO contracts
+       (id, vendor_id, asset_id, title, value, end_date, status, created_by_id, created_by_name)
+     SELECT id, vendor_id, id, name || ' contract', contract_amount, contract_end_date,
+            'Active', 'system', 'System'
+     FROM assets
+     WHERE contract_amount IS NOT NULL OR contract_end_date IS NOT NULL`
+  );
+
   const insertIgnore = (sqlText: string, params: unknown[]) => {
     conn.prepare(sqlText).run(...(params as SQLInputValue[]));
   };
