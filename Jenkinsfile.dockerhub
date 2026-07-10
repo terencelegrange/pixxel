@@ -1,0 +1,122 @@
+// Jenkinsfile.dockerhub
+//
+// Builds the Pixxel image and pushes it to Docker Hub under two tags:
+//   - an auto-incremented "X.Y" version (1.0, 1.1, 1.2, ... — queried from
+//     Docker Hub itself, so no version state is kept in this repo or in Jenkins)
+//   - "latest", always pointing at the same image as the newest version tag
+//
+// To wire this up: in the pixxel-dockerhub Jenkins job, switch the pipeline
+// definition from "Pipeline script" (inline) to "Pipeline script from SCM",
+// pointing at this repo/branch with script path "Jenkinsfile.dockerhub".
+
+pipeline {
+    agent any
+
+    environment {
+        IMAGE_NAME = 'tlgrange/pixxel'
+        // TODO: replace with the credential ID Jenkins already uses to push
+        // to Docker Hub (Manage Jenkins -> Credentials) — a "Username with
+        // password" credential where the password is a Docker Hub access token.
+        DOCKERHUB_CREDENTIALS_ID = 'dockerhub-creds'
+    }
+
+    stages {
+        stage('Setup: Docker') {
+            steps {
+                sh '''
+                    if command -v docker >/dev/null 2>&1; then
+                        echo "Docker already installed: $(docker --version)"
+                    else
+                        echo "Docker not found on this agent" >&2
+                        exit 1
+                    fi
+                    sudo chmod 666 /var/run/docker.sock
+                    docker --version
+                '''
+            }
+        }
+
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+
+        stage('Compute Version') {
+            steps {
+                script {
+                    def response = sh(
+                        script: "curl -sf 'https://hub.docker.com/v2/repositories/${env.IMAGE_NAME}/tags?page_size=100'",
+                        returnStdout: true
+                    ).trim()
+
+                    if (!response) {
+                        error("Failed to fetch existing tags from Docker Hub for ${env.IMAGE_NAME} — aborting rather than guessing a version.")
+                    }
+
+                    env.IMAGE_VERSION = computeNextVersion(response)
+                    echo "Computed next version: ${env.IMAGE_VERSION}"
+                }
+            }
+        }
+
+        stage('Build Image') {
+            steps {
+                sh "docker build -t ${IMAGE_NAME}:${IMAGE_VERSION} ."
+                sh "docker tag ${IMAGE_NAME}:${IMAGE_VERSION} ${IMAGE_NAME}:latest"
+            }
+        }
+
+        stage('Push to Docker Hub') {
+            steps {
+                withCredentials([usernamePassword(
+                    credentialsId: DOCKERHUB_CREDENTIALS_ID,
+                    usernameVariable: 'DOCKERHUB_USER',
+                    passwordVariable: 'DOCKERHUB_PASS'
+                )]) {
+                    sh '''
+                        echo "$DOCKERHUB_PASS" | docker login -u "$DOCKERHUB_USER" --password-stdin
+                        docker push ${IMAGE_NAME}:${IMAGE_VERSION}
+                        docker push ${IMAGE_NAME}:latest
+                        docker logout
+                    '''
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            sh "docker rmi ${IMAGE_NAME}:${IMAGE_VERSION} ${IMAGE_NAME}:latest || true"
+            cleanWs()
+        }
+        success {
+            echo "Pushed ${IMAGE_NAME}:${IMAGE_VERSION} and ${IMAGE_NAME}:latest"
+        }
+        failure {
+            echo "Build/push failed -- check logs above"
+        }
+    }
+}
+
+// Parses the Docker Hub tags API response for "X.Y"-shaped tag names and
+// returns the next minor version as a string, e.g. "1.3" -> "1.4".
+// Starts at "1.0" if no version-shaped tags exist yet (e.g. only "latest").
+// @NonCPS: uses a java.util.regex.Matcher, which isn't serializable — must
+// run outside the CPS transform.
+@NonCPS
+def computeNextVersion(String tagsJson) {
+    def matches = (tagsJson =~ /"name"\s*:\s*"(\d+)\.(\d+)"/)
+    def versions = []
+    for (m in matches) {
+        versions << [m[1].toInteger(), m[2].toInteger()]
+    }
+
+    if (versions.isEmpty()) {
+        return "1.0"
+    }
+
+    versions.sort { a, b -> a[0] != b[0] ? a[0] <=> b[0] : a[1] <=> b[1] }
+    def latest = versions[-1]
+    return "${latest[0]}.${latest[1] + 1}"
+}
