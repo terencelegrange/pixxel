@@ -90,8 +90,6 @@ export async function GET(req: NextRequest) {
       slaRto: row.sla_rto ?? null, slaRpo: row.sla_rpo ?? null,
       goLiveDate: toDate(row.go_live_date), retirementDate: toDate(row.retirement_date),
       appUrl: row.app_url ?? null, docUrl: row.doc_url ?? null,
-      contractEndDate: toDate(row.contract_end_date),
-      contractAmount: row.contract_amount != null ? Number(row.contract_amount) : null,
       notes: row.notes ?? null,
       createdById: row.created_by_id, createdByName: row.created_by_name,
       createdAt: toISO(row.created_at)!, updatedAt: toISO(row.updated_at)!,
