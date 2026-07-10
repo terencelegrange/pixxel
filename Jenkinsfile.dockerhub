@@ -14,10 +14,7 @@ pipeline {
 
     environment {
         IMAGE_NAME = 'tlgrange/pixxel'
-        // TODO: replace with the credential ID Jenkins already uses to push
-        // to Docker Hub (Manage Jenkins -> Credentials) — a "Username with
-        // password" credential where the password is a Docker Hub access token.
-        DOCKERHUB_CREDENTIALS_ID = 'dockerhub-creds'
+        DOCKERHUB_CREDENTIALS_ID = 'DOCKERHUB_CREDENTIALS'
     }
 
     stages {
