@@ -49,6 +49,11 @@ export const navigationConfig: NavGroup[] = [
         href: "/projects",
         icon: "FolderKanban",
       },
+      {
+        label: "Contracts",
+        href: "/contracts",
+        icon: "FileText",
+      },
     ],
   },
   {

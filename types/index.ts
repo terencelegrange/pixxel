@@ -119,6 +119,30 @@ export interface Vendor {
   updatedAt: string;
 }
 
+export type ContractStatus = "Active" | "Terminated";
+
+export interface Contract {
+  id: string;
+  vendorId: string | null;
+  vendorName: string | null;
+  assetId: string | null;
+  assetName: string | null;
+  title: string;
+  value: number | null;
+  startDate: string | null;
+  endDate: string | null;
+  noticePeriodDays: number | null;
+  autoRenews: boolean;
+  owner: string | null;
+  status: ContractStatus;
+  docUrl: string | null;
+  notes: string | null;
+  createdById: string;
+  createdByName: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface Asset {
   id: string;
   name: string;
@@ -155,8 +179,6 @@ export interface Asset {
   retirementDate: string | null;
   appUrl: string | null;
   docUrl: string | null;
-  contractEndDate: string | null;
-  contractAmount: number | null;
   notes: string | null;
   createdById: string;
   createdByName: string;

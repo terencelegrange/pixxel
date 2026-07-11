@@ -20,6 +20,7 @@ import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import AssetModal, { AssetFormState, AssetIcon } from "@/components/assets/AssetModal";
+import { AssetContractsList } from "@/components/contracts/AssetContractsList";
 import { Asset, AuditLog, AssetComplexity, AssetStrategy, AssetType, BusinessCapability, Department, Diagram, Domain, IndustrySector, LifecycleStatus, Tier, User, Vendor } from "@/types";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -100,7 +101,6 @@ const FIELD_LABELS: Record<string, string> = {
   technicalOwner: "Technical Owner", vendor: "Vendor", vendorId: "Vendor",
   slaAvailability: "Availability SLA", slaRto: "RTO", slaRpo: "RPO",
   goLiveDate: "Go Live Date", retirementDate: "Retirement Date",
-  contractEndDate: "Contract End Date", contractAmount: "Contract Amount",
   appUrl: "Application URL", docUrl: "Documentation URL", notes: "Notes",
 };
 
@@ -644,14 +644,14 @@ export default function AssetDetailPage() {
           <Field label="RPO"               value={asset.slaRpo} />
           <Field label="Go live date"       value={fmtDate(asset.goLiveDate)} />
           <Field label="Retirement date"   value={fmtDate(asset.retirementDate)} />
-          <Field label="Contract end date" value={fmtDate(asset.contractEndDate)} />
-          <Field
-            label="Contract amount"
-            value={asset.contractAmount != null
-              ? new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(asset.contractAmount)
-              : null}
-          />
           {/* ↑ Add new SLA/date fields here in future */}
+        </Section>
+
+        {/* Contracts */}
+        <Section title="Contracts">
+          <div className="col-span-2">
+            <AssetContractsList assetId={asset.id} />
+          </div>
         </Section>
 
         {/* Links & Notes */}

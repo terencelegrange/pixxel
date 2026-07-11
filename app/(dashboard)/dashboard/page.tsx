@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { TrendingUp, Users, Building2, ArrowUpRight, Server, FolderKanban } from "lucide-react";
+import Link from "next/link";
+import { TrendingUp, Users, Building2, ArrowUpRight, Server, FolderKanban, AlertCircle } from "lucide-react";
 import {
   PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer,
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
@@ -67,6 +68,7 @@ export default function DashboardPage() {
   const [assetsByLifecycle, setAssetsByLifecycle] = useState<LifecycleStat[]>([]);
   const [assetsByTier, setAssetsByTier]         = useState<TierStat[]>([]);
   const [assetsByStrategy, setAssetsByStrategy] = useState<StrategyStat[]>([]);
+  const [expiringContracts, setExpiringContracts] = useState<number | null>(null);
 
   useEffect(() => {
     fetch("/api/dashboard/stats")
@@ -77,6 +79,7 @@ export default function DashboardPage() {
         setAssetsByLifecycle(d.assetsByLifecycle ?? []);
         setAssetsByTier(d.assetsByTier ?? []);
         setAssetsByStrategy(d.assetsByStrategy ?? []);
+        setExpiringContracts(d.expiringContracts30d ?? 0);
       })
       .catch(() => {
         setPublishedDepts(0);
@@ -84,6 +87,7 @@ export default function DashboardPage() {
         setAssetsByLifecycle([]);
         setAssetsByTier([]);
         setAssetsByStrategy([]);
+        setExpiringContracts(0);
       });
   }, []);
 
@@ -135,6 +139,16 @@ export default function DashboardPage() {
       bg: "bg-brand-50 dark:bg-brand-900/30",
       loading: activeProjects === null,
     },
+    {
+      label: "Contracts Expiring Soon",
+      value: expiringContracts === null ? "—" : String(expiringContracts),
+      change: "Within 30 days",
+      icon: AlertCircle,
+      color: "text-red-600 dark:text-red-400",
+      bg: "bg-red-50 dark:bg-red-900/30",
+      loading: expiringContracts === null,
+      href: "/contracts?expiring=30",
+    },
   ];
 
   return (
@@ -144,8 +158,11 @@ export default function DashboardPage() {
         {stats.map((s) => (
           <div
             key={s.label}
-            className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900"
+            className="relative rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900"
           >
+            {s.href ? (
+              <Link href={s.href} className="absolute inset-0" aria-label={s.label} />
+            ) : null}
             <div className="flex items-center justify-between">
               <p className="text-sm font-medium text-slate-500 dark:text-slate-400">{s.label}</p>
               <div className={`rounded-lg p-2 ${s.bg}`}>

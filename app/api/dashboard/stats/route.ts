@@ -3,6 +3,7 @@ import logger from "@/lib/logger";
 import mysql from "mysql2/promise";
 import { getDb, setupDatabase } from "@/lib/db";
 import { requireUser } from "@/lib/require-user";
+import { isExpiringWithin } from "@/lib/contracts";
 
 export async function GET(req: NextRequest) {
   const auth = await requireUser(req);
@@ -11,7 +12,7 @@ export async function GET(req: NextRequest) {
     await setupDatabase();
     const db = getDb();
 
-    const [[deptRows], [lifecycleRows], [tierRows], [projectRows], [strategyRows]] = await Promise.all([
+    const [[deptRows], [lifecycleRows], [tierRows], [projectRows], [strategyRows], [contractRows]] = await Promise.all([
       db.execute<mysql.RowDataPacket[]>(
         "SELECT COUNT(*) AS count FROM departments WHERE status = 'Published'"
       ),
@@ -35,6 +36,9 @@ export async function GET(req: NextRequest) {
          GROUP BY a.strategy_id, s.name
          ORDER BY s.sort_order IS NULL ASC, s.sort_order ASC, s.name ASC`
       ),
+      db.execute<mysql.RowDataPacket[]>(
+        "SELECT status, end_date, notice_period_days, auto_renews FROM contracts WHERE status = 'Active' AND end_date IS NOT NULL"
+      ),
     ]);
 
     const assetsByLifecycle = lifecycleRows.map((r) => ({
@@ -52,15 +56,23 @@ export async function GET(req: NextRequest) {
       count: Number(r.count),
     }));
 
+    const expiringContracts30d = contractRows.filter((r) =>
+      isExpiringWithin(
+        { status: r.status, endDate: r.end_date, noticePeriodDays: r.notice_period_days, autoRenews: !!r.auto_renews },
+        30
+      )
+    ).length;
+
     return NextResponse.json({
       publishedDepartments: deptRows[0].count as number,
       activeProjects: Number(projectRows[0].count),
       assetsByLifecycle,
       assetsByTier,
       assetsByStrategy,
+      expiringContracts30d,
     });
   } catch (err) {
     logger.error({ err, route: "GET /api/dashboard/stats" }, "request failed");
-    return NextResponse.json({ publishedDepartments: 0, assetsByLifecycle: [] }, { status: 500 });
+    return NextResponse.json({ publishedDepartments: 0, assetsByLifecycle: [], expiringContracts30d: 0 }, { status: 500 });
   }
 }

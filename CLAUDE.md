@@ -60,6 +60,7 @@ saas-boilerplate/
 │   │   ├── projects/
 │   │   │   ├── page.tsx          # Projects list — create/edit/delete; status filter; links to detail
 │   │   │   └── [id]/page.tsx     # Project detail — hero card + asset dependency panel (List / Flow tab)
+│   │   ├── contracts/page.tsx    # Contract Management — list + create/edit modal; urgency badges; filter by vendor/asset/expiring window
 │   │   ├── organisations/page.tsx # Department CRUD
 │   │   ├── vendors/page.tsx      # Vendor CRUD — contact details, address, primary contact + role
 │   │   ├── domains/page.tsx      # Domain CRUD
@@ -111,13 +112,17 @@ saas-boilerplate/
 │   │   ├── support/
 │   │   │   ├── route.ts          # GET (all submissions) + POST (create, status defaults to 'New')
 │   │   │   └── [id]/route.ts     # PATCH (update status)
-│   │   └── projects/
-│   │       ├── route.ts          # GET (list with asset count) + POST
-│   │       └── [id]/
-│   │           ├── route.ts      # PUT + DELETE (cascades project_assets)
-│   │           └── assets/
-│   │               ├── route.ts          # GET (linked assets with metadata) + POST (link asset)
-│   │               └── [assetId]/route.ts # PATCH (update dependency_type/notes) + DELETE (unlink)
+│   │   ├── projects/
+│   │   │   ├── route.ts          # GET (list with asset count) + POST
+│   │   │   └── [id]/
+│   │   │       ├── route.ts      # PUT + DELETE (cascades project_assets)
+│   │   │       └── assets/
+│   │   │           ├── route.ts          # GET (linked assets with metadata) + POST (link asset)
+│   │   │           └── [assetId]/route.ts # PATCH (update dependency_type/notes) + DELETE (unlink)
+│   │   └── contracts/
+│   │       ├── route.ts          # GET (list, filter by vendor/asset/expiring window, joins vendor/asset names) + POST
+│   │       ├── [id]/route.ts     # PUT + DELETE
+│   │       └── expiring-count/route.ts # GET — count of Active contracts expiring within 90 days (header bell)
 │   ├── globals.css
 │   ├── layout.tsx                # Root layout — mounts ThemeProvider + AuthProvider; inline script for no-FOUC dark mode
 │   └── page.tsx                  # Root redirect → /dashboard or /login
@@ -145,6 +150,7 @@ saas-boilerplate/
 ├── lib/
 │   ├── audit.ts                  # Server-only: writeAudit() helper — call after every write
 │   ├── auth.ts                   # Client-side: localStorage helpers + fetch to API routes
+│   ├── contracts.ts              # Shared urgency computation (getEffectiveDeadline/getContractUrgency/isExpiringWithin) — used by API and UI, computed at read time, never stored
 │   └── db.ts                     # Server-only: mysql2 pool singleton + setupDatabase() (applies drizzle/ migrations, then seeds reference data)
 ├── drizzle/
 │   ├── schema.ts                 # Schema source of truth (Drizzle TS DSL) — migrations only, not a query layer
@@ -159,7 +165,7 @@ saas-boilerplate/
 
 ```
 (no group)     Dashboard, Profile
-Assets         Asset Registry, Projects
+Assets         Asset Registry, Projects, Contracts
 Reports        Asset Strategy (matrix report: domains × strategies)
 Manage         Departments, Domains, Asset Strategy, Vendors, Tier, Users, Settings, Audit
 Resources      Documentation, Support
@@ -353,8 +359,8 @@ anywhere — add a new migration instead.
 | `sla_rpo` | `VARCHAR(100)` NULL | Recovery Point Objective |
 | `go_live_date` | `DATE` NULL | |
 | `retirement_date` | `DATE` NULL | |
-| `contract_end_date` | `DATE` NULL | |
-| `contract_amount` | `DECIMAL(15,2)` NULL | Formatted as USD in UI |
+| `contract_end_date` | `DATE` NULL | **Deprecated** — still physically present, but no longer read or written by app code (superseded by `contracts`, see below). Pending a future migration to drop it once backfilled `contracts` data is verified. |
+| `contract_amount` | `DECIMAL(15,2)` NULL | **Deprecated** — same status as `contract_end_date` above. |
 | `app_url` | `VARCHAR(500)` NULL | |
 | `doc_url` | `VARCHAR(500)` NULL | Documentation link |
 | `notes` | `TEXT` NULL | |
@@ -387,6 +393,27 @@ anywhere — add a new migration instead.
 | `notes` | `TEXT` NULL | |
 | `created_by_id/name` | | Denormalised creator |
 | `created_at` / `updated_at` | `DATETIME` | Auto-managed |
+
+#### `contracts`
+| Column | Type | Notes |
+|---|---|---|
+| `id` | `CHAR(36)` PK | UUID |
+| `vendor_id` | `CHAR(36)` NULL | FK-shaped (no DB constraint) → `vendors.id` |
+| `asset_id` | `CHAR(36)` NULL | FK-shaped (no DB constraint) → `assets.id`; at most one linked asset per contract |
+| `title` | `VARCHAR(255)` | |
+| `value` | `DECIMAL(15,2)` NULL | Formatted as USD in UI |
+| `start_date` | `DATE` NULL | |
+| `end_date` | `DATE` NULL | |
+| `notice_period_days` | `INT UNSIGNED` NULL | Days' notice required before auto-renewal to avoid it |
+| `auto_renews` | `BOOLEAN` | Default `false` |
+| `owner` | `VARCHAR(255)` NULL | Internal contract owner |
+| `status` | `ENUM('Active','Terminated')` | Default: `Active` |
+| `doc_url` | `VARCHAR(500)` NULL | Documentation link |
+| `notes` | `TEXT` NULL | |
+| `created_by_id/name` | | Denormalised creator |
+| `created_at` / `updated_at` | `DATETIME` | Auto-managed |
+
+> Indexed on `vendor_id` and `asset_id`. Urgency/status displayed in the UI is never stored — see "Contract Management" below.
 
 #### `changelog`
 | Column | Type | Notes |
@@ -464,6 +491,19 @@ anywhere — add a new migration instead.
 
 ---
 
+## Contract Management
+
+- **`/contracts`** — list + create/edit modal (`app/(dashboard)/contracts/page.tsx`); filterable by `?vendor=`, `?asset=`, and `?expiring=<days>` query params; urgency badge per row
+- **Urgency is computed at read time, never stored** — `lib/contracts.ts`:
+  - `getEffectiveDeadline()` — the date action is actually needed by: for an auto-renewing contract with a notice period, `end_date` minus `notice_period_days` (miss it and it silently renews); otherwise just `end_date`
+  - `getContractUrgency()` — buckets a contract as `terminated` / `overdue` / `critical` (≤30 days) / `warning` (≤90 days) / `active`, relative to the effective deadline
+  - `isExpiringWithin(days)` — true when an `Active` contract's effective deadline falls within `days`; drives both the dashboard card and the header bell counts
+- **Dashboard "Contracts Expiring Soon" card** (`/dashboard`) — count of contracts expiring within **30 days**; links to `/contracts?expiring=30`
+- **Header bell — contracts-expiring section** (`components/layout/Header.tsx`) — Admin only; polls `GET /api/contracts/expiring-count` every 60s alongside the feedback count; counts contracts expiring within **90 days**; links to `/contracts?expiring=90`
+- **Vendor list "View contracts" link** (`/vendors`) — per-row link to `/contracts?vendor={vendor.id}`
+
+---
+
 ## Implemented Features
 
 - [x] User registration + login (bcrypt, MariaDB)
@@ -482,12 +522,12 @@ anywhere — add a new migration instead.
 - [x] Vendor management — full CRUD at `/vendors`; primary contact includes role dropdown
 - [x] User management — add user (with password + role), edit name/role, delete (cannot self-delete); roles: Admin / Member / Viewer; audited
 - [x] Asset Registry — full CRUD at `/assets`; all lookup fields (tier, strategy, domain, vendor, departments); audited
-- [x] Asset fields: doc_url (documentation link), contract_end_date, contract_amount (USD)
+- [x] Asset fields: doc_url (documentation link)
 - [x] Asset list table columns: Asset name, Type, Tier, Strategy, Lifecycle, Actions
-- [x] Asset detail page (`/assets/[id]`) — hero card, info sections (incl. contract + doc URL), audit history
+- [x] Asset detail page (`/assets/[id]`) — hero card, info sections (incl. doc URL), audit history
 - [x] Reports → Asset Strategy matrix (`/reports/assets-by-domain`) — domains as row groups, strategies as columns, colour-coded dots
 - [x] Audit log viewer (`/audit`) — paginated, filters (table, action, user), expandable field diffs; covers all entities
-- [x] `AssetModal` — reusable create/edit modal with sections: Basic Info, Ownership (dept checkboxes, tier, strategy, domain, vendor), SLA & Dates (incl. contract), Links & Notes (incl. doc URL), Appearance (icon picker)
+- [x] `AssetModal` — reusable create/edit modal with sections: Basic Info, Ownership (dept checkboxes, tier, strategy, domain, vendor), SLA & Dates, Links & Notes (incl. doc URL), Appearance (icon picker)
 - [x] `AssetIcon` — resolves Lucide icon by name string; used in list, detail, and modal
 - [x] Dashboard — bar chart of assets grouped by tier (Recharts); published departments count
 - [x] Support form (`/support`) — users submit feature requests, report requests, bugs, other; status defaults to `New`
@@ -497,6 +537,10 @@ anywhere — add a new migration instead.
 - [x] Projects (`/projects`) — CRUD; status (Active / On Hold / Completed / Cancelled); start/end dates
 - [x] Project asset dependencies (`/projects/[id]`) — link assets as upstream or downstream; notes per link; edit/remove inline
 - [x] Project dependency flow diagram — ReactFlow visualisation; project hub + upstream/downstream asset nodes; animated directional edges; lazy-loaded
+- [x] Contract Management (`/contracts`) — full CRUD; links to vendor and/or one asset; auto-renewal + notice-period tracking; urgency computed at read time (`lib/contracts.ts`), never stored
+- [x] Dashboard "Contracts Expiring Soon" card — count within 30 days, links to `/contracts?expiring=30`
+- [x] Header notification bell — contracts-expiring section (90-day window) alongside feedback count; links to `/contracts?expiring=90`
+- [x] Vendor list "View contracts" link — per-row link to `/contracts?vendor={id}`
 - [x] Documentation page (`/docs`) — Server Component; renders `CLAUDE.md` via `react-markdown` + `remark-gfm`; sticky TOC sidebar built from `##` headings; custom component renderers for tables, code blocks, blockquotes
 - [x] Changelog (`/settings/changelog`) — CRUD for release notes; fields: version, title, type (feature/fix/improvement/breaking), release date, description; audited
 

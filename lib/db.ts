@@ -179,6 +179,21 @@ async function runMysqlSetup(): Promise<void> {
   // directly in this function.
   await migrate(drizzle(db), { migrationsFolder: path.join(process.cwd(), "drizzle", "migrations") });
 
+  // One-time backfill: every asset that still has legacy contract_amount/
+  // contract_end_date data gets a corresponding contracts row, so that data
+  // survives once those two asset columns are dropped in a later migration
+  // (see docs/superpowers/specs/2026-07-10-contract-management-design.md).
+  // Idempotent forever via INSERT IGNORE keyed on id = the source asset's id
+  // — a second run on an already-migrated install silently no-ops.
+  await db.execute(
+    `INSERT IGNORE INTO contracts
+       (id, vendor_id, asset_id, title, value, end_date, status, created_by_id, created_by_name)
+     SELECT id, vendor_id, id, CONCAT(name, ' contract'), contract_amount, contract_end_date,
+            'Active', 'system', 'System'
+     FROM assets
+     WHERE contract_amount IS NOT NULL OR contract_end_date IS NOT NULL`
+  );
+
   // Seed data below is reference/lookup data, not schema — it stays here as
   // idempotent inserts rather than migration files.
 

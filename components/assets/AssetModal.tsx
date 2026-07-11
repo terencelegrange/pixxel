@@ -70,8 +70,6 @@ export interface AssetFormState {
   retirementDate: string;
   appUrl: string;
   docUrl: string;
-  contractEndDate: string;
-  contractAmount: string;
   notes: string;
   heroDiagramId: string;
 }
@@ -84,7 +82,7 @@ export const EMPTY_FORM: AssetFormState = {
   businessOwner: "", technicalOwner: "",
   slaAvailability: "", slaRto: "", slaRpo: "",
   goLiveDate: "", retirementDate: "",
-  appUrl: "", docUrl: "", contractEndDate: "", contractAmount: "",
+  appUrl: "", docUrl: "",
   notes: "",
   heroDiagramId: "",
 };
@@ -115,8 +113,6 @@ export function assetToForm(asset: Asset): AssetFormState {
     retirementDate: asset.retirementDate ?? "",
     appUrl: asset.appUrl ?? "",
     docUrl: asset.docUrl ?? "",
-    contractEndDate: asset.contractEndDate ?? "",
-    contractAmount: asset.contractAmount != null ? String(asset.contractAmount) : "",
     notes: asset.notes ?? "",
     heroDiagramId: asset.heroDiagramId ?? "",
   };
@@ -568,22 +564,6 @@ export default function AssetModal({
               onChange={(e) => set("retirementDate", e.target.value)}
             />
           </div>
-
-          <Input
-            label="Contract end date"
-            type="date"
-            value={form.contractEndDate}
-            onChange={(e) => set("contractEndDate", e.target.value)}
-          />
-
-          <Input
-            label="Contract amount"
-            type="number"
-            placeholder="e.g. 50000"
-            value={form.contractAmount}
-            onChange={(e) => set("contractAmount", e.target.value)}
-            hint="Annual contract value"
-          />
 
           {/* ── Links & Notes ─────────────────────────────────────────── */}
           <SectionHeading>Links &amp; Notes</SectionHeading>

@@ -36,7 +36,7 @@ const dbAssetRow = {
   vendor: null,
   sla_availability: null, sla_rto: null, sla_rpo: null,
   go_live_date: null, retirement_date: null, app_url: null, doc_url: null,
-  contract_end_date: null, contract_amount: null, notes: null,
+  notes: null,
   created_by_id: 'u1', created_by_name: 'Admin',
   created_at: new Date(), updated_at: new Date(),
 }

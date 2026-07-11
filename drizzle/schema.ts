@@ -9,7 +9,7 @@
  */
 import {
   mysqlTable, char, varchar, text, longtext, int, datetime, date, decimal,
-  mysqlEnum, primaryKey, index, uniqueIndex,
+  mysqlEnum, primaryKey, index, uniqueIndex, boolean,
 } from "drizzle-orm/mysql-core";
 import { sql } from "drizzle-orm";
 
@@ -134,6 +134,28 @@ export const vendors = mysqlTable("vendors", {
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 });
+
+export const contracts = mysqlTable("contracts", {
+  id: char("id", { length: 36 }).primaryKey(),
+  vendorId: char("vendor_id", { length: 36 }),
+  assetId: char("asset_id", { length: 36 }),
+  title: varchar("title", { length: 255 }).notNull(),
+  value: decimal("value", { precision: 15, scale: 2 }),
+  startDate: date("start_date"),
+  endDate: date("end_date"),
+  noticePeriodDays: int("notice_period_days", { unsigned: true }),
+  autoRenews: boolean("auto_renews").notNull().default(false),
+  owner: varchar("owner", { length: 255 }),
+  status: mysqlEnum("status", ["Active", "Terminated"]).notNull().default("Active"),
+  docUrl: varchar("doc_url", { length: 500 }),
+  notes: text("notes"),
+  ...createdBy(),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+}, (t) => [
+  index("idx_contracts_vendor").on(t.vendorId),
+  index("idx_contracts_asset").on(t.assetId),
+]);
 
 export const assetDepartments = mysqlTable("asset_departments", {
   assetId: char("asset_id", { length: 36 }).notNull(),
