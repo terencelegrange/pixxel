@@ -36,7 +36,8 @@ const config: Config = {
       moduleNameMapper: { '^@/(.*)$': '<rootDir>/$1' },
       // Avoid haste-map collisions with the standalone build's copied
       // package.json (and coverage output) when .next/ exists on disk.
-      modulePathIgnorePatterns: ['<rootDir>/.next/', '<rootDir>/coverage/'],
+      modulePathIgnorePatterns: ['<rootDir>/.next/', '<rootDir>/coverage/', '<rootDir>/.claude/'],
+      testPathIgnorePatterns: ['<rootDir>/node_modules/', '<rootDir>/.claude/'],
     } as any,
     {
       displayName: 'integration',
@@ -46,7 +47,8 @@ const config: Config = {
       moduleNameMapper: { '^@/(.*)$': '<rootDir>/$1' },
       // Avoid haste-map collisions with the standalone build's copied
       // package.json (and coverage output) when .next/ exists on disk.
-      modulePathIgnorePatterns: ['<rootDir>/.next/', '<rootDir>/coverage/'],
+      modulePathIgnorePatterns: ['<rootDir>/.next/', '<rootDir>/coverage/', '<rootDir>/.claude/'],
+      testPathIgnorePatterns: ['<rootDir>/node_modules/', '<rootDir>/.claude/'],
     } as any,
     {
       displayName: 'ui',
@@ -58,7 +60,8 @@ const config: Config = {
         '\\.(css|scss)$': '<rootDir>/__tests__/__mocks__/fileMock.ts',
       },
       setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'],
-      modulePathIgnorePatterns: ['<rootDir>/.next/', '<rootDir>/coverage/'],
+      modulePathIgnorePatterns: ['<rootDir>/.next/', '<rootDir>/coverage/', '<rootDir>/.claude/'],
+      testPathIgnorePatterns: ['<rootDir>/node_modules/', '<rootDir>/.claude/'],
     } as any,
   ],
 }
