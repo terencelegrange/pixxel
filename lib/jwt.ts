@@ -4,7 +4,8 @@
  * Minimal HS256 JWT implementation using Node.js built-in crypto.
  * No external dependencies.
  *
- * JWT_SECRET must be ≥ 32 chars (enforced by lib/env.ts at boot).
+ * JWT_SECRET must be ≥ 32 chars — either operator-supplied or auto-generated
+ * at boot (enforced/populated by lib/env.ts, see lib/jwt-secret.ts).
  */
 import { createHmac, timingSafeEqual } from "crypto";
 

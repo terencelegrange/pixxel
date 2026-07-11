@@ -22,6 +22,9 @@ build/
 # Setup config — contains DB credentials, never commit
 site.config.json
 
+# Auto-generated JWT signing secret (lib/jwt-secret.ts), never commit
+.jwt-secret
+
 # Misc
 .DS_Store
 *.pem

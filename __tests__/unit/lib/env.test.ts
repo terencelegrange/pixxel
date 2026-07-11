@@ -31,14 +31,44 @@ describe('validateEnv', () => {
     expect(() => validateEnv()).not.toThrow()
   })
 
-  it('still requires JWT_SECRET on a fresh instance', () => {
-    expect(() => validateEnv()).toThrow(/JWT_SECRET is not set/)
+  it('auto-generates and persists a JWT_SECRET when none is set', () => {
+    expect(() => validateEnv()).not.toThrow()
+    expect(process.env.JWT_SECRET).toBeDefined()
+    expect(process.env.JWT_SECRET!.length).toBeGreaterThanOrEqual(32)
+    expect(fs.writeFileSync).toHaveBeenCalledWith(
+      expect.stringContaining('.jwt-secret'),
+      expect.any(String),
+      expect.objectContaining({ mode: 0o600 })
+    )
   })
 
-  it('rejects a JWT_SECRET shorter than 32 chars', () => {
+  it('reuses a previously-persisted JWT_SECRET instead of generating a new one', () => {
+    const persisted = 'y'.repeat(40)
+    ;(fs.readFileSync as jest.Mock).mockImplementation((filePath: string) => {
+      if (String(filePath).includes('.jwt-secret')) return persisted
+      throw new Error('ENOENT')
+    })
+
+    validateEnv()
+
+    expect(process.env.JWT_SECRET).toBe(persisted)
+    expect(fs.writeFileSync).not.toHaveBeenCalled()
+  })
+
+  it('rejects an explicitly-set JWT_SECRET shorter than 32 chars rather than silently regenerating', () => {
     process.env.JWT_SECRET = 'too-short'
 
     expect(() => validateEnv()).toThrow(/JWT_SECRET is too short/)
+  })
+
+  it('keeps an explicitly-set, valid JWT_SECRET rather than generating a new one', () => {
+    const explicit = 'z'.repeat(32)
+    process.env.JWT_SECRET = explicit
+
+    validateEnv()
+
+    expect(process.env.JWT_SECRET).toBe(explicit)
+    expect(fs.writeFileSync).not.toHaveBeenCalled()
   })
 
   it('requires the rest of the DB env vars once one is supplied (catches typos)', () => {

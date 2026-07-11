@@ -12,20 +12,24 @@
  * vars are only enforced pre-setup when the operator has started supplying
  * them (a partial set is almost certainly a typo, e.g. missing DB_PASSWORD)
  * — matching the pre-configured docker-compose deployment path.
- * JWT_SECRET is always required — it must be set in .env.local (never in
- * site.config.json).
+ *
+ * JWT_SECRET is never required to be set explicitly: if absent, one is
+ * generated and persisted on first boot (see lib/jwt-secret.ts) so people
+ * who just pull the Docker image and run it don't have to configure
+ * anything up front. An explicitly-set-but-too-short value is still a real
+ * misconfiguration and is rejected rather than silently overridden.
  */
 import { isSetupComplete } from "@/lib/setup";
+import { getOrCreateJwtSecret } from "@/lib/jwt-secret";
 
 export function validateEnv(): void {
   const errors: string[] = [];
 
-  // JWT_SECRET is always required once JWT auth is in use.
-  const secret = process.env.JWT_SECRET ?? "";
-  if (!secret) {
-    errors.push("JWT_SECRET is not set");
-  } else if (secret.length < 32) {
-    errors.push(`JWT_SECRET is too short (${secret.length} chars — need ≥ 32)`);
+  const providedSecret = process.env.JWT_SECRET ?? "";
+  if (providedSecret && providedSecret.length < 32) {
+    errors.push(`JWT_SECRET is too short (${providedSecret.length} chars — need ≥ 32)`);
+  } else if (!providedSecret) {
+    process.env.JWT_SECRET = getOrCreateJwtSecret();
   }
 
   if (!isSetupComplete()) {

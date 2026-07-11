@@ -11,13 +11,9 @@ Source: [github.com/terencelegrange/pixxel](https://github.com/terencelegrange/p
 
 ## Quick start
 
-`JWT_SECRET` is **always required**, regardless of which database option you pick — it signs session cookies and is never written to `site.config.json`, so it must come from an env var on every run. Generate one with:
+Just pull and run — nothing has to be configured up front. If you don't set `JWT_SECRET` (which signs session cookies), Pixxel generates one itself on first boot and persists it to `.jwt-secret` inside the container, so restarts keep working sessions. Set it explicitly if you want a stable secret across container recreations (e.g. mount it in, or use `--env-file`), or if you're running more than one replica — see the [Environment variables](#environment-variables) table.
 
-```bash
-openssl rand -base64 32
-```
-
-Pixxel also ships with two database options — pick whichever fits your use case. Neither option requires any `DB_*` env vars beyond `JWT_SECRET` to boot: a container with no database configured yet will start up fine and serve the first-run setup wizard at `/setup`, where you name the instance, pick a dialect, and create the initial admin account.
+Pixxel also ships with two database options — pick whichever fits your use case. Neither requires any env vars to boot: a container with no database configured yet starts up fine and serves the first-run setup wizard at `/setup`, where you name the instance, pick a dialect, and create the initial admin account.
 
 ### Option A — SQLite trial mode (fastest way to try it out)
 
@@ -28,7 +24,6 @@ docker run -d \
   --name pixxel \
   -p 3000:3000 \
   -v pixxel-data:/app/data \
-  -e JWT_SECRET=$(openssl rand -base64 32) \
   -e DB_TYPE=sqlite \
   -e DB_FILE=data/pixxel.db \
   tlgrange/pixxel:latest
@@ -42,7 +37,6 @@ Open [http://localhost:3000](http://localhost:3000) — you'll land on the first
 docker run -d \
   --name pixxel \
   -p 3000:3000 \
-  -e JWT_SECRET=$(openssl rand -base64 32) \
   -e DB_TYPE=mysql \
   -e DB_HOST=your-db-host \
   -e DB_PORT=3306 \
@@ -67,7 +61,8 @@ services:
     ports:
       - "3000:3000"
     environment:
-      JWT_SECRET: your_generated_secret # openssl rand -base64 32
+      # Optional — omit to auto-generate on first boot (see Quick start above).
+      # JWT_SECRET: your_generated_secret # openssl rand -base64 32
       DB_TYPE: mysql
       DB_HOST: db
       DB_PORT: 3306
@@ -122,7 +117,7 @@ SQLite mode is explicitly a trial/evaluation path, not a production backend: the
 
 | Variable | Applies to | Default | Notes |
 |---|---|---|---|
-| `JWT_SECRET` | always | — | **required** on every boot, every dialect. ≥ 32 chars. Signs session cookies; never written to `site.config.json` |
+| `JWT_SECRET` | always | auto-generated | Optional. ≥ 32 chars if set. Signs session cookies; never written to `site.config.json`. If unset, generated on first boot and persisted to `.jwt-secret` in the container — set it explicitly for a stable secret across container recreations, or when running multiple replicas (see note below) |
 | `DB_TYPE` | both | `mysql` | `mysql` or `sqlite` |
 | `DB_HOST` | mysql | — | required once you supply any `DB_*` var pre-setup (see note above) |
 | `DB_PORT` | mysql | `3306` | |
@@ -132,7 +127,11 @@ SQLite mode is explicitly a trial/evaluation path, not a production backend: the
 | `DB_FILE` | sqlite | `data/pixxel.db` | path relative to the container's working dir; mount a volume over its parent directory to persist it |
 | `PLANTUML_SERVER_URL` | both | `https://www.plantuml.com/plantuml` | optional — point at a self-hosted PlantUML server if your architecture diagrams are confidential |
 
-`DB_*` credentials can also be supplied entirely through the in-app setup wizard on first boot instead of environment variables — whichever is configured takes effect, with the wizard's `site.config.json` taking priority over env vars once setup has completed. `JWT_SECRET` is the one exception: it's an operator-level secret and is never collected by the wizard, so it must always come from an env var.
+`DB_*` credentials can also be supplied entirely through the in-app setup wizard on first boot instead of environment variables — whichever is configured takes effect, with the wizard's `site.config.json` taking priority over env vars once setup has completed. `JWT_SECRET` is never collected by the wizard — it's either an env var you set, or auto-generated.
+
+> **Auto-generated `JWT_SECRET` and container recreation.** The generated secret is written to `.jwt-secret` inside the container's filesystem, not a named volume — it persists across `docker restart`/`docker stop`+`start` of the *same* container, but a fresh `docker run` (new container from the image) generates a new one, invalidating existing sessions (users just log in again; no data is lost). If you want the secret itself to survive container recreation, set `JWT_SECRET` explicitly rather than relying on auto-generation.
+>
+> **Running multiple replicas?** Each instance auto-generates its own secret independently and will reject session tokens issued by the others. Always set `JWT_SECRET` explicitly (the same value on every replica) for any multi-instance deployment.
 
 ---
 
@@ -171,7 +170,7 @@ The image is built from a codebase with unit, integration, and UI test suites (J
 - **Integration tests** — auth, CRUD, and cross-entity flows against a real database
 - **UI tests** — shared components and context providers (React Testing Library)
 
-At the time of this image's build: **61 test suites / 348 tests**, all passing, with `npx tsc --noEmit` clean. The CI pipeline enforces minimum coverage thresholds (statements 48%, branches 60%, functions 68%, lines 48%) and fails the build on any TypeScript or ESLint error before an image is ever pushed.
+At the time of this image's build: **66 test suites / 382 tests**, all passing, with `npx tsc --noEmit` clean. The CI pipeline enforces minimum coverage thresholds (statements 48%, branches 60%, functions 68%, lines 48%) and fails the build on any TypeScript or ESLint error before an image is ever pushed.
 
 ---
 
