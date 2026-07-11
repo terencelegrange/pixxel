@@ -8,6 +8,7 @@ import { signJwt } from "@/lib/jwt";
 import { validate } from "@/lib/validate";
 import { LoginSchema } from "@/lib/schemas";
 import { User } from "@/types";
+import { isSecureRequest } from "@/lib/cookie-secure";
 
 interface DbUserRow {
   id: string;
@@ -70,7 +71,7 @@ export async function POST(req: NextRequest) {
     const res = NextResponse.json({ user, token }, { status: 200 });
     res.cookies.set("authToken", token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
+      secure: isSecureRequest(req),
       sameSite: "lax",
       maxAge: 7 * 24 * 3600,
       path: "/",

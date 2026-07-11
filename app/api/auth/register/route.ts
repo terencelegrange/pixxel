@@ -9,6 +9,7 @@ import { validate } from "@/lib/validate";
 import { RegisterSchema } from "@/lib/schemas";
 import { User } from "@/types";
 import mysql from "mysql2/promise";
+import { isSecureRequest } from "@/lib/cookie-secure";
 
 // bcrypt work factor — 12 is a good balance of security vs. latency
 const SALT_ROUNDS = 12;
@@ -72,7 +73,7 @@ export async function POST(req: NextRequest) {
     const res = NextResponse.json({ user, token }, { status: 201 });
     res.cookies.set("authToken", token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
+      secure: isSecureRequest(req),
       sameSite: "lax",
       maxAge: 7 * 24 * 3600,
       path: "/",
