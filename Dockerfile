@@ -54,6 +54,14 @@ COPY --from=builder --chown=nextjs:nodejs /app/drizzle/migrations-sqlite ./drizz
 # Allow the app to write config/state files to /app at runtime
 RUN chown nextjs:nodejs /app
 
+# Pre-create the SQLite trial-mode data directory with correct ownership.
+# Without this, a fresh named volume mounted at /app/data (e.g.
+# `-v pixxel-data:/app/data`) is initialized by Docker as root:root, and the
+# non-root nextjs user below gets EACCES trying to create pixxel.db in it.
+# Creating the directory here first means Docker copies ITS ownership into
+# the new volume when the mount is first attached.
+RUN mkdir -p /app/data && chown nextjs:nodejs /app/data
+
 USER nextjs
 
 EXPOSE 3000
