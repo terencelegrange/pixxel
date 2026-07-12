@@ -21,9 +21,9 @@ const TABLE_LABELS: Record<string, string> = {
 };
 
 const ACTION_STYLES: Record<AuditLog["action"], string> = {
-  CREATE: "bg-emerald-50 text-emerald-700",
-  UPDATE: "bg-amber-50  text-amber-700",
-  DELETE: "bg-red-50    text-red-600",
+  CREATE: "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400",
+  UPDATE: "bg-amber-50  text-amber-700 dark:bg-amber-950/50 dark:text-amber-400",
+  DELETE: "bg-red-50    text-red-600 dark:bg-red-950/50 dark:text-red-400",
 };
 
 // ---------------------------------------------------------------------------
@@ -68,30 +68,30 @@ function AuditRow({ entry }: { entry: AuditLog }) {
 
   return (
     <>
-      <tr className="hover:bg-slate-50 transition-colors">
+      <tr className="hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
         <td className="px-4 py-3 whitespace-nowrap">
           <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${ACTION_STYLES[entry.action]}`}>
             {entry.action}
           </span>
         </td>
-        <td className="px-4 py-3 text-xs font-mono text-slate-500 whitespace-nowrap">
+        <td className="px-4 py-3 text-xs font-mono text-slate-500 dark:text-slate-400 whitespace-nowrap">
           {TABLE_LABELS[entry.tableName] ?? entry.tableName}
         </td>
-        <td className="px-4 py-3 text-sm text-slate-700">{entry.performedByName}</td>
-        <td className="px-4 py-3 text-sm text-slate-500 whitespace-nowrap">
+        <td className="px-4 py-3 text-sm text-slate-700 dark:text-slate-300">{entry.performedByName}</td>
+        <td className="px-4 py-3 text-sm text-slate-500 dark:text-slate-400 whitespace-nowrap">
           {new Date(entry.performedAt).toLocaleString("en-GB", {
             day: "2-digit", month: "short", year: "numeric",
             hour: "2-digit", minute: "2-digit",
           })}
         </td>
-        <td className="px-4 py-3 text-sm text-slate-500">
+        <td className="px-4 py-3 text-sm text-slate-500 dark:text-slate-400">
           {entry.action === "CREATE" && "Record created"}
           {entry.action === "DELETE" && "Record deleted"}
           {entry.action === "UPDATE" && (
             hasDiff ? (
               <button
                 onClick={() => setExpanded((e) => !e)}
-                className="flex items-center gap-1 text-brand-600 hover:underline"
+                className="flex items-center gap-1 text-brand-600 dark:text-brand-400 hover:underline"
               >
                 {diff.length} field{diff.length !== 1 ? "s" : ""} changed
                 {expanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
@@ -103,28 +103,28 @@ function AuditRow({ entry }: { entry: AuditLog }) {
       {hasDiff && expanded && (
         <tr>
           <td colSpan={5} className="px-4 pb-3">
-            <div className="rounded-lg border border-slate-200 bg-slate-50 overflow-hidden">
+            <div className="rounded-lg border border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-800/50 overflow-hidden">
               <table className="min-w-full text-xs">
                 <thead>
-                  <tr className="border-b border-slate-200">
-                    <th className="px-3 py-2 text-left font-semibold text-slate-500 w-40">Field</th>
-                    <th className="px-3 py-2 text-left font-semibold text-slate-500">Before</th>
-                    <th className="px-3 py-2 text-left font-semibold text-slate-500">After</th>
+                  <tr className="border-b border-slate-200 dark:border-slate-700">
+                    <th className="px-3 py-2 text-left font-semibold text-slate-500 dark:text-slate-400 w-40">Field</th>
+                    <th className="px-3 py-2 text-left font-semibold text-slate-500 dark:text-slate-400">Before</th>
+                    <th className="px-3 py-2 text-left font-semibold text-slate-500 dark:text-slate-400">After</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                   {diff.map((d) => (
                     <tr key={d.field}>
-                      <td className="px-3 py-2 font-medium text-slate-600">{d.label}</td>
-                      <td className="px-3 py-2 text-red-600 line-through break-all">
+                      <td className="px-3 py-2 font-medium text-slate-600 dark:text-slate-300">{d.label}</td>
+                      <td className="px-3 py-2 text-red-600 dark:text-red-400 line-through break-all">
                         {d.from != null && d.from !== ""
                           ? String(d.from)
-                          : <span className="no-underline italic text-slate-400" style={{ textDecoration: "none" }}>empty</span>}
+                          : <span className="no-underline italic text-slate-400 dark:text-slate-500" style={{ textDecoration: "none" }}>empty</span>}
                       </td>
-                      <td className="px-3 py-2 text-emerald-700 break-all">
+                      <td className="px-3 py-2 text-emerald-700 dark:text-emerald-400 break-all">
                         {d.to != null && d.to !== ""
                           ? String(d.to)
-                          : <span className="italic text-slate-400">empty</span>}
+                          : <span className="italic text-slate-400 dark:text-slate-500">empty</span>}
                       </td>
                     </tr>
                   ))}
@@ -221,7 +221,7 @@ export default function AuditPage() {
             value={draftPerformer}
             onChange={(e) => setDraftPerformer(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter") applyFilters(); }}
-            className="h-9 w-48 rounded-lg border border-slate-300 bg-white px-3 text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500"
+            className="h-9 w-48 rounded-lg border border-slate-300 bg-white px-3 text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500 dark:bg-slate-800 dark:border-slate-600 dark:text-slate-100 dark:placeholder:text-slate-500"
           />
           <Button size="sm" variant="secondary" onClick={applyFilters}>Search</Button>
         </div>
@@ -230,7 +230,7 @@ export default function AuditPage() {
         <select
           value={filterTable}
           onChange={(e) => handleFilterChange(setFilterTable, e.target.value)}
-          className="h-9 rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-500"
+          className="h-9 rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-500 dark:bg-slate-800 dark:border-slate-600 dark:text-slate-100"
         >
           <option value="">All tables</option>
           <option value="departments">Departments</option>
@@ -246,7 +246,7 @@ export default function AuditPage() {
         <select
           value={filterAction}
           onChange={(e) => handleFilterChange(setFilterAction, e.target.value)}
-          className="h-9 rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-500"
+          className="h-9 rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-500 dark:bg-slate-800 dark:border-slate-600 dark:text-slate-100"
         >
           <option value="">All actions</option>
           <option value="CREATE">CREATE</option>
@@ -258,7 +258,7 @@ export default function AuditPage() {
         <select
           value={pageSize}
           onChange={(e) => { setPageSize(Number(e.target.value)); setPage(1); }}
-          className="h-9 rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-500"
+          className="h-9 rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-500 dark:bg-slate-800 dark:border-slate-600 dark:text-slate-100"
         >
           {PAGE_SIZE_OPTIONS.map((n) => (
             <option key={n} value={n}>{n} per page</option>
@@ -282,35 +282,35 @@ export default function AuditPage() {
       </div>
 
       {/* Table card */}
-      <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+      <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden dark:bg-slate-900 dark:border-slate-700">
         {isLoading ? (
           <div className="flex items-center justify-center py-20">
             <div className="h-7 w-7 animate-spin rounded-full border-4 border-brand-600 border-t-transparent" />
           </div>
         ) : fetchError ? (
-          <div className="flex flex-col items-center justify-center gap-2 py-20 text-red-500">
+          <div className="flex flex-col items-center justify-center gap-2 py-20 text-red-500 dark:text-red-400">
             <AlertTriangle className="h-6 w-6" />
             <p className="text-sm">{fetchError}</p>
             <Button variant="secondary" size="sm" onClick={fetchData}>Retry</Button>
           </div>
         ) : entries.length === 0 ? (
-          <div className="flex flex-col items-center justify-center gap-3 py-20 text-slate-400">
-            <ClipboardList className="h-10 w-10 text-slate-300" />
+          <div className="flex flex-col items-center justify-center gap-3 py-20 text-slate-400 dark:text-slate-500">
+            <ClipboardList className="h-10 w-10 text-slate-300 dark:text-slate-600" />
             <p className="text-sm font-medium">No audit events found</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="min-w-full">
-              <thead className="bg-slate-50 border-b border-slate-200">
+              <thead className="bg-slate-50 border-b border-slate-200 dark:bg-slate-800/50 dark:border-slate-700">
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500 w-24">Action</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500 w-32">Table</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">Performed by</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500 whitespace-nowrap">Date &amp; Time</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">Changes</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 w-24">Action</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 w-32">Table</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Performed by</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 whitespace-nowrap">Date &amp; Time</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Changes</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800 dark:bg-slate-900">
                 {entries.map((entry) => (
                   <AuditRow key={entry.id} entry={entry} />
                 ))}
@@ -322,7 +322,7 @@ export default function AuditPage() {
 
       {/* Pagination footer */}
       {!isLoading && !fetchError && total > 0 && (
-        <div className="flex items-center justify-between text-sm text-slate-500">
+        <div className="flex items-center justify-between text-sm text-slate-500 dark:text-slate-400">
           <p>
             Showing {Math.min((page - 1) * pageSize + 1, total)}–{Math.min(page * pageSize, total)} of {total} event{total !== 1 ? "s" : ""}
           </p>
@@ -330,7 +330,7 @@ export default function AuditPage() {
             <button
               onClick={() => setPage((p) => Math.max(1, p - 1))}
               disabled={page === 1}
-              className="rounded-lg p-1.5 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              className="rounded-lg p-1.5 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors dark:hover:bg-slate-800"
               aria-label="Previous page"
             >
               <ChevronLeft className="h-4 w-4" />
@@ -345,7 +345,7 @@ export default function AuditPage() {
               }, [])
               .map((n, idx) =>
                 n === "…" ? (
-                  <span key={`ellipsis-${idx}`} className="px-2 text-slate-400">…</span>
+                  <span key={`ellipsis-${idx}`} className="px-2 text-slate-400 dark:text-slate-500">…</span>
                 ) : (
                   <button
                     key={n}
@@ -354,7 +354,7 @@ export default function AuditPage() {
                       "min-w-[2rem] rounded-lg px-2 py-1 text-sm font-medium transition-colors",
                       n === page
                         ? "bg-brand-600 text-white"
-                        : "hover:bg-slate-100 text-slate-600",
+                        : "hover:bg-slate-100 text-slate-600 dark:hover:bg-slate-800 dark:text-slate-300",
                     ].join(" ")}
                   >
                     {n}
@@ -364,7 +364,7 @@ export default function AuditPage() {
             <button
               onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
               disabled={page === totalPages}
-              className="rounded-lg p-1.5 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              className="rounded-lg p-1.5 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors dark:hover:bg-slate-800"
               aria-label="Next page"
             >
               <ChevronRight className="h-4 w-4" />
