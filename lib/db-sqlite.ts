@@ -28,6 +28,14 @@ function isSelectLike(sqlText: string): boolean {
   return /^\s*(SELECT|PRAGMA|WITH)/i.test(sqlText);
 }
 
+// node:sqlite's DatabaseSync only accepts null/number/bigint/string/Uint8Array
+// as bind values — unlike mysql2, which silently coerces JS booleans to 0/1.
+// Route code writes booleans directly (e.g. contracts.auto_renews), so this
+// coercion has to happen here rather than at every call site.
+function toSqliteBindable(value: unknown): unknown {
+  return typeof value === "boolean" ? (value ? 1 : 0) : value;
+}
+
 /**
  * Returns the cached single DatabaseSync connection for this process.
  * Trial mode uses a single shared connection by design (no pooling, no locking).
@@ -47,10 +55,11 @@ function makeClient(conn: DatabaseSync): DbClient {
   return {
     async execute<T = unknown>(sqlText: string, params: unknown[] = []): Promise<[T, unknown]> {
       const stmt = conn.prepare(sqlText);
+      const bindable = params.map(toSqliteBindable) as SQLInputValue[];
       if (isSelectLike(sqlText)) {
-        return [stmt.all(...(params as SQLInputValue[])) as T, undefined];
+        return [stmt.all(...bindable) as T, undefined];
       }
-      stmt.run(...(params as SQLInputValue[]));
+      stmt.run(...bindable);
       return [[] as unknown as T, undefined];
     },
   };

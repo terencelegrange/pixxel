@@ -19,6 +19,8 @@ import { getSiteConfig } from '@/lib/setup'
 import { resetPool } from '@/lib/db'
 import { GET as getAssets, POST as createAsset } from '@/app/api/assets/route'
 import { PUT as putSettings } from '@/app/api/settings/route'
+import { GET as getDashboardStats } from '@/app/api/dashboard/stats/route'
+import { POST as createContract } from '@/app/api/contracts/route'
 
 describe('SQLite trial mode smoke test', () => {
   let dbFile: string
@@ -75,5 +77,30 @@ describe('SQLite trial mode smoke test', () => {
     const { getDb } = await import('@/lib/db')
     const [rows] = await getDb().execute<{ value: string }[]>("SELECT value FROM app_settings WHERE key = 'confluence.base_url'")
     expect(rows[0].value).toBe('https://two.example')
+  })
+
+  // Regression test for the FIELD() bug: dashboard/stats ordered
+  // lifecycle_status with MySQL's FIELD(), which SQLite doesn't have
+  // ("no such function: FIELD"). Runs the real route against real SQLite
+  // rather than mocking the DB, so a dialect-only SQL function slipping
+  // through review fails here instead of surfacing in production Docker.
+  it('loads dashboard stats without a dialect-specific SQL error', async () => {
+    const res = await getDashboardStats(new NextRequest('http://localhost/api/dashboard/stats'))
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(Array.isArray(body.assetsByLifecycle)).toBe(true)
+  })
+
+  // Regression test for the boolean-bind bug: POST /api/contracts writes
+  // auto_renews as a real JS boolean, which node:sqlite's DatabaseSync
+  // rejects unless coerced ("Provided value cannot be bound to SQLite
+  // parameter 9"). Runs the real route against real SQLite so the dialect
+  // gap is caught here, not in a user's Docker container.
+  it('creates a contract with autoRenews: true without a bind-type error', async () => {
+    const res = await createContract(new NextRequest('http://localhost/api/contracts', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: 'Renewal Test Contract', autoRenews: true, status: 'Active' }),
+    }))
+    expect(res.status).toBe(201)
   })
 })

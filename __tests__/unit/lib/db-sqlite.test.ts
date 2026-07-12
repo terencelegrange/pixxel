@@ -58,6 +58,28 @@ describe('lib/db-sqlite', () => {
     expect(after.updated_at).not.toBe(before.updated_at)
   })
 
+  // Regression test: node:sqlite's DatabaseSync only accepts
+  // null/number/bigint/string/Uint8Array as bind values. mysql2 silently
+  // coerces JS booleans to 0/1, so route code (e.g. contracts.auto_renews)
+  // writes real booleans without ever hitting this in MySQL mode. Without
+  // coercion in execute(), this throws "Provided value cannot be bound to
+  // SQLite parameter N".
+  it('coerces boolean bind params to 0/1 instead of throwing', async () => {
+    await setupSqliteDatabase(dbFile)
+    const db = getSqliteDb(dbFile)
+    const id = randomUUID()
+    await expect(db.execute(
+      `INSERT INTO contracts (id, title, status, auto_renews, created_by_id, created_by_name)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [id, 'Test Contract', 'Active', true, 'u1', 'Admin']
+    )).resolves.toBeDefined()
+
+    const [rows] = await db.execute<{ auto_renews: number }[]>(
+      'SELECT auto_renews FROM contracts WHERE id = ?', [id]
+    )
+    expect(rows[0].auto_renews).toBe(1)
+  })
+
   it('commits a successful transaction and rolls back a failed one', async () => {
     await setupSqliteDatabase(dbFile)
     const okId = randomUUID()

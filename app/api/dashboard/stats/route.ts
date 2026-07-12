@@ -17,7 +17,17 @@ export async function GET(req: NextRequest) {
         "SELECT COUNT(*) AS count FROM departments WHERE status = 'Published'"
       ),
       db.execute<mysql.RowDataPacket[]>(
-        "SELECT lifecycle_status AS status, COUNT(*) AS count FROM assets GROUP BY lifecycle_status ORDER BY FIELD(lifecycle_status,'Proposed','Approved','In Development','Production','Sunset','Retired')"
+        `SELECT lifecycle_status AS status, COUNT(*) AS count FROM assets
+         GROUP BY lifecycle_status
+         ORDER BY CASE lifecycle_status
+           WHEN 'Proposed' THEN 1
+           WHEN 'Approved' THEN 2
+           WHEN 'In Development' THEN 3
+           WHEN 'Production' THEN 4
+           WHEN 'Sunset' THEN 5
+           WHEN 'Retired' THEN 6
+           ELSE 7
+         END`
       ),
       db.execute<mysql.RowDataPacket[]>(
         `SELECT COALESCE(t.name, 'Unassigned') AS tier, COUNT(*) AS count
