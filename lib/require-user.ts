@@ -22,6 +22,7 @@ import { NextRequest, NextResponse } from "next/server";
 import mysql from "mysql2/promise";
 import { verifyJwt } from "@/lib/jwt";
 import { getDb } from "@/lib/db";
+import { isSecureRequest } from "@/lib/cookie-secure";
 
 export interface AuthUser {
   id: string;
@@ -40,8 +41,23 @@ const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 // requests must present an Origin/Referer matching this app's own origin.
 // Requests with neither header (non-browser clients) are allowed through —
 // SameSite=Lax already blocks the classic cross-site form-POST vector.
+//
+// The "expected" origin is built from the request's Host header (honoring
+// X-Forwarded-Host for reverse-proxy deployments), NOT req.nextUrl.origin.
+// In Next.js's standalone server output (this app's Docker build target),
+// req.nextUrl is constructed from the server's own listen address
+// (HOSTNAME/PORT env vars, e.g. http://0.0.0.0:3000) rather than the
+// incoming request's actual Host header — so a container run with a
+// remapped host port (`docker run -p 3088:3000 ...`, a normal deployment)
+// would see req.nextUrl.origin stay stuck at the internal port and reject
+// every state-changing request as cross-site, no matter what the browser
+// actually sent. The Host header always reflects what the client used.
 function isTrustedOrigin(req: NextRequest): boolean {
-  const expected = req.nextUrl.origin;
+  const host = req.headers.get("x-forwarded-host") ?? req.headers.get("host");
+  if (!host) return false;
+  const proto = isSecureRequest(req) ? "https" : "http";
+  const expected = `${proto}://${host}`;
+
   const origin = req.headers.get("origin");
   if (origin) return origin === expected;
 
