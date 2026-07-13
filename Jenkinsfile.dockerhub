@@ -42,6 +42,17 @@ pipeline {
             }
         }
 
+        stage('Verify') {
+            steps {
+                sh '''
+                    npm ci
+                    npx tsc --noEmit
+                    npm run lint
+                    npm run test:coverage
+                '''
+            }
+        }
+
         stage('Compute Version') {
             steps {
                 script {
