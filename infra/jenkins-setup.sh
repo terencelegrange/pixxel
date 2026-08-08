@@ -219,12 +219,14 @@ create_username_password() {
   info "Created username/password: $id"
 }
 
-# SSH deploy key
+# SSH deploy key -- PROXMOX_APPS_KEY is shared across every app deployed to
+# this Docker host (mysql-gui, finance-web, calendar, pixxel, ...), not
+# per-app despite the app-specific description below.
 create_ssh_credential \
-  "PIXXEL_SSH_KEY" \
+  "PROXMOX_APPS_KEY" \
   "$DEPLOY_USER" \
   "$PRIVATE_KEY" \
-  "Pixxel — SSH key for deploy user on Docker host"
+  "Proxmox apps -- SSH key for deploy user on Docker host"
 
 # Gitea pull credential
 create_username_password \

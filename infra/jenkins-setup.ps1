@@ -327,7 +327,7 @@ Read-Host "Press Enter once you have added the public key to the Docker host"
 # ==============================================================================
 Section "Creating Jenkins credentials"
 
-New-JenkinsSshKey  'PIXXEL_SSH_KEY'         $DEPLOY_USER  $privateKey      'Pixxel - SSH key for deploy user on Docker host'
+New-JenkinsSshKey  'PROXMOX_APPS_KEY'       $DEPLOY_USER  $privateKey      'Proxmox apps - SSH key for deploy user on Docker host (shared across all apps on this host)'
 New-JenkinsUserPass 'PIXXEL_GITEA_CRED'     $GITEA_USER   $GITEA_TOKEN     'Pixxel - Gitea read credential'
 New-JenkinsSecret  'PIXXEL_DB_HOST'         $DB_HOST                       'Pixxel - DB host'
 New-JenkinsSecret  'PIXXEL_DB_PORT'         $DB_PORT                       'Pixxel - DB port'

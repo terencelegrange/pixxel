@@ -2,10 +2,10 @@ pipeline {
     agent any
 
     environment {
-        REMOTE_HOST = '192.168.100.227'
+        REMOTE_HOST = '192.168.100.228'
         REMOTE_USER = 'terence'
         DEPLOY_DIR  = '/home/pixxel'
-        APP_PORT    = '3000'
+        APP_PORT    = '3030'
     }
 
     triggers {
@@ -32,7 +32,7 @@ pipeline {
                     string(credentialsId: 'PIXXEL_NEXTAUTH_SECRET', variable: 'NEXTAUTH_SECRET'),
                     string(credentialsId: 'PIXXEL_NEXTAUTH_URL',    variable: 'NEXTAUTH_URL')
                 ]) {
-                    sshagent(credentials: ['PIXXEL_SSH_KEY']) {
+                    sshagent(credentials: ['PROXMOX_APPS_KEY']) {
                         sh """
                             ssh -o StrictHostKeyChecking=no ${REMOTE_USER}@${REMOTE_HOST} "mkdir -p ${DEPLOY_DIR}"
                             ssh ${REMOTE_USER}@${REMOTE_HOST} "cat > ${DEPLOY_DIR}/.env.production <<'ENVEOF'
@@ -54,7 +54,7 @@ ENVEOF"
 
         stage('Transfer Code') {
             steps {
-                sshagent(credentials: ['PIXXEL_SSH_KEY']) {
+                sshagent(credentials: ['PROXMOX_APPS_KEY']) {
                     sh """
                         rsync -az --delete \
                             --exclude='.git' \
@@ -70,7 +70,7 @@ ENVEOF"
 
         stage('Build & Deploy') {
             steps {
-                sshagent(credentials: ['PIXXEL_SSH_KEY']) {
+                sshagent(credentials: ['PROXMOX_APPS_KEY']) {
                     sh """
                         ssh ${REMOTE_USER}@${REMOTE_HOST} "
                             cd ${DEPLOY_DIR}
@@ -85,7 +85,7 @@ ENVEOF"
 
         stage('Health Check') {
             steps {
-                sshagent(credentials: ['PIXXEL_SSH_KEY']) {
+                sshagent(credentials: ['PROXMOX_APPS_KEY']) {
                     sh """
                         ssh ${REMOTE_USER}@${REMOTE_HOST} 'bash -s' << 'REMOTE_SCRIPT'
                             attempt=0
