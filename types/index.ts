@@ -18,6 +18,8 @@ export interface NavItem {
   href: string;
   icon: string;
   badge?: string | number;
+  /** If set, this item is hidden unless the active feature tier includes this key. */
+  featureKey?: string;
 }
 
 export interface NavGroup {
@@ -158,6 +160,38 @@ export interface Asset {
   notes: string | null;
   createdById: string;
   createdByName: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type RiskFactorKind = "Attribute" | "Characteristic";
+export type RiskLevel = "Low" | "Medium" | "High" | "Critical";
+export type RiskAssessmentStatus = "Met" | "Not Met" | "Partial";
+
+export interface RiskFactor {
+  id: string;
+  name: string;
+  description: string | null;
+  kind: RiskFactorKind;
+  severity: RiskLevel;
+  likelihood: RiskLevel;
+  impact: RiskLevel;
+  categories: AssetCategory[];
+  createdById: string;
+  createdByName: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AssetRiskAssessment {
+  id: string;
+  assetId: string;
+  riskFactorId: string;
+  status: RiskAssessmentStatus;
+  notes: string | null;
+  assessedById: string;
+  assessedByName: string;
+  assessedAt: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -355,6 +389,19 @@ export interface AssetDependency {
   type: DependencyConnectionType;
   direction: DependencyDirection;
   notes: string | null;
+  createdById: string;
+  createdByName: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface FeatureTier {
+  id: string;
+  name: string;
+  description: string | null;
+  sortOrder: number | null;
+  isDefault: boolean;
+  features: string[];
   createdById: string;
   createdByName: string;
   createdAt: string;

@@ -6,6 +6,7 @@ import * as LucideIcons from "lucide-react";
 import { LucideProps, Rocket, X } from "lucide-react";
 import { navigationConfig } from "@/config/navigation";
 import { useGetStarted } from "@/context/GetStartedContext";
+import { useFeatureTier } from "@/context/FeatureTierContext";
 import { NavItem } from "@/types";
 
 // Dynamically resolve icon by name from lucide-react
@@ -95,6 +96,8 @@ function GetStartedNavItem({ onClick }: { onClick?: () => void }) {
 }
 
 export default function Sidebar({ isOpen, onClose }: SidebarProps) {
+  const { hasFeature } = useFeatureTier();
+
   return (
     <>
       {/* Mobile overlay */}
@@ -140,22 +143,26 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         {/* Navigation */}
         <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-6">
           <GetStartedNavItem onClick={onClose} />
-          {navigationConfig.map((group, groupIdx) => (
-            <div key={groupIdx}>
-              {group.title && (
-                <p className="mb-1 px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-                  {group.title}
-                </p>
-              )}
-              <ul className="space-y-0.5">
-                {group.items.map((item) => (
-                  <li key={item.href}>
-                    <NavLink item={item} onClick={onClose} />
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
+          {navigationConfig.map((group, groupIdx) => {
+            const items = group.items.filter((item) => !item.featureKey || hasFeature(item.featureKey));
+            if (items.length === 0) return null;
+            return (
+              <div key={groupIdx}>
+                {group.title && (
+                  <p className="mb-1 px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                    {group.title}
+                  </p>
+                )}
+                <ul className="space-y-0.5">
+                  {items.map((item) => (
+                    <li key={item.href}>
+                      <NavLink item={item} onClick={onClose} />
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            );
+          })}
         </nav>
       </aside>
     </>

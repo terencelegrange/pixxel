@@ -45,6 +45,9 @@ function useChartTheme(isDark: boolean) {
     },
     legendText: isDark ? "#94a3b8" : "#475569",
     legendValue: isDark ? "#e2e8f0" : "#1e293b",
+    // Pie/donut slice border — matches the card background so segments blend
+    // into it instead of showing Recharts' default white outline in dark mode.
+    cardBg: isDark ? "#0f172a" : "#ffffff",
   };
 }
 
@@ -201,6 +204,8 @@ export default function DashboardPage() {
                       <Cell
                         key={entry.status}
                         fill={LIFECYCLE_COLOURS[entry.status] ?? "#94a3b8"}
+                        stroke={ct.cardBg}
+                        strokeWidth={2}
                       />
                     ))}
                   </Pie>
@@ -323,6 +328,8 @@ export default function DashboardPage() {
                       <Cell
                         key={entry.strategy}
                         fill={STRATEGY_COLOURS[i % STRATEGY_COLOURS.length]}
+                        stroke={ct.cardBg}
+                        strokeWidth={2}
                       />
                     ))}
                   </Pie>

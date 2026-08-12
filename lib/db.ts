@@ -738,6 +738,102 @@ async function runSetup(): Promise<void> {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
   `);
 
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS risk_factors (
+      id              CHAR(36)     NOT NULL,
+      name            VARCHAR(255) NOT NULL,
+      description     TEXT         NULL,
+      kind            ENUM('Attribute','Characteristic') NOT NULL DEFAULT 'Attribute',
+      severity        ENUM('Low','Medium','High','Critical') NOT NULL DEFAULT 'Medium',
+      likelihood      ENUM('Low','Medium','High','Critical') NOT NULL DEFAULT 'Medium',
+      impact          ENUM('Low','Medium','High','Critical') NOT NULL DEFAULT 'Medium',
+      created_by_id   CHAR(36)     NOT NULL,
+      created_by_name VARCHAR(255) NOT NULL,
+      created_at      DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at      DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      PRIMARY KEY (id),
+      UNIQUE KEY uq_risk_factors_name (name)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  `);
+
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS risk_factor_categories (
+      risk_factor_id CHAR(36)     NOT NULL,
+      category       VARCHAR(100) NOT NULL COMMENT 'matches AssetCategory union',
+      PRIMARY KEY (risk_factor_id, category),
+      KEY idx_risk_factor_categories_category (category)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  `);
+
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS asset_risk_assessments (
+      id                CHAR(36)     NOT NULL,
+      asset_id          CHAR(36)     NOT NULL,
+      risk_factor_id    CHAR(36)     NOT NULL,
+      status            ENUM('Met','Not Met','Partial') NOT NULL DEFAULT 'Not Met',
+      notes             TEXT         NULL,
+      assessed_by_id    CHAR(36)     NOT NULL,
+      assessed_by_name  VARCHAR(255) NOT NULL,
+      assessed_at       DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      created_at        DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at        DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      PRIMARY KEY (id),
+      UNIQUE KEY uq_asset_risk (asset_id, risk_factor_id),
+      KEY idx_asset_risk_factor (risk_factor_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  `);
+
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS feature_tiers (
+      id              CHAR(36)     NOT NULL,
+      name            VARCHAR(255) NOT NULL,
+      description     TEXT         NULL,
+      sort_order      INT UNSIGNED NULL,
+      is_default      TINYINT(1)   NOT NULL DEFAULT 0,
+      created_by_id   CHAR(36)     NOT NULL,
+      created_by_name VARCHAR(255) NOT NULL,
+      created_at      DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at      DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      PRIMARY KEY (id),
+      UNIQUE KEY uq_feature_tiers_name (name)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  `);
+
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS feature_tier_features (
+      tier_id     CHAR(36)     NOT NULL,
+      feature_key VARCHAR(100) NOT NULL COMMENT 'matches a key in config/features.ts',
+      PRIMARY KEY (tier_id, feature_key)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  `);
+
+  // Seed the three default feature tiers with fixed IDs — referenced directly by the
+  // /setup wizard (which runs before this seeding, so it can't look them up dynamically)
+  // and by app/api/setup/complete/route.ts when it stamps the chosen tier onto app_settings.
+  await db.execute(`
+    INSERT IGNORE INTO feature_tiers (id, name, description, sort_order, is_default, created_by_id, created_by_name) VALUES
+      ('ftier000-0000-0000-0000-000000000001', 'Basic',
+        'Asset register and asset strategy reporting for smaller teams.', 1, 1, 'system', 'System'),
+      ('ftier000-0000-0000-0000-000000000002', 'Advanced',
+        'Adds architecture diagramming, dependency mapping, projects, and richer reporting.', 2, 0, 'system', 'System'),
+      ('ftier000-0000-0000-0000-000000000003', 'Enterprise',
+        'Full platform, including security attribute/characteristic assessment and the security quadrant report.', 3, 0, 'system', 'System')
+  `);
+
+  const advancedFeatures = ['diagrams', 'plantuml', 'dependency_map', 'projects', 'roadmap', 'capability_coverage', 'complexity_cost'];
+  for (const key of advancedFeatures) {
+    await db.execute(
+      `INSERT IGNORE INTO feature_tier_features (tier_id, feature_key) VALUES ('ftier000-0000-0000-0000-000000000002', ?)`,
+      [key]
+    );
+  }
+  for (const key of [...advancedFeatures, 'security']) {
+    await db.execute(
+      `INSERT IGNORE INTO feature_tier_features (tier_id, feature_key) VALUES ('ftier000-0000-0000-0000-000000000003', ?)`,
+      [key]
+    );
+  }
+
   } finally {
     await db.execute("SELECT RELEASE_LOCK('pixxel_db_setup')");
   }

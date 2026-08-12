@@ -44,9 +44,9 @@ const TYPE_STYLES: Record<AssetType, string> = {
 };
 
 const ACTION_STYLES = {
-  CREATE: "bg-emerald-50 text-emerald-700",
-  UPDATE: "bg-amber-50 text-amber-700",
-  DELETE: "bg-red-50 text-red-600",
+  CREATE: "bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400",
+  UPDATE: "bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
+  DELETE: "bg-red-50 text-red-600 dark:bg-red-900/30 dark:text-red-400",
 };
 
 const TYPE_BADGE: Record<DependencyConnectionType, string> = {
@@ -64,11 +64,11 @@ const TYPE_BADGE: Record<DependencyConnectionType, string> = {
 // ─────────────────────────────────────────────────────────────────────────────
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-      <div className="border-b border-slate-100 bg-slate-50 px-5 py-3">
-        <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-500">{title}</h2>
+    <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden dark:border-slate-700 dark:bg-slate-900">
+      <div className="border-b border-slate-100 bg-slate-50 px-5 py-3 dark:border-slate-800 dark:bg-slate-800/50">
+        <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">{title}</h2>
       </div>
-      <dl className="divide-y divide-slate-100">{children}</dl>
+      <dl className="divide-y divide-slate-100 dark:divide-slate-800">{children}</dl>
     </div>
   );
 }
@@ -80,9 +80,9 @@ function Field({ label, value, fullWidth = false }: {
 }) {
   return (
     <div className={`flex flex-col gap-0.5 px-5 py-3 sm:flex-row sm:items-start ${fullWidth ? "" : ""}`}>
-      <dt className="w-full shrink-0 text-xs font-medium text-slate-400 sm:w-40">{label}</dt>
-      <dd className="text-sm text-slate-800 break-words min-w-0">
-        {value ?? <span className="italic text-slate-300">—</span>}
+      <dt className="w-full shrink-0 text-xs font-medium text-slate-400 dark:text-slate-500 sm:w-40">{label}</dt>
+      <dd className="text-sm text-slate-800 dark:text-slate-200 break-words min-w-0">
+        {value ?? <span className="italic text-slate-300 dark:text-slate-600">—</span>}
       </dd>
     </div>
   );
@@ -139,26 +139,26 @@ function AuditRow({ entry }: { entry: AuditLog }) {
 
   return (
     <>
-      <tr className="hover:bg-slate-50 transition-colors">
+      <tr className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
         <td className="px-4 py-3 whitespace-nowrap">
           <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${ACTION_STYLES[entry.action]}`}>
             {entry.action}
           </span>
         </td>
-        <td className="px-4 py-3 text-sm text-slate-700">{entry.performedByName}</td>
-        <td className="px-4 py-3 text-sm text-slate-500 whitespace-nowrap">
+        <td className="px-4 py-3 text-sm text-slate-700 dark:text-slate-300">{entry.performedByName}</td>
+        <td className="px-4 py-3 text-sm text-slate-500 dark:text-slate-400 whitespace-nowrap">
           {new Date(entry.performedAt).toLocaleString("en-GB", {
             day: "2-digit", month: "short", year: "numeric",
             hour: "2-digit", minute: "2-digit",
           })}
         </td>
-        <td className="px-4 py-3 text-sm text-slate-500">
+        <td className="px-4 py-3 text-sm text-slate-500 dark:text-slate-400">
           {entry.action === "CREATE" && "Record created"}
           {entry.action === "DELETE" && "Record deleted"}
           {entry.action === "UPDATE" && (
             <button
               onClick={() => setExpanded((e) => !e)}
-              className="flex items-center gap-1 text-brand-600 hover:underline"
+              className="flex items-center gap-1 text-brand-600 dark:text-brand-400 hover:underline"
             >
               {diff.length} field{diff.length !== 1 ? "s" : ""} changed
               {expanded ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
@@ -169,24 +169,24 @@ function AuditRow({ entry }: { entry: AuditLog }) {
       {hasDiff && expanded && (
         <tr>
           <td colSpan={4} className="px-4 pb-3">
-            <div className="rounded-lg border border-slate-200 bg-slate-50 overflow-hidden">
+            <div className="rounded-lg border border-slate-200 bg-slate-50 overflow-hidden dark:border-slate-700 dark:bg-slate-800/50">
               <table className="min-w-full text-xs">
                 <thead>
-                  <tr className="border-b border-slate-200">
-                    <th className="px-3 py-2 text-left font-semibold text-slate-500 w-36">Field</th>
-                    <th className="px-3 py-2 text-left font-semibold text-slate-500">Before</th>
-                    <th className="px-3 py-2 text-left font-semibold text-slate-500">After</th>
+                  <tr className="border-b border-slate-200 dark:border-slate-700">
+                    <th className="px-3 py-2 text-left font-semibold text-slate-500 dark:text-slate-400 w-36">Field</th>
+                    <th className="px-3 py-2 text-left font-semibold text-slate-500 dark:text-slate-400">Before</th>
+                    <th className="px-3 py-2 text-left font-semibold text-slate-500 dark:text-slate-400">After</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                   {diff.map((d) => (
                     <tr key={d.field}>
-                      <td className="px-3 py-2 font-medium text-slate-600">{d.label}</td>
-                      <td className="px-3 py-2 text-red-600 line-through break-all">
-                        {d.from != null && d.from !== "" ? String(d.from) : <span className="no-underline italic text-slate-400 no-line-through" style={{textDecoration:"none"}}>empty</span>}
+                      <td className="px-3 py-2 font-medium text-slate-600 dark:text-slate-300">{d.label}</td>
+                      <td className="px-3 py-2 text-red-600 dark:text-red-400 line-through break-all">
+                        {d.from != null && d.from !== "" ? String(d.from) : <span className="no-underline italic text-slate-400 dark:text-slate-500 no-line-through" style={{textDecoration:"none"}}>empty</span>}
                       </td>
-                      <td className="px-3 py-2 text-emerald-700 break-all">
-                        {d.to != null && d.to !== "" ? String(d.to) : <span className="italic text-slate-400">empty</span>}
+                      <td className="px-3 py-2 text-emerald-700 dark:text-emerald-400 break-all">
+                        {d.to != null && d.to !== "" ? String(d.to) : <span className="italic text-slate-400 dark:text-slate-500">empty</span>}
                       </td>
                     </tr>
                   ))}
@@ -485,7 +485,7 @@ export default function AssetDetailPage() {
 
   if (error || !asset) {
     return (
-      <div className="flex flex-col items-center justify-center gap-3 py-20 text-slate-500">
+      <div className="flex flex-col items-center justify-center gap-3 py-20 text-slate-500 dark:text-slate-400">
         <AlertTriangle className="h-8 w-8 text-red-400" />
         <p>{error ?? "Asset not found."}</p>
         <Link href="/assets">
@@ -500,29 +500,29 @@ export default function AssetDetailPage() {
     <div className="space-y-6">
 
       {/* Back link */}
-      <Link href="/assets" className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-800 transition-colors">
+      <Link href="/assets" className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200 transition-colors">
         <ArrowLeft className="h-4 w-4" />
         Back to Asset Registry
       </Link>
 
       {/* ── Hero card ──────────────────────────────────────────────────────── */}
-      <div className="rounded-xl border border-slate-200 bg-white shadow-sm p-6">
+      <div className="rounded-xl border border-slate-200 bg-white shadow-sm p-6 dark:border-slate-700 dark:bg-slate-900">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="flex items-start gap-4">
-            <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl bg-slate-100">
-              <AssetIcon name={asset.icon ?? ''} className="h-6 w-6 text-slate-500" />
+            <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl bg-slate-100 dark:bg-slate-800">
+              <AssetIcon name={asset.icon ?? ''} className="h-6 w-6 text-slate-500 dark:text-slate-400" />
             </div>
             <div>
               <div className="flex flex-wrap items-center gap-2">
                 <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">{asset.name}</h1>
                 {asset.shortCode && (
-                  <span className="rounded bg-slate-100 px-2 py-0.5 font-mono text-sm text-slate-500">
+                  <span className="rounded bg-slate-100 dark:bg-slate-800 px-2 py-0.5 font-mono text-sm text-slate-500 dark:text-slate-400">
                     {asset.shortCode}
                   </span>
                 )}
                 {asset.appUrl && (
                   <a href={asset.appUrl} target="_blank" rel="noopener noreferrer"
-                    className="text-slate-400 hover:text-brand-600"
+                    className="text-slate-400 hover:text-brand-600 dark:text-slate-500 dark:hover:text-brand-400"
                     title="Open application"
                   >
                     <ExternalLink className="h-4 w-4" />
@@ -537,13 +537,13 @@ export default function AssetDetailPage() {
                   {asset.type}
                 </span>
                 {asset.departmentNames.length > 0 && (
-                  <span className="text-xs text-slate-400">
+                  <span className="text-xs text-slate-400 dark:text-slate-500">
                     {asset.departmentNames.join(", ")}
                   </span>
                 )}
               </div>
               {asset.vendorName && (
-                <p className="mt-1 text-sm text-slate-500">{asset.vendorName}</p>
+                <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{asset.vendorName}</p>
               )}
             </div>
           </div>
@@ -569,9 +569,9 @@ export default function AssetDetailPage() {
         </div>
 
         {/* Meta footer */}
-        <div className="mt-4 flex flex-wrap gap-4 border-t border-slate-100 pt-4 text-xs text-slate-400">
-          <span>Created by <span className="font-medium text-slate-600">{asset.createdByName}</span> on {fmtDate(asset.createdAt)}</span>
-          <span>Last modified <span className="font-medium text-slate-600">{fmtDateTime(asset.updatedAt)}</span></span>
+        <div className="mt-4 flex flex-wrap gap-4 border-t border-slate-100 dark:border-slate-800 pt-4 text-xs text-slate-400 dark:text-slate-500">
+          <span>Created by <span className="font-medium text-slate-600 dark:text-slate-300">{asset.createdByName}</span> on {fmtDate(asset.createdAt)}</span>
+          <span>Last modified <span className="font-medium text-slate-600 dark:text-slate-300">{fmtDateTime(asset.updatedAt)}</span></span>
         </div>
       </div>
 
@@ -658,38 +658,38 @@ export default function AssetDetailPage() {
 
       {/* ── Active Projects ────────────────────────────────────────────────── */}
       {activeProjects.length > 0 && (
-        <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-          <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50 px-5 py-3">
+        <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden dark:border-slate-700 dark:bg-slate-900">
+          <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50 px-5 py-3 dark:border-slate-800 dark:bg-slate-800/50">
             <div className="flex items-center gap-2">
-              <FolderKanban className="h-4 w-4 text-slate-400" />
-              <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-500">Active Projects</h2>
+              <FolderKanban className="h-4 w-4 text-slate-400 dark:text-slate-500" />
+              <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Active Projects</h2>
             </div>
-            <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">
+            <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
               {activeProjects.length} project{activeProjects.length !== 1 ? "s" : ""}
             </span>
           </div>
-          <div className="divide-y divide-slate-100">
+          <div className="divide-y divide-slate-100 dark:divide-slate-800">
             {activeProjects.map((p) => (
-              <div key={p.id} className="flex items-center gap-4 px-5 py-3 hover:bg-slate-50 transition-colors">
-                <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-brand-50">
-                  <FolderKanban className="h-4 w-4 text-brand-600" />
+              <div key={p.id} className="flex items-center gap-4 px-5 py-3 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-brand-50 dark:bg-brand-900/20">
+                  <FolderKanban className="h-4 w-4 text-brand-600 dark:text-brand-400" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <Link
                     href={`/projects/${p.id}`}
-                    className="text-sm font-medium text-slate-900 hover:text-brand-600 transition-colors"
+                    className="text-sm font-medium text-slate-900 dark:text-slate-100 hover:text-brand-600 dark:hover:text-brand-400 transition-colors"
                   >
                     {p.name}
                   </Link>
                   {p.notes && (
-                    <p className="mt-0.5 text-xs text-slate-400 truncate">{p.notes}</p>
+                    <p className="mt-0.5 text-xs text-slate-400 dark:text-slate-500 truncate">{p.notes}</p>
                   )}
                 </div>
                 <span className={[
                   "inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium flex-shrink-0",
                   p.dependencyType === "upstream"
-                    ? "bg-violet-50 text-violet-700"
-                    : "bg-sky-50 text-sky-700",
+                    ? "bg-violet-50 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400"
+                    : "bg-sky-50 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400",
                 ].join(" ")}>
                   {p.dependencyType === "upstream"
                     ? <ArrowUpFromLine className="h-3 w-3" />
@@ -705,34 +705,34 @@ export default function AssetDetailPage() {
 
       {/* ── Diagrams ───────────────────────────────────────────────────────── */}
       {assetDiagrams.length > 0 && (
-        <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-          <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50 px-5 py-3">
+        <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden dark:border-slate-700 dark:bg-slate-900">
+          <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50 px-5 py-3 dark:border-slate-800 dark:bg-slate-800/50">
             <div className="flex items-center gap-2">
-              <GitBranch className="h-4 w-4 text-slate-400" />
-              <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-500">Architecture Diagrams</h2>
+              <GitBranch className="h-4 w-4 text-slate-400 dark:text-slate-500" />
+              <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Architecture Diagrams</h2>
             </div>
-            <span className="rounded-full bg-brand-100 px-2 py-0.5 text-xs font-medium text-brand-700">
+            <span className="rounded-full bg-brand-100 px-2 py-0.5 text-xs font-medium text-brand-700 dark:bg-brand-900/30 dark:text-brand-400">
               {assetDiagrams.length} diagram{assetDiagrams.length !== 1 ? "s" : ""}
             </span>
           </div>
-          <div className="divide-y divide-slate-100">
+          <div className="divide-y divide-slate-100 dark:divide-slate-800">
             {assetDiagrams.map((d) => (
-              <div key={d.id} className="flex items-center gap-4 px-5 py-3 hover:bg-slate-50 transition-colors">
-                <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-brand-50">
-                  <GitBranch className="h-4 w-4 text-brand-500" />
+              <div key={d.id} className="flex items-center gap-4 px-5 py-3 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-brand-50 dark:bg-brand-900/20">
+                  <GitBranch className="h-4 w-4 text-brand-500 dark:text-brand-400" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <Link
                     href={`/diagrams/${d.id}`}
-                    className="text-sm font-medium text-slate-900 hover:text-brand-600 transition-colors"
+                    className="text-sm font-medium text-slate-900 dark:text-slate-100 hover:text-brand-600 dark:hover:text-brand-400 transition-colors"
                   >
                     {d.name}
                   </Link>
                 </div>
-                <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600 shrink-0">
+                <span className="inline-flex items-center rounded-full bg-slate-100 dark:bg-slate-800 px-2 py-0.5 text-xs font-medium text-slate-600 dark:text-slate-300 shrink-0">
                   v{d.latestVersion}
                 </span>
-                <span className="text-xs text-slate-400 shrink-0 hidden sm:block">
+                <span className="text-xs text-slate-400 dark:text-slate-500 shrink-0 hidden sm:block">
                   {new Date(d.updatedAt).toLocaleDateString("en-GB", {
                     day: "2-digit", month: "short", year: "numeric",
                   })}
@@ -961,28 +961,28 @@ export default function AssetDetailPage() {
       )}
 
       {/* ── Audit History ──────────────────────────────────────────────────── */}
-      <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-        <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50 px-5 py-3">
-          <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-500">Audit History</h2>
-          <span className="rounded-full bg-slate-200 px-2 py-0.5 text-xs font-medium text-slate-600">
+      <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden dark:border-slate-700 dark:bg-slate-900">
+        <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50 px-5 py-3 dark:border-slate-800 dark:bg-slate-800/50">
+          <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Audit History</h2>
+          <span className="rounded-full bg-slate-200 px-2 py-0.5 text-xs font-medium text-slate-600 dark:bg-slate-700 dark:text-slate-300">
             {history.length} event{history.length !== 1 ? "s" : ""}
           </span>
         </div>
 
         {history.length === 0 ? (
-          <p className="px-5 py-8 text-center text-sm italic text-slate-400">No audit events recorded yet.</p>
+          <p className="px-5 py-8 text-center text-sm italic text-slate-400 dark:text-slate-500">No audit events recorded yet.</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="min-w-full">
-              <thead className="bg-slate-50 border-b border-slate-100">
+              <thead className="bg-slate-50 border-b border-slate-100 dark:bg-slate-800/50 dark:border-slate-800">
                 <tr>
-                  <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wider text-slate-500 w-24">Action</th>
-                  <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">Performed by</th>
-                  <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">Date &amp; Time</th>
-                  <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wider text-slate-500">Changes</th>
+                  <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400 w-24">Action</th>
+                  <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Performed by</th>
+                  <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Date &amp; Time</th>
+                  <th className="px-4 py-2 text-left text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Changes</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                 {history.map((entry) => (
                   <AuditRow key={entry.id} entry={entry} />
                 ))}
@@ -1013,15 +1013,15 @@ export default function AssetDetailPage() {
       <Modal isOpen={deleteOpen} onClose={() => setDeleteOpen(false)} title="Delete Asset" maxWidth="max-w-md">
         <div className="flex flex-col gap-4">
           <div className="flex items-start gap-3">
-            <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-red-50">
+            <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-red-50 dark:bg-red-900/20">
               <AlertTriangle className="h-5 w-5 text-red-500" />
             </div>
             <div>
-              <p className="text-sm text-slate-700">
+              <p className="text-sm text-slate-700 dark:text-slate-300">
                 Are you sure you want to delete <span className="font-semibold">{asset.name}</span>?
                 This will also remove all audit history for this asset.
               </p>
-              {deleteError && <p className="mt-2 text-sm text-red-500">{deleteError}</p>}
+              {deleteError && <p className="mt-2 text-sm text-red-500 dark:text-red-400">{deleteError}</p>}
             </div>
           </div>
           <div className="flex justify-end gap-3">

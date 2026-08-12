@@ -15,7 +15,8 @@ export async function POST(req: Request) {
   }
 
   const body = await req.json();
-  const { db, appName, orgName, admin } = body;
+  const { db, appName, orgName, admin, tierId } = body;
+  const DEFAULT_TIER_ID = "ftier000-0000-0000-0000-000000000001"; // Basic — see lib/db.ts seed
 
   // Validate
   if (!db?.host || !db?.user || !db?.name) {
@@ -94,7 +95,14 @@ export async function POST(req: Request) {
       ]
     );
 
-    // 5. Mark setup complete
+    // 5. Record the chosen feature tier (setupDatabase() above already seeded the
+    //    three default tiers, so this row is guaranteed to exist by now)
+    await db_pool.execute(
+      "INSERT INTO app_settings (`key`, `value`) VALUES ('feature_tier_id', ?) ON DUPLICATE KEY UPDATE `value` = VALUES(`value`)",
+      [typeof tierId === "string" && tierId.trim() ? tierId : DEFAULT_TIER_ID]
+    );
+
+    // 6. Mark setup complete
     writeSiteConfig({
       setupComplete: true,
       appName: appName.trim(),
