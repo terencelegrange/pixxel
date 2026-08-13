@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { Settings, Bell, Lock, Globe, ShieldCheck, MessageSquare, ChevronRight, Layers, GitBranch, Gauge, Building2, Network, Target, Package2, BarChart2, ScrollText, MapPin, Users, ClipboardList, Activity } from "lucide-react";
+import { Settings, Bell, Lock, Globe, ShieldCheck, ShieldAlert, MessageSquare, ChevronRight, Layers, GitBranch, Gauge, Building2, Network, Target, Package2, BarChart2, ScrollText, MapPin, Users, ClipboardList, Activity, Blocks } from "lucide-react";
+import { useFeatureTier } from "@/context/FeatureTierContext";
 
 // ---------------------------------------------------------------------------
 // Clickable settings tile
@@ -41,6 +42,8 @@ function SettingsTile({
 // Page
 // ---------------------------------------------------------------------------
 export default function SettingsPage() {
+  const { hasFeature } = useFeatureTier();
+
   return (
     <div className="space-y-6">
       <div>
@@ -124,6 +127,13 @@ export default function SettingsPage() {
         </h2>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <SettingsTile
+          href="/settings/platform"
+          icon={Blocks}
+          iconBg="bg-fuchsia-600"
+          title="Platform"
+          description="Choose which feature set is enabled for this install, and manage feature tiers."
+        />
+        <SettingsTile
           href="/settings/roles"
           icon={ShieldCheck}
           iconBg="bg-violet-500"
@@ -144,41 +154,60 @@ export default function SettingsPage() {
           title="Changelog"
           description="Record and publish what has changed in each platform release."
         />
-        <SettingsTile
-          href="/settings/investment-classifications"
-          icon={MapPin}
-          iconBg="bg-rose-500"
-          title="Investment Classifications"
-          description="Configure roadmap investment labels and their colours."
-        />
-        <SettingsTile
-          href="/settings/industry-sectors"
-          icon={Globe}
-          iconBg="bg-teal-500"
-          title="Industry Sectors"
-          description="Manage industry sectors for business capability categorisation."
-        />
-        <SettingsTile
-          href="/settings/business-capabilities"
-          icon={Layers}
-          iconBg="bg-indigo-500"
-          title="Business Capabilities"
-          description="Define and manage business capabilities by industry sector."
-        />
-        <SettingsTile
-          href="/settings/diagram-types"
-          icon={GitBranch}
-          iconBg="bg-brand-500"
-          title="Diagram Types"
-          description="Configure diagram classification types (Domain, Program, Solution, Detailed)."
-        />
-        <SettingsTile
-          href="/settings/asset-complexity"
-          icon={Gauge}
-          iconBg="bg-rose-500"
-          title="Asset Complexity"
-          description="Define complexity levels for classifying assets (e.g. Low, Medium, High, Critical)."
-        />
+        {hasFeature("security") && (
+          <SettingsTile
+            href="/settings/security-configuration"
+            icon={ShieldAlert}
+            iconBg="bg-red-600"
+            title="Security Configuration"
+            description="Configure risk attributes, characteristics, and how they map to asset categories."
+          />
+        )}
+        {hasFeature("roadmap") && (
+          <SettingsTile
+            href="/settings/investment-classifications"
+            icon={MapPin}
+            iconBg="bg-rose-500"
+            title="Investment Classifications"
+            description="Configure roadmap investment labels and their colours."
+          />
+        )}
+        {hasFeature("capability_coverage") && (
+          <SettingsTile
+            href="/settings/industry-sectors"
+            icon={Globe}
+            iconBg="bg-teal-500"
+            title="Industry Sectors"
+            description="Manage industry sectors for business capability categorisation."
+          />
+        )}
+        {hasFeature("capability_coverage") && (
+          <SettingsTile
+            href="/settings/business-capabilities"
+            icon={Layers}
+            iconBg="bg-indigo-500"
+            title="Business Capabilities"
+            description="Define and manage business capabilities by industry sector."
+          />
+        )}
+        {hasFeature("diagrams") && (
+          <SettingsTile
+            href="/settings/diagram-types"
+            icon={GitBranch}
+            iconBg="bg-brand-500"
+            title="Diagram Types"
+            description="Configure diagram classification types (Domain, Program, Solution, Detailed)."
+          />
+        )}
+        {hasFeature("complexity_cost") && (
+          <SettingsTile
+            href="/settings/asset-complexity"
+            icon={Gauge}
+            iconBg="bg-rose-500"
+            title="Asset Complexity"
+            description="Define complexity levels for classifying assets (e.g. Low, Medium, High, Critical)."
+          />
+        )}
         <SettingsTile
           icon={Settings}
           iconBg="bg-slate-400"

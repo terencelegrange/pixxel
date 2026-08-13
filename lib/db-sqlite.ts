@@ -12,7 +12,7 @@ import path from "path";
 import { randomUUID } from "crypto";
 import {
   SEED_DIAGRAM_TYPES, SEED_INDUSTRY_SECTORS, SEED_TELECOM_CAPABILITIES,
-  SEED_UTILITY_CAPABILITIES, SEED_INVESTMENT_CLASSIFICATIONS,
+  SEED_UTILITY_CAPABILITIES, SEED_INVESTMENT_CLASSIFICATIONS, SEED_FEATURE_TIERS,
 } from "@/lib/db-seed-data";
 
 export interface DbClient {
@@ -185,6 +185,18 @@ async function runSqliteSetup(filePath: string): Promise<void> {
       conn.prepare(
         "INSERT INTO investment_classifications (id, name, color, sort_order, created_by_id, created_by_name) VALUES (?, ?, ?, ?, 'system', 'System')"
       ).run(randomUUID(), c.name, c.color, c.sortOrder);
+    }
+  }
+
+  for (const tier of SEED_FEATURE_TIERS) {
+    conn.prepare(
+      `INSERT OR IGNORE INTO feature_tiers (id, name, description, sort_order, is_default, created_by_id, created_by_name)
+       VALUES (?, ?, ?, ?, ?, 'system', 'System')`
+    ).run(tier.id, tier.name, tier.description, tier.sortOrder, tier.isDefault ? 1 : 0);
+    for (const featureKey of tier.features) {
+      conn.prepare(
+        "INSERT OR IGNORE INTO feature_tier_features (tier_id, feature_key) VALUES (?, ?)"
+      ).run(tier.id, featureKey);
     }
   }
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
+import { useFeatureTier } from "@/context/FeatureTierContext";
 
 const STORAGE_KEY = "pixxel_getstarted_hidden";
 
@@ -31,7 +32,7 @@ const GetStartedContext = createContext<GetStartedContextValue>({
   refresh: () => {},
 });
 
-const STEP_META: Omit<GetStartedStep, "count" | "done">[] = [
+const STEP_META: (Omit<GetStartedStep, "count" | "done"> & { featureKey?: string })[] = [
   {
     key: "departments",
     label: "Departments",
@@ -67,6 +68,7 @@ const STEP_META: Omit<GetStartedStep, "count" | "done">[] = [
     label: "Asset Complexity",
     description: "Define complexity levels (e.g. Low, Medium, High, Critical) for classifying assets.",
     href: "/settings/asset-complexity",
+    featureKey: "complexity_cost",
   },
   {
     key: "assets",
@@ -79,10 +81,12 @@ const STEP_META: Omit<GetStartedStep, "count" | "done">[] = [
     label: "Add my first project",
     description: "Create a project to group related assets, initiatives, or changes.",
     href: "/projects",
+    featureKey: "projects",
   },
 ];
 
 export function GetStartedProvider({ children }: { children: React.ReactNode }) {
+  const { hasFeature } = useFeatureTier();
   const [counts, setCounts] = useState<Record<string, number>>({});
   const [hidden, setHidden] = useState(false);
 
@@ -105,11 +109,13 @@ export function GetStartedProvider({ children }: { children: React.ReactNode }) 
     refresh();
   }, [refresh]);
 
-  const steps: GetStartedStep[] = STEP_META.map((meta) => ({
-    ...meta,
-    count: counts[meta.key] ?? 0,
-    done: (counts[meta.key] ?? 0) > 0,
-  }));
+  const steps: GetStartedStep[] = STEP_META
+    .filter((meta) => !meta.featureKey || hasFeature(meta.featureKey))
+    .map((meta) => ({
+      ...meta,
+      count: counts[meta.key] ?? 0,
+      done: (counts[meta.key] ?? 0) > 0,
+    }));
 
   const doneCount = steps.filter((s) => s.done).length;
   const allComplete = doneCount === steps.length;

@@ -28,7 +28,25 @@ interface AdminForm {
   confirmPassword: string;
 }
 
-type Step = 1 | 2 | 3 | 4;
+type Step = 1 | 2 | 3 | 4 | 5;
+
+const FEATURE_TIERS = [
+  {
+    id: "ftier000-0000-0000-0000-000000000001",
+    name: "Basic",
+    description: "Asset register and asset strategy reporting for smaller teams.",
+  },
+  {
+    id: "ftier000-0000-0000-0000-000000000002",
+    name: "Advanced",
+    description: "Adds architecture diagramming, dependency mapping, projects, and richer reporting.",
+  },
+  {
+    id: "ftier000-0000-0000-0000-000000000003",
+    name: "Enterprise",
+    description: "Full platform, including security attribute/characteristic assessment and the security quadrant report.",
+  },
+] as const;
 
 // ---------------------------------------------------------------------------
 // Step indicator
@@ -37,7 +55,8 @@ const STEPS = [
   { number: 1, label: "Database" },
   { number: 2, label: "Application" },
   { number: 3, label: "Admin Account" },
-  { number: 4, label: "Review" },
+  { number: 4, label: "Feature Tier" },
+  { number: 5, label: "Review" },
 ];
 
 function StepIndicator({ current }: { current: Step }) {
@@ -527,18 +546,78 @@ function StepAdmin({
 }
 
 // ---------------------------------------------------------------------------
-// Step 4 — Review & complete
+// Step 4 — Feature tier
+// ---------------------------------------------------------------------------
+function StepFeatureTier({
+  tierId,
+  onChange,
+  onBack,
+  onNext,
+}: {
+  tierId: string;
+  onChange: (id: string) => void;
+  onBack: () => void;
+  onNext: () => void;
+}) {
+  return (
+    <div>
+      <h2 className="mb-1 text-lg font-semibold text-slate-900">Feature Tier</h2>
+      <p className="mb-6 text-sm text-slate-500">
+        Choose which feature set is enabled for this install. This can be
+        changed anytime from Settings → Platform.
+      </p>
+
+      <div className="flex flex-col gap-3">
+        {FEATURE_TIERS.map((tier) => (
+          <button
+            key={tier.id}
+            type="button"
+            onClick={() => onChange(tier.id)}
+            className={`rounded-lg border-2 px-4 py-3 text-left text-sm font-medium transition-colors ${
+              tierId === tier.id ? "border-brand-600 bg-brand-50 text-brand-900" : "border-slate-200 text-slate-600 hover:border-slate-300"
+            }`}
+          >
+            {tier.name}
+            <span className="mt-1 block text-xs font-normal text-slate-400">{tier.description}</span>
+          </button>
+        ))}
+      </div>
+
+      <div className="mt-6 flex justify-between">
+        <button
+          type="button"
+          onClick={onBack}
+          className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+        >
+          Back
+        </button>
+        <button
+          type="button"
+          onClick={onNext}
+          className="rounded-lg bg-brand-600 px-6 py-2 text-sm font-semibold text-white hover:bg-brand-700"
+        >
+          Next
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Step 5 — Review & complete
 // ---------------------------------------------------------------------------
 function StepReview({
   db,
   app,
   admin,
+  tierId,
   onBack,
   onComplete,
 }: {
   db: DbForm;
   app: AppForm;
   admin: AdminForm;
+  tierId: string;
   onBack: () => void;
   onComplete: () => void;
 }) {
@@ -569,6 +648,7 @@ function StepReview({
             email: admin.email.trim(),
             password: admin.password,
           },
+          tierId,
         }),
       });
       const data = await res.json();
@@ -637,7 +717,7 @@ function StepReview({
       </div>
 
       {/* Admin section */}
-      <div className="mb-6 rounded-lg border border-slate-200 px-4 py-1">
+      <div className="mb-4 rounded-lg border border-slate-200 px-4 py-1">
         <p className="mb-1 mt-3 text-xs font-semibold uppercase tracking-wide text-slate-400">
           Admin Account
         </p>
@@ -645,6 +725,16 @@ function StepReview({
           <Row label="Name" value={admin.name} />
           <Row label="Email" value={admin.email} />
           <Row label="Password" value="••••••••" />
+        </div>
+      </div>
+
+      {/* Feature tier section */}
+      <div className="mb-6 rounded-lg border border-slate-200 px-4 py-1">
+        <p className="mb-1 mt-3 text-xs font-semibold uppercase tracking-wide text-slate-400">
+          Feature Tier
+        </p>
+        <div className="divide-y divide-slate-100">
+          <Row label="Tier" value={FEATURE_TIERS.find((t) => t.id === tierId)?.name ?? ""} />
         </div>
       </div>
 
@@ -706,6 +796,7 @@ export default function SetupPage() {
     password: "",
     confirmPassword: "",
   });
+  const [tierId, setTierId] = useState<string>(FEATURE_TIERS[0].id);
 
   // Redirect away if setup is already complete
   useEffect(() => {
@@ -754,11 +845,20 @@ export default function SetupPage() {
         />
       )}
       {step === 4 && (
+        <StepFeatureTier
+          tierId={tierId}
+          onChange={setTierId}
+          onBack={() => setStep(3)}
+          onNext={() => setStep(5)}
+        />
+      )}
+      {step === 5 && (
         <StepReview
           db={db}
           app={app}
           admin={admin}
-          onBack={() => setStep(3)}
+          tierId={tierId}
+          onBack={() => setStep(4)}
           onComplete={() => router.push("/setup/complete")}
         />
       )}

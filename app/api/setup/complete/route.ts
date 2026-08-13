@@ -4,6 +4,7 @@ import { randomUUID } from "crypto";
 import fs from "fs";
 import path from "path";
 import { isSetupComplete, writeSiteConfig, type DbConfig } from "@/lib/setup";
+import { upsertSql } from "@/lib/sql-compat";
 
 export async function POST(req: Request) {
   // Guard: prevent re-running setup
@@ -15,7 +16,7 @@ export async function POST(req: Request) {
   }
 
   const body = await req.json();
-  const { db, appName, orgName, admin } = body;
+  const { db, appName, orgName, admin, tierId } = body;
 
   // Validate
   if (!db?.dialect) {
@@ -108,7 +109,7 @@ export async function POST(req: Request) {
     // 3. Bootstrap the schema using the credentials just written to site.config.json.
     //    Reset any existing pool so it is recreated with the new credentials
     //    rather than the stale env vars that were loaded when the server started.
-    const { setupDatabase, getDb, resetPool } = await import("@/lib/db");
+    const { setupDatabase, getDb, resetPool, getDbDialect } = await import("@/lib/db");
     resetPool();
     await setupDatabase();
 
@@ -128,7 +129,15 @@ export async function POST(req: Request) {
       ]
     );
 
-    // 5. Mark setup complete
+    // 5. Persist the chosen feature tier as the active tier
+    if (tierId) {
+      await db_pool.execute(
+        upsertSql("app_settings", ["key", "value"], "value", getDbDialect()),
+        ["feature_tier_id", tierId]
+      );
+    }
+
+    // 6. Mark setup complete
     writeSiteConfig({
       setupComplete: true,
       appName: appName.trim(),

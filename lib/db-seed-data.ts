@@ -50,3 +50,25 @@ export const SEED_INVESTMENT_CLASSIFICATIONS = [
   { name: "Contain",      color: "#eab308", sortOrder: 3 },
   { name: "Decommission", color: "#ef4444", sortOrder: 4 },
 ];
+
+// Fixed IDs — referenced directly by the /setup wizard's Feature Tier step,
+// which runs before setupDatabase() has ever executed and can't look these
+// up dynamically.
+const ADVANCED_FEATURES = ["diagrams", "plantuml", "dependency_map", "projects", "roadmap", "capability_coverage", "complexity_cost"];
+export const SEED_FEATURE_TIERS = [
+  {
+    id: "ftier000-0000-0000-0000-000000000001", name: "Basic", sortOrder: 1, isDefault: true,
+    description: "Asset register and asset strategy reporting for smaller teams.",
+    features: [] as string[],
+  },
+  {
+    id: "ftier000-0000-0000-0000-000000000002", name: "Advanced", sortOrder: 2, isDefault: false,
+    description: "Adds architecture diagramming, dependency mapping, projects, and richer reporting.",
+    features: ADVANCED_FEATURES,
+  },
+  {
+    id: "ftier000-0000-0000-0000-000000000003", name: "Enterprise", sortOrder: 3, isDefault: false,
+    description: "Full platform, including security attribute/characteristic assessment and the security quadrant report.",
+    features: [...ADVANCED_FEATURES, "security"],
+  },
+];

@@ -15,6 +15,13 @@
       "when": 1783661025115,
       "tag": "0001_fearless_deathstrike",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1786544457920,
+      "tag": "0002_fearless_outlaw_kid",
+      "breakpoints": true
     }
   ]
 }

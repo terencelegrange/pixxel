@@ -23,7 +23,7 @@ import {
 } from "@/lib/db-sqlite";
 import {
   SEED_DIAGRAM_TYPES, SEED_INDUSTRY_SECTORS, SEED_TELECOM_CAPABILITIES,
-  SEED_UTILITY_CAPABILITIES, SEED_INVESTMENT_CLASSIFICATIONS,
+  SEED_UTILITY_CAPABILITIES, SEED_INVESTMENT_CLASSIFICATIONS, SEED_FEATURE_TIERS,
 } from "@/lib/db-seed-data";
 
 // ---------------------------------------------------------------------------
@@ -237,6 +237,20 @@ async function runMysqlSetup(): Promise<void> {
       await db.execute(
         "INSERT INTO investment_classifications (id, name, color, sort_order, created_by_id, created_by_name) VALUES (?, ?, ?, ?, 'system', 'System')",
         [randomUUID(), c.name, c.color, c.sortOrder]
+      );
+    }
+  }
+
+  for (const tier of SEED_FEATURE_TIERS) {
+    await db.execute(
+      `INSERT IGNORE INTO feature_tiers (id, name, description, sort_order, is_default, created_by_id, created_by_name)
+       VALUES (?, ?, ?, ?, ?, 'system', 'System')`,
+      [tier.id, tier.name, tier.description, tier.sortOrder, tier.isDefault]
+    );
+    for (const featureKey of tier.features) {
+      await db.execute(
+        "INSERT IGNORE INTO feature_tier_features (tier_id, feature_key) VALUES (?, ?)",
+        [tier.id, featureKey]
       );
     }
   }

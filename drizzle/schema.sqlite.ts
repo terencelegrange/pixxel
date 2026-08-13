@@ -406,3 +406,62 @@ export const assetDependencies = sqliteTable("asset_dependencies", {
   index("idx_dep_source").on(t.sourceAssetId),
   index("idx_dep_target").on(t.targetAssetId),
 ]);
+
+export const riskFactors = sqliteTable("risk_factors", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  description: text("description"),
+  kind: text("kind", { enum: ["Attribute", "Characteristic"] }).notNull().default("Attribute"),
+  severity: text("severity", { enum: ["Low", "Medium", "High", "Critical"] }).notNull().default("Medium"),
+  likelihood: text("likelihood", { enum: ["Low", "Medium", "High", "Critical"] }).notNull().default("Medium"),
+  impact: text("impact", { enum: ["Low", "Medium", "High", "Critical"] }).notNull().default("Medium"),
+  ...createdBy(),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+}, (t) => [
+  uniqueIndex("uq_risk_factors_name").on(t.name),
+]);
+
+export const riskFactorCategories = sqliteTable("risk_factor_categories", {
+  riskFactorId: text("risk_factor_id").notNull(),
+  category: text("category").notNull(),
+}, (t) => [
+  primaryKey({ columns: [t.riskFactorId, t.category] }),
+  index("idx_risk_factor_categories_category").on(t.category),
+]);
+
+export const assetRiskAssessments = sqliteTable("asset_risk_assessments", {
+  id: text("id").primaryKey(),
+  assetId: text("asset_id").notNull(),
+  riskFactorId: text("risk_factor_id").notNull(),
+  status: text("status", { enum: ["Met", "Not Met", "Partial"] }).notNull().default("Not Met"),
+  notes: text("notes"),
+  assessedById: text("assessed_by_id").notNull(),
+  assessedByName: text("assessed_by_name").notNull(),
+  assessedAt: text("assessed_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+}, (t) => [
+  uniqueIndex("uq_asset_risk").on(t.assetId, t.riskFactorId),
+  index("idx_asset_risk_factor").on(t.riskFactorId),
+]);
+
+export const featureTiers = sqliteTable("feature_tiers", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  description: text("description"),
+  sortOrder: integer("sort_order"),
+  isDefault: integer("is_default", { mode: "boolean" }).notNull().default(false),
+  ...createdBy(),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+}, (t) => [
+  uniqueIndex("uq_feature_tiers_name").on(t.name),
+]);
+
+export const featureTierFeatures = sqliteTable("feature_tier_features", {
+  tierId: text("tier_id").notNull(),
+  featureKey: text("feature_key").notNull(),
+}, (t) => [
+  primaryKey({ columns: [t.tierId, t.featureKey] }),
+]);

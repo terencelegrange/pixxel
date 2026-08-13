@@ -410,6 +410,61 @@ export const assetDependencies = mysqlTable("asset_dependencies", {
   index("idx_dep_target").on(t.targetAssetId),
 ]);
 
+export const riskFactors = mysqlTable("risk_factors", {
+  id: char("id", { length: 36 }).primaryKey(),
+  name: varchar("name", { length: 255 }).notNull().unique("uq_risk_factors_name"),
+  description: text("description"),
+  kind: mysqlEnum("kind", ["Attribute", "Characteristic"]).notNull().default("Attribute"),
+  severity: mysqlEnum("severity", ["Low", "Medium", "High", "Critical"]).notNull().default("Medium"),
+  likelihood: mysqlEnum("likelihood", ["Low", "Medium", "High", "Critical"]).notNull().default("Medium"),
+  impact: mysqlEnum("impact", ["Low", "Medium", "High", "Critical"]).notNull().default("Medium"),
+  ...createdBy(),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+});
+
+export const riskFactorCategories = mysqlTable("risk_factor_categories", {
+  riskFactorId: char("risk_factor_id", { length: 36 }).notNull(),
+  category: varchar("category", { length: 100 }).notNull(),
+}, (t) => [
+  primaryKey({ columns: [t.riskFactorId, t.category] }),
+  index("idx_risk_factor_categories_category").on(t.category),
+]);
+
+export const assetRiskAssessments = mysqlTable("asset_risk_assessments", {
+  id: char("id", { length: 36 }).primaryKey(),
+  assetId: char("asset_id", { length: 36 }).notNull(),
+  riskFactorId: char("risk_factor_id", { length: 36 }).notNull(),
+  status: mysqlEnum("status", ["Met", "Not Met", "Partial"]).notNull().default("Not Met"),
+  notes: text("notes"),
+  assessedById: char("assessed_by_id", { length: 36 }).notNull(),
+  assessedByName: varchar("assessed_by_name", { length: 255 }).notNull(),
+  assessedAt: datetime("assessed_at").default(sql`CURRENT_TIMESTAMP`).notNull(),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+}, (t) => [
+  uniqueIndex("uq_asset_risk").on(t.assetId, t.riskFactorId),
+  index("idx_asset_risk_factor").on(t.riskFactorId),
+]);
+
+export const featureTiers = mysqlTable("feature_tiers", {
+  id: char("id", { length: 36 }).primaryKey(),
+  name: varchar("name", { length: 255 }).notNull().unique("uq_feature_tiers_name"),
+  description: text("description"),
+  sortOrder: int("sort_order", { unsigned: true }),
+  isDefault: boolean("is_default").notNull().default(false),
+  ...createdBy(),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+});
+
+export const featureTierFeatures = mysqlTable("feature_tier_features", {
+  tierId: char("tier_id", { length: 36 }).notNull(),
+  featureKey: varchar("feature_key", { length: 100 }).notNull(),
+}, (t) => [
+  primaryKey({ columns: [t.tierId, t.featureKey] }),
+]);
+
 // Referenced above only so `sql` stays imported for future defaults that need
 // raw SQL (e.g. seed data migrations) — harmless if unused by a given table.
 void sql;

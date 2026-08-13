@@ -3,6 +3,26 @@ import path from "path";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { Components } from "react-markdown";
+import type { ReactNode } from "react";
+import { TocNav } from "@/components/docs/TocNav";
+
+// ---------------------------------------------------------------------------
+// Heading id helpers — shared between the TOC (built from raw markdown) and
+// the heading renderers below, so `#slug` links actually have a target.
+// ---------------------------------------------------------------------------
+function slugify(text: string): string {
+  return text.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+}
+
+function getText(node: ReactNode): string {
+  if (typeof node === "string") return node;
+  if (typeof node === "number") return String(node);
+  if (Array.isArray(node)) return node.map(getText).join("");
+  if (node && typeof node === "object" && "props" in node) {
+    return getText((node as { props: { children?: ReactNode } }).props.children);
+  }
+  return "";
+}
 
 export const dynamic = 'force-dynamic';
 
@@ -22,22 +42,23 @@ async function getContent(): Promise<string> {
 // Custom renderers — maps markdown elements to styled HTML
 // ---------------------------------------------------------------------------
 const components: Components = {
-  // Headings
+  // Headings — scroll-mt offsets the sticky top header so an anchored
+  // heading doesn't land underneath it.
   h1: ({ children }) => (
-    <h1 className="mt-8 mb-4 text-2xl font-bold text-slate-900 dark:text-slate-100 border-b border-slate-200 dark:border-slate-800 pb-3 first:mt-0">
+    <h1 id={slugify(getText(children))} className="mt-8 mb-4 scroll-mt-20 text-2xl font-bold text-slate-900 dark:text-slate-100 border-b border-slate-200 dark:border-slate-800 pb-3 first:mt-0">
       {children}
     </h1>
   ),
   h2: ({ children }) => (
-    <h2 className="mt-8 mb-3 text-lg font-semibold text-slate-800 dark:text-slate-200 border-b border-slate-100 dark:border-slate-800 pb-2">
+    <h2 id={slugify(getText(children))} className="mt-8 mb-3 scroll-mt-20 text-lg font-semibold text-slate-800 dark:text-slate-200 border-b border-slate-100 dark:border-slate-800 pb-2">
       {children}
     </h2>
   ),
   h3: ({ children }) => (
-    <h3 className="mt-6 mb-2 text-base font-semibold text-slate-700 dark:text-slate-300">{children}</h3>
+    <h3 id={slugify(getText(children))} className="mt-6 mb-2 scroll-mt-20 text-base font-semibold text-slate-700 dark:text-slate-300">{children}</h3>
   ),
   h4: ({ children }) => (
-    <h4 className="mt-4 mb-1.5 text-sm font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider">{children}</h4>
+    <h4 id={slugify(getText(children))} className="mt-4 mb-1.5 scroll-mt-20 text-sm font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wider">{children}</h4>
   ),
 
   // Paragraphs
@@ -140,8 +161,7 @@ function extractToc(markdown: string): { id: string; label: string }[] {
     .filter((l) => l.startsWith("## "))
     .map((l) => {
       const label = l.replace(/^## /, "").trim();
-      const id = label.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
-      return { id, label };
+      return { id: slugify(label), label };
     });
 }
 
@@ -161,17 +181,7 @@ export default async function DocsPage() {
           <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
             On this page
           </p>
-          <nav className="space-y-1">
-            {toc.map((item) => (
-              <a
-                key={item.id}
-                href={`#${item.id}`}
-                className="block rounded-lg px-3 py-1.5 text-xs text-slate-500 hover:bg-slate-100 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200 transition-colors leading-snug"
-              >
-                {item.label}
-              </a>
-            ))}
-          </nav>
+          <TocNav items={toc} />
         </div>
       </aside>
 
