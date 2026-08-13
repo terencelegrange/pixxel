@@ -419,6 +419,26 @@ export interface AssetRiskAssessment {
   updatedAt: string;
 }
 
+export type RiskCategory = "Operational" | "Financial" | "Compliance" | "Security" | "Vendor" | "Reputational" | "Other";
+export type RiskStatus = "Open" | "Mitigating" | "Accepted" | "Closed";
+
+export interface AssetRisk {
+  id: string;
+  assetId: string;
+  assetName: string;
+  title: string;
+  description: string | null;
+  category: RiskCategory;
+  likelihood: RiskLevel;
+  impact: RiskLevel;
+  status: RiskStatus;
+  owner: string | null;
+  createdById: string;
+  createdByName: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface FeatureTier {
   id: string;
   name: string;

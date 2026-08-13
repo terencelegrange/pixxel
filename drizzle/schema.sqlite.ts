@@ -465,3 +465,20 @@ export const featureTierFeatures = sqliteTable("feature_tier_features", {
 }, (t) => [
   primaryKey({ columns: [t.tierId, t.featureKey] }),
 ]);
+
+export const assetRisks = sqliteTable("asset_risks", {
+  id: text("id").primaryKey(),
+  assetId: text("asset_id").notNull(),
+  title: text("title").notNull(),
+  description: text("description"),
+  category: text("category", { enum: ["Operational", "Financial", "Compliance", "Security", "Vendor", "Reputational", "Other"] }).notNull().default("Operational"),
+  likelihood: text("likelihood", { enum: ["Low", "Medium", "High", "Critical"] }).notNull().default("Medium"),
+  impact: text("impact", { enum: ["Low", "Medium", "High", "Critical"] }).notNull().default("Medium"),
+  status: text("status", { enum: ["Open", "Mitigating", "Accepted", "Closed"] }).notNull().default("Open"),
+  owner: text("owner"),
+  ...createdBy(),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+}, (t) => [
+  index("idx_asset_risks_asset").on(t.assetId),
+]);

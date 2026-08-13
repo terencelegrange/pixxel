@@ -465,6 +465,23 @@ export const featureTierFeatures = mysqlTable("feature_tier_features", {
   primaryKey({ columns: [t.tierId, t.featureKey] }),
 ]);
 
+export const assetRisks = mysqlTable("asset_risks", {
+  id: char("id", { length: 36 }).primaryKey(),
+  assetId: char("asset_id", { length: 36 }).notNull(),
+  title: varchar("title", { length: 255 }).notNull(),
+  description: text("description"),
+  category: mysqlEnum("category", ["Operational", "Financial", "Compliance", "Security", "Vendor", "Reputational", "Other"]).notNull().default("Operational"),
+  likelihood: mysqlEnum("likelihood", ["Low", "Medium", "High", "Critical"]).notNull().default("Medium"),
+  impact: mysqlEnum("impact", ["Low", "Medium", "High", "Critical"]).notNull().default("Medium"),
+  status: mysqlEnum("status", ["Open", "Mitigating", "Accepted", "Closed"]).notNull().default("Open"),
+  owner: varchar("owner", { length: 255 }),
+  ...createdBy(),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+}, (t) => [
+  index("idx_asset_risks_asset").on(t.assetId),
+]);
+
 // Referenced above only so `sql` stays imported for future defaults that need
 // raw SQL (e.g. seed data migrations) — harmless if unused by a given table.
 void sql;

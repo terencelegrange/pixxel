@@ -31,6 +31,8 @@ export const FEATURES: FeatureDef[] = [
     description: "Asset complexity vs. contract cost report." },
   { key: "security", label: "Security Assessment", category: "Security",
     description: "Risk attributes/characteristics, per-asset assessment, and the security quadrant report." },
+  { key: "risk_register", label: "Risk Register", category: "Security",
+    description: "Log and track freeform risks against assets — operational, financial, compliance, and more." },
 ];
 
 export const FEATURE_CATEGORIES = Array.from(new Set(FEATURES.map((f) => f.category)));

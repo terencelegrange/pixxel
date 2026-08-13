@@ -68,7 +68,7 @@ export const SEED_FEATURE_TIERS = [
   },
   {
     id: "ftier000-0000-0000-0000-000000000003", name: "Enterprise", sortOrder: 3, isDefault: false,
-    description: "Full platform, including security attribute/characteristic assessment and the security quadrant report.",
-    features: [...ADVANCED_FEATURES, "security"],
+    description: "Full platform, including security attribute/characteristic assessment, the security quadrant report, and the risk register.",
+    features: [...ADVANCED_FEATURES, "security", "risk_register"],
   },
 ];
