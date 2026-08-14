@@ -183,6 +183,6 @@ describe('POST /api/assets', () => {
     const res = await POST(makeReq(valid))
     expect(res.status).toBe(201)
     const junctionCall = mockExecute.mock.calls.find(([sql]) => sql.includes('asset_departments'))
-    expect(junctionCall?.[0]).toBe('INSERT OR IGNORE INTO asset_departments (asset_id, department_id) VALUES (?, ?)')
+    expect(junctionCall?.[0]).toBe('INSERT OR IGNORE INTO asset_departments (`asset_id`, `department_id`) VALUES (?, ?)')
   })
 })

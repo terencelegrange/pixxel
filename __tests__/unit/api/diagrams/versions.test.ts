@@ -102,7 +102,7 @@ describe('POST /api/diagrams/[id]/versions', () => {
     const updateCall = mockExecute.mock.calls.find(([sql]) => sql.includes('UPDATE diagrams'))
     expect(updateCall?.[0]).toBe('UPDATE diagrams SET updated_at = NOW() WHERE id = ?')
     const junctionCall = mockExecute.mock.calls.find(([sql]) => sql.includes('diagram_assets') && sql.startsWith('INSERT'))
-    expect(junctionCall?.[0]).toBe('INSERT IGNORE INTO diagram_assets (diagram_id, asset_id) VALUES (?, ?)')
+    expect(junctionCall?.[0]).toBe('INSERT IGNORE INTO diagram_assets (`diagram_id`, `asset_id`) VALUES (?, ?)')
   })
 
   it('uses CURRENT_TIMESTAMP and INSERT OR IGNORE for sqlite dialect', async () => {
@@ -115,7 +115,7 @@ describe('POST /api/diagrams/[id]/versions', () => {
     const updateCall = mockExecute.mock.calls.find(([sql]) => sql.includes('UPDATE diagrams'))
     expect(updateCall?.[0]).toBe('UPDATE diagrams SET updated_at = CURRENT_TIMESTAMP WHERE id = ?')
     const junctionCall = mockExecute.mock.calls.find(([sql]) => sql.includes('diagram_assets') && sql.startsWith('INSERT'))
-    expect(junctionCall?.[0]).toBe('INSERT OR IGNORE INTO diagram_assets (diagram_id, asset_id) VALUES (?, ?)')
+    expect(junctionCall?.[0]).toBe('INSERT OR IGNORE INTO diagram_assets (`diagram_id`, `asset_id`) VALUES (?, ?)')
   })
 
   it('returns 500 when DB throws', async () => {

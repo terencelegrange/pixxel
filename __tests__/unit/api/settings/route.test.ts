@@ -80,7 +80,7 @@ describe('PUT /api/settings', () => {
     const res = await PUT(makeReq({ 'confluence.base_url': 'https://x.example' }))
     expect(res.status).toBe(200)
     expect(mockExecute).toHaveBeenCalledWith(
-      'INSERT INTO app_settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value',
+      'INSERT INTO app_settings (`key`, `value`) VALUES (?, ?) ON CONFLICT(`key`) DO UPDATE SET `value` = excluded.`value`',
       ['confluence.base_url', 'https://x.example']
     )
   })

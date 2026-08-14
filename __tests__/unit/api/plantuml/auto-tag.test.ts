@@ -43,7 +43,7 @@ describe('POST /api/plantuml/[id]/assets/auto-tag', () => {
     const res = await POST(makeReq({ participantNames: ['Alice'] }), { params: Promise.resolve({ id: 'diagram-1' }) })
     expect(res.status).toBe(200)
     expect(mockExecute).toHaveBeenCalledWith(
-      `INSERT INTO plantuml_diagram_assets (diagram_id, asset_id, matched_on) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE matched_on = VALUES(matched_on)`,
+      `INSERT INTO plantuml_diagram_assets (\`diagram_id\`, \`asset_id\`, \`matched_on\`) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE \`matched_on\` = VALUES(\`matched_on\`)`,
       ['diagram-1', 'asset-1', 'name']
     )
   })
@@ -57,7 +57,7 @@ describe('POST /api/plantuml/[id]/assets/auto-tag', () => {
     const res = await POST(makeReq({ participantNames: ['Alice'] }), { params: Promise.resolve({ id: 'diagram-1' }) })
     expect(res.status).toBe(200)
     expect(mockExecute).toHaveBeenCalledWith(
-      'INSERT INTO plantuml_diagram_assets (diagram_id, asset_id, matched_on) VALUES (?, ?, ?) ON CONFLICT(diagram_id, asset_id) DO UPDATE SET matched_on = excluded.matched_on',
+      'INSERT INTO plantuml_diagram_assets (`diagram_id`, `asset_id`, `matched_on`) VALUES (?, ?, ?) ON CONFLICT(`diagram_id`, `asset_id`) DO UPDATE SET `matched_on` = excluded.`matched_on`',
       ['diagram-1', 'asset-1', 'name']
     )
   })
