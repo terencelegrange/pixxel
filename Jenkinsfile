@@ -32,6 +32,14 @@ pipeline {
             }
         }
 
+        stage('Debug: show deploy public key') {
+            steps {
+                sshagent(credentials: ['PIXXEL_SSH_KEY']) {
+                    sh 'ssh-add -L'
+                }
+            }
+        }
+
         stage('Write .env') {
             steps {
                 withCredentials([
