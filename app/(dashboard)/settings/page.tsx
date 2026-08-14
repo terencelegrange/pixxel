@@ -209,16 +209,18 @@ export default function SettingsPage() {
           />
         )}
         <SettingsTile
+          href="/settings/general"
           icon={Settings}
           iconBg="bg-slate-400"
           title="General"
-          description="Manage account name, timezone, and language."
+          description="Manage account name, branding, timezone, and language."
         />
         <SettingsTile
+          href="/settings/notifications"
           icon={Bell}
           iconBg="bg-amber-400"
           title="Notifications"
-          description="Configure email and in-app notification preferences."
+          description="Choose what shows up in your notification bell."
         />
         <SettingsTile
           href="/settings/security"

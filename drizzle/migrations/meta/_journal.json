@@ -36,6 +36,13 @@
       "when": 1786688388810,
       "tag": "0004_sharp_starfox",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "5",
+      "when": 1786690929607,
+      "tag": "0005_lyrical_sentinel",
+      "breakpoints": true
     }
   ]
 }

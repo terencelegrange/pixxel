@@ -35,6 +35,10 @@ export const users = mysqlTable("users", {
   mfaEnabled: boolean("mfa_enabled").notNull().default(false),
   mfaSecret: text("mfa_secret"),
   mfaPendingSecret: text("mfa_pending_secret"),
+  timezone: varchar("timezone", { length: 100 }),
+  language: varchar("language", { length: 10 }).notNull().default("en"),
+  notifyNewFeedback: boolean("notify_new_feedback").notNull().default(true),
+  notifyContractsExpiring: boolean("notify_contracts_expiring").notNull().default(true),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 });

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Bell, Menu, Moon, Search, Sun, UserCircle, LogOut, MessageSquare, FileText } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useTheme } from "@/context/ThemeContext";
+import { useBranding } from "@/context/BrandingContext";
 
 interface HeaderProps {
   onMenuToggle: () => void;
@@ -14,6 +15,7 @@ export default function Header({ onMenuToggle }: HeaderProps) {
   const { user, logout } = useAuth();
   const isAdmin = user?.role === "Admin";
   const { theme, toggleTheme } = useTheme();
+  const { companyName } = useBranding();
 
   // Avatar dropdown
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -23,7 +25,23 @@ export default function Header({ onMenuToggle }: HeaderProps) {
   const [notifOpen, setNotifOpen] = useState(false);
   const [newCount, setNewCount] = useState(0);
   const [expiringCount, setExpiringCount] = useState(0);
+  const [notifyNewFeedback, setNotifyNewFeedback] = useState(true);
+  const [notifyContractsExpiring, setNotifyContractsExpiring] = useState(true);
   const notifRef = useRef<HTMLDivElement>(null);
+
+  // Load the current user's notification preferences (admin only — the bell
+  // itself is admin-only today).
+  useEffect(() => {
+    if (!isAdmin) return;
+    fetch("/api/profile/preferences")
+      .then((res) => res.ok ? res.json() : null)
+      .then((data) => {
+        if (!data) return;
+        setNotifyNewFeedback(data.notifyNewFeedback ?? true);
+        setNotifyContractsExpiring(data.notifyContractsExpiring ?? true);
+      })
+      .catch(() => {});
+  }, [isAdmin]);
 
   // Close both dropdowns on outside click
   useEffect(() => {
@@ -39,9 +57,10 @@ export default function Header({ onMenuToggle }: HeaderProps) {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Poll for new feedback count (admin only)
+  // Poll for new feedback count (admin only, and only if the user hasn't
+  // turned this notification off in Settings → Notifications)
   const fetchNewCount = useCallback(async () => {
-    if (!isAdmin) return;
+    if (!isAdmin || !notifyNewFeedback) { setNewCount(0); return; }
     try {
       const res = await fetch("/api/support");
       if (!res.ok) return;
@@ -51,11 +70,11 @@ export default function Header({ onMenuToggle }: HeaderProps) {
     } catch {
       // silently ignore
     }
-  }, [isAdmin]);
+  }, [isAdmin, notifyNewFeedback]);
 
-  // Poll for expiring contracts count (admin only)
+  // Poll for expiring contracts count (admin only, same preference gate)
   const fetchExpiringCount = useCallback(async () => {
-    if (!isAdmin) return;
+    if (!isAdmin || !notifyContractsExpiring) { setExpiringCount(0); return; }
     try {
       const res = await fetch("/api/contracts/expiring-count");
       if (!res.ok) return;
@@ -64,7 +83,7 @@ export default function Header({ onMenuToggle }: HeaderProps) {
     } catch {
       // silently ignore
     }
-  }, [isAdmin]);
+  }, [isAdmin, notifyContractsExpiring]);
 
   useEffect(() => {
     fetchNewCount();
@@ -91,7 +110,7 @@ export default function Header({ onMenuToggle }: HeaderProps) {
 
       {/* Logo / Brand (visible on mobile) */}
       <span className="text-base font-semibold text-slate-900 lg:hidden dark:text-slate-100">
-        Pixxel
+        {companyName || "Pixxel"}
       </span>
 
       {/* Search bar */}

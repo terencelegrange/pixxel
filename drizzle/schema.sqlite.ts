@@ -32,6 +32,10 @@ export const users = sqliteTable("users", {
   mfaEnabled: integer("mfa_enabled", { mode: "boolean" }).notNull().default(false),
   mfaSecret: text("mfa_secret"),
   mfaPendingSecret: text("mfa_pending_secret"),
+  timezone: text("timezone"),
+  language: text("language").notNull().default("en"),
+  notifyNewFeedback: integer("notify_new_feedback", { mode: "boolean" }).notNull().default(true),
+  notifyContractsExpiring: integer("notify_contracts_expiring", { mode: "boolean" }).notNull().default(true),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 });
