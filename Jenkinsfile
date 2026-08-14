@@ -2,7 +2,7 @@ pipeline {
     agent any
 
     environment {
-        REMOTE_HOST = '192.168.100.227'
+        REMOTE_HOST = '192.168.100.228'
         REMOTE_USER = 'terence'
         DEPLOY_DIR  = '/home/pixxel'
         APP_PORT    = '3000'
