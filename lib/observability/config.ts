@@ -20,6 +20,8 @@ export interface ObservabilityConfig {
   authType: ObservabilityAuthType;
   apiKey: string;
   minLevel: MinLevel;
+  /** The collector's required `channel` field — a logical stream name within the ingest topic. */
+  channel: string;
 }
 
 const DEFAULT_CONFIG: ObservabilityConfig = {
@@ -29,6 +31,7 @@ const DEFAULT_CONFIG: ObservabilityConfig = {
   authType: "bearer",
   apiKey: "",
   minLevel: "warn",
+  channel: "pixxel",
 };
 
 let cached: ObservabilityConfig | null = null;
@@ -50,6 +53,7 @@ async function loadConfig(): Promise<ObservabilityConfig> {
       authType: (raw["observability.auth_type"] as ObservabilityAuthType) || "bearer",
       apiKey: raw["observability.api_key"] ?? "",
       minLevel: (raw["observability.min_level"] as MinLevel) || "warn",
+      channel: raw["observability.channel"] || "pixxel",
     };
   } catch {
     // DB not configured yet (e.g. before /setup completes), or table missing.

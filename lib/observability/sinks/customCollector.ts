@@ -35,11 +35,17 @@ export async function sendToCustomCollector(config: ObservabilityConfig, entry: 
         "Content-Type": "application/json",
         Authorization: `Bearer ${config.apiKey}`,
       },
+      // Shape required by the collector's LogEntryRequest schema (see its
+      // /openapi.json) — `channel` is required; our level/message/metadata
+      // all live inside the free-form `payload` field.
       body: JSON.stringify({
-        level: entry.level,
-        message: entry.message.slice(0, MAX_MESSAGE_LENGTH),
+        channel: config.channel,
         timestamp: entry.timestamp,
-        metadata: entry.metadata,
+        payload: {
+          level: entry.level,
+          message: entry.message.slice(0, MAX_MESSAGE_LENGTH),
+          metadata: entry.metadata,
+        },
       }),
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     });

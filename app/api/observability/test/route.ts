@@ -14,7 +14,7 @@ export async function POST(req: NextRequest) {
   if (!auth.ok) return auth.response;
   try {
     const body = await req.json();
-    const { collectorUrl, apiKey } = body as { collectorUrl?: string; apiKey?: string };
+    const { collectorUrl, apiKey, channel } = body as { collectorUrl?: string; apiKey?: string; channel?: string };
 
     if (!collectorUrl?.trim()) {
       return NextResponse.json({ error: "Collector URL is required." }, { status: 400 });
@@ -32,7 +32,10 @@ export async function POST(req: NextRequest) {
     }
 
     const result = await sendToCustomCollector(
-      { enabled: true, provider: "custom", collectorUrl: collectorUrl.trim(), authType: "bearer", apiKey: resolvedApiKey, minLevel: "debug" },
+      {
+        enabled: true, provider: "custom", collectorUrl: collectorUrl.trim(), authType: "bearer",
+        apiKey: resolvedApiKey, minLevel: "debug", channel: channel?.trim() || "pixxel",
+      },
       {
         level: "info",
         message: "Pixxel observability test log",

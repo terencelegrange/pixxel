@@ -17,6 +17,7 @@ interface ObservabilitySettings {
   /** Only ever holds a NEW value the admin typed — never the saved secret. */
   apiKeyInput: string;
   minLevel: MinLevel;
+  channel: string;
 }
 
 const EMPTY: ObservabilitySettings = {
@@ -26,6 +27,7 @@ const EMPTY: ObservabilitySettings = {
   authType: "bearer",
   apiKeyInput: "",
   minLevel: "warn",
+  channel: "pixxel",
 };
 
 export default function ObservabilityPage() {
@@ -60,6 +62,7 @@ export default function ObservabilityPage() {
           authType: "bearer",
           apiKeyInput: "",
           minLevel: (s["observability.min_level"] as MinLevel) || "warn",
+          channel: s["observability.channel"] || "pixxel",
         });
         setHasSavedKey(s["observability.api_key"] === MASKED_VALUE);
       } catch (err) {
@@ -97,6 +100,7 @@ export default function ObservabilityPage() {
             "observability.auth_type": settings.authType,
             "observability.api_key": resolveApiKeyForSubmit(),
             "observability.min_level": settings.minLevel,
+            "observability.channel": settings.channel,
           },
         }),
       });
@@ -122,7 +126,7 @@ export default function ObservabilityPage() {
       const res = await fetch("/api/observability/test", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ collectorUrl: settings.collectorUrl, apiKey: resolveApiKeyForSubmit() }),
+        body: JSON.stringify({ collectorUrl: settings.collectorUrl, apiKey: resolveApiKeyForSubmit(), channel: settings.channel }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Test failed.");
@@ -201,6 +205,19 @@ export default function ObservabilityPage() {
                     />
                     <p className="text-xs text-slate-400 dark:text-slate-500">
                       The full ingest endpoint URL, including path.
+                    </p>
+                  </div>
+
+                  <div className="py-4 flex flex-col gap-1.5">
+                    <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Channel</label>
+                    <Input
+                      type="text"
+                      value={settings.channel}
+                      onChange={(e) => setSettings((s) => ({ ...s, channel: e.target.value }))}
+                      placeholder="pixxel"
+                    />
+                    <p className="text-xs text-slate-400 dark:text-slate-500">
+                      Sent as the collector&apos;s required <code>channel</code> field — a logical stream name within the ingest topic.
                     </p>
                   </div>
 
