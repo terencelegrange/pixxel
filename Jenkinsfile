@@ -32,10 +32,17 @@ pipeline {
             }
         }
 
-        stage('Debug: show deploy public key') {
+        stage('Debug: inspect port 3000 on host') {
             steps {
                 sshagent(credentials: ['PIXXEL_SSH_KEY']) {
-                    sh 'ssh-add -L'
+                    sh """
+                        ssh -o StrictHostKeyChecking=no ${REMOTE_USER}@${REMOTE_HOST} "
+                            echo '--- docker ps (all) ---'
+                            docker ps -a --format 'table {{.Names}}\\t{{.Image}}\\t{{.Ports}}\\t{{.Status}}'
+                            echo '--- listeners on :3000 ---'
+                            sudo ss -ltnp 'sport = :3000' 2>/dev/null || ss -ltnp 'sport = :3000' || true
+                        "
+                    """
                 }
             }
         }
