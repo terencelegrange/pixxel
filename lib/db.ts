@@ -100,6 +100,14 @@ function getPool(): Pool {
     }
     g._dbPool = mysql.createPool({
       ...creds,
+      // Pins the connection's default collation so CREATE TABLE (which has
+      // no explicit COLLATE per-table) is consistent regardless of the
+      // server's own default — MariaDB changed its default from
+      // utf8mb4_unicode_ci to utf8mb4_uca1400_ai_ci in 10.10+, and tables
+      // created against different server versions silently picked up
+      // different collations, breaking any JOIN between them with
+      // "Illegal mix of collations".
+      charset: "utf8mb4_unicode_ci",
       waitForConnections: true,
       connectionLimit: 10,
       queueLimit: 0,
