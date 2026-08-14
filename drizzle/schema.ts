@@ -32,6 +32,9 @@ export const users = mysqlTable("users", {
   role: varchar("role", { length: 50 }).notNull().default("Member"),
   roleId: char("role_id", { length: 36 }),
   tokenVersion: int("token_version", { unsigned: true }).notNull().default(1),
+  mfaEnabled: boolean("mfa_enabled").notNull().default(false),
+  mfaSecret: text("mfa_secret"),
+  mfaPendingSecret: text("mfa_pending_secret"),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 });
@@ -480,6 +483,16 @@ export const assetRisks = mysqlTable("asset_risks", {
   updatedAt: updatedAt(),
 }, (t) => [
   index("idx_asset_risks_asset").on(t.assetId),
+]);
+
+export const userMfaRecoveryCodes = mysqlTable("user_mfa_recovery_codes", {
+  id: char("id", { length: 36 }).primaryKey(),
+  userId: char("user_id", { length: 36 }).notNull(),
+  codeHash: varchar("code_hash", { length: 255 }).notNull(),
+  usedAt: datetime("used_at"),
+  createdAt: createdAt(),
+}, (t) => [
+  index("idx_user_mfa_recovery_codes_user").on(t.userId),
 ]);
 
 // Referenced above only so `sql` stays imported for future defaults that need

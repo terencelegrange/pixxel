@@ -17,6 +17,8 @@ import {
   loginUser,
   registerUser,
   logoutUser,
+  verifyMfaChallenge,
+  LoginResult,
 } from "@/lib/auth";
 
 // ---------------------------------------------------------------------------
@@ -28,7 +30,8 @@ interface AuthContextValue {
   isLoading: boolean;
   /** False for the read-only "Viewer" role; true for Member/Admin. */
   canWrite: boolean;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<LoginResult>;
+  completeMfaLogin: (mfaToken: string, credential: { code: string } | { recoveryCode: string }) => Promise<void>;
   register: (name: string, email: string, password: string) => Promise<void>;
   logout: () => void;
   updateUser: (patch: Partial<User>) => void;
@@ -54,8 +57,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setIsLoading(false);
   }, []);
 
-  const login = useCallback(async (email: string, password: string) => {
-    const loggedIn = await loginUser(email, password);
+  const login = useCallback(async (email: string, password: string): Promise<LoginResult> => {
+    const result = await loginUser(email, password);
+    if (result.status === "ok") {
+      storeUser(result.user);
+      setUser(result.user);
+      router.push("/dashboard");
+    }
+    return result;
+  }, [router]);
+
+  const completeMfaLogin = useCallback(async (mfaToken: string, credential: { code: string } | { recoveryCode: string }) => {
+    const loggedIn = await verifyMfaChallenge(mfaToken, credential);
     storeUser(loggedIn);
     setUser(loggedIn);
     router.push("/dashboard");
@@ -96,6 +109,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isLoading,
         canWrite: user?.role !== "Viewer",
         login,
+        completeMfaLogin,
         register,
         logout,
         updateUser,

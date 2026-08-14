@@ -221,6 +221,7 @@ export default function SettingsPage() {
           description="Configure email and in-app notification preferences."
         />
         <SettingsTile
+          href="/settings/security"
           icon={Lock}
           iconBg="bg-slate-500"
           title="Security"

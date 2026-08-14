@@ -5,6 +5,7 @@ import mysql from "mysql2/promise";
 import { getDb, setupDatabase } from "@/lib/db";
 import { rateLimit } from "@/lib/rate-limit";
 import { signJwt } from "@/lib/jwt";
+import { signMfaChallengeToken } from "@/lib/mfa";
 import { validate } from "@/lib/validate";
 import { LoginSchema } from "@/lib/schemas";
 import { User } from "@/types";
@@ -18,6 +19,7 @@ interface DbUserRow {
   role: string;
   created_at: Date;
   token_version: number;
+  mfa_enabled: number | boolean;
 }
 
 export async function POST(req: NextRequest) {
@@ -33,7 +35,7 @@ export async function POST(req: NextRequest) {
 
     const db = getDb();
     const [rows] = await db.execute<mysql.RowDataPacket[]>(
-      "SELECT id, name, email, password, role, created_at, token_version FROM users WHERE email = ? LIMIT 1",
+      "SELECT id, name, email, password, role, created_at, token_version, mfa_enabled FROM users WHERE email = ? LIMIT 1",
       [email]
     );
 
@@ -65,6 +67,11 @@ export async function POST(req: NextRequest) {
         ? row.created_at.toISOString()
         : String(row.created_at),
     };
+
+    if (row.mfa_enabled) {
+      const mfaToken = signMfaChallengeToken(user.id);
+      return NextResponse.json({ mfaRequired: true, mfaToken }, { status: 200 });
+    }
 
     const token = signJwt({ sub: user.id, name: user.name, email: user.email, role: user.role, tokenVersion: row.token_version });
 

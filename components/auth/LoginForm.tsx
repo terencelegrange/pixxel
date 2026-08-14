@@ -2,7 +2,7 @@
 
 import { useState, FormEvent } from "react";
 import Link from "next/link";
-import { LogIn } from "lucide-react";
+import { LogIn, ShieldCheck, ArrowLeft } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -24,12 +24,95 @@ function validate(email: string, password: string): FormErrors {
   return errors;
 }
 
+// ---------------------------------------------------------------------------
+// Step 2 — MFA code entry
+// ---------------------------------------------------------------------------
+function MfaStep({ mfaToken, onBack }: { mfaToken: string; onBack: () => void }) {
+  const { completeMfaLogin } = useAuth();
+  const [useRecovery, setUseRecovery] = useState(false);
+  const [value, setValue] = useState("");
+  const [error, setError] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    if (!value.trim()) { setError(useRecovery ? "Recovery code is required." : "Code is required."); return; }
+    setError("");
+    setIsLoading(true);
+    try {
+      await completeMfaLogin(mfaToken, useRecovery ? { recoveryCode: value.trim() } : { code: value.trim() });
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Verification failed.");
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="flex flex-col gap-5" noValidate>
+      <div className="flex flex-col items-center gap-2 text-center">
+        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-50">
+          <ShieldCheck className="h-5 w-5 text-brand-600" />
+        </div>
+        <h2 className="text-base font-semibold text-slate-800">Two-factor authentication</h2>
+        <p className="text-sm text-slate-500">
+          {useRecovery
+            ? "Enter one of your one-time recovery codes."
+            : "Enter the 6-digit code from your authenticator app."}
+        </p>
+      </div>
+
+      {error && (
+        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
+          {error}
+        </div>
+      )}
+
+      <Input
+        label={useRecovery ? "Recovery code" : "6-digit code"}
+        type="text"
+        placeholder={useRecovery ? "XXXXX-XXXXX" : "000000"}
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        autoComplete="one-time-code"
+        autoFocus
+      />
+
+      <Button type="submit" fullWidth isLoading={isLoading} size="lg">
+        <LogIn className="h-4 w-4" />
+        Verify
+      </Button>
+
+      <div className="flex items-center justify-between text-sm">
+        <button
+          type="button"
+          onClick={onBack}
+          className="inline-flex items-center gap-1 text-slate-500 hover:text-slate-700"
+        >
+          <ArrowLeft className="h-3.5 w-3.5" /> Back
+        </button>
+        <button
+          type="button"
+          onClick={() => { setUseRecovery((v) => !v); setValue(""); setError(""); }}
+          className="text-brand-600 hover:underline"
+        >
+          {useRecovery ? "Use authenticator code instead" : "Use a recovery code instead"}
+        </button>
+      </div>
+    </form>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Step 1 — Email + password
+// ---------------------------------------------------------------------------
 export default function LoginForm() {
   const { login } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [errors, setErrors] = useState<FormErrors>({});
   const [isLoading, setIsLoading] = useState(false);
+  const [mfaToken, setMfaToken] = useState<string | null>(null);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -41,7 +124,8 @@ export default function LoginForm() {
     setErrors({});
     setIsLoading(true);
     try {
-      await login(email, password);
+      const result = await login(email, password);
+      if (result.status === "mfa_required") setMfaToken(result.mfaToken);
     } catch (err: unknown) {
       setErrors({
         general: err instanceof Error ? err.message : "Login failed.",
@@ -49,6 +133,10 @@ export default function LoginForm() {
     } finally {
       setIsLoading(false);
     }
+  }
+
+  if (mfaToken) {
+    return <MfaStep mfaToken={mfaToken} onBack={() => setMfaToken(null)} />;
   }
 
   return (

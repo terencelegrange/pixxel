@@ -29,7 +29,11 @@ export function clearStoredUser(): void {
 // HttpOnly cookie by the server (no manual header wiring needed in the
 // browser). The caller receives the user object; the cookie is automatic.
 // ---------------------------------------------------------------------------
-export async function loginUser(email: string, password: string): Promise<User> {
+export type LoginResult =
+  | { status: "ok"; user: User }
+  | { status: "mfa_required"; mfaToken: string };
+
+export async function loginUser(email: string, password: string): Promise<LoginResult> {
   const res = await fetch("/api/auth/login", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -38,6 +42,24 @@ export async function loginUser(email: string, password: string): Promise<User> 
 
   const data = await res.json();
   if (!res.ok) throw new Error(data.error ?? "Login failed.");
+  if (data.mfaRequired) return { status: "mfa_required", mfaToken: data.mfaToken as string };
+  return { status: "ok", user: data.user as User };
+}
+
+// Completes login after loginUser() returned "mfa_required" — submits a
+// 6-digit TOTP code or a one-time recovery code.
+export async function verifyMfaChallenge(
+  mfaToken: string,
+  credential: { code: string } | { recoveryCode: string }
+): Promise<User> {
+  const res = await fetch("/api/auth/mfa/challenge", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ mfaToken, ...credential }),
+  });
+
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error ?? "Verification failed.");
   return data.user as User;
 }
 

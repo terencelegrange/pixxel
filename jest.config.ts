@@ -32,7 +32,13 @@ const config: Config = {
       // Windows, silently matching zero files. testRegex applies directly
       // to the normalized path string and isn't affected.
       testRegex: '__tests__/unit/.*\\.test\\.ts$',
-      transform: { '^.+\\.tsx?$': ['ts-jest', { tsconfig: 'tsconfig.test.json' }] },
+      // otplib's base32 plugin depends on @scure/base and @noble/hashes,
+      // which ship ESM-only (no CJS build — ".type": "module", top-level
+      // `export`). Jest's CJS runtime can't load that raw, so these need to
+      // go through the transform too instead of being skipped like the rest
+      // of node_modules.
+      transform: { '^.+\\.[tj]sx?$': ['ts-jest', { tsconfig: 'tsconfig.test.json' }] },
+      transformIgnorePatterns: ['/node_modules/(?!(@scure|@noble|otplib|@otplib)/)'],
       moduleNameMapper: { '^@/(.*)$': '<rootDir>/$1' },
       // Avoid haste-map collisions with the standalone build's copied
       // package.json (and coverage output) when .next/ exists on disk.

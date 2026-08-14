@@ -29,6 +29,9 @@ export const users = sqliteTable("users", {
   role: text("role").notNull().default("Member"),
   roleId: text("role_id"),
   tokenVersion: integer("token_version").notNull().default(1),
+  mfaEnabled: integer("mfa_enabled", { mode: "boolean" }).notNull().default(false),
+  mfaSecret: text("mfa_secret"),
+  mfaPendingSecret: text("mfa_pending_secret"),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 });
@@ -481,4 +484,14 @@ export const assetRisks = sqliteTable("asset_risks", {
   updatedAt: updatedAt(),
 }, (t) => [
   index("idx_asset_risks_asset").on(t.assetId),
+]);
+
+export const userMfaRecoveryCodes = sqliteTable("user_mfa_recovery_codes", {
+  id: text("id").primaryKey(),
+  userId: text("user_id").notNull(),
+  codeHash: text("code_hash").notNull(),
+  usedAt: text("used_at"),
+  createdAt: createdAt(),
+}, (t) => [
+  index("idx_user_mfa_recovery_codes_user").on(t.userId),
 ]);
