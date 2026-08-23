@@ -6,6 +6,15 @@ A web-based platform for registering and managing enterprise applications, track
 
 ---
 
+## Backlog workflow
+
+Feature/bug work for this project is driven through a tracker board, not
+ad hoc requests — see [`docs/workflow/AGENT_BACKLOG_WORKFLOW.md`](docs/workflow/AGENT_BACKLOG_WORKFLOW.md)
+for the full process (roles, board columns, deploy gate, project-specific
+conventions) before elaborating, building, or shipping a card.
+
+---
+
 ## Development Environment
 
 - **Runtime:** Node.js v25.8.1 via Homebrew (`/opt/homebrew/Cellar/node/25.8.1_1/bin/node`)
