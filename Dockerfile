@@ -8,12 +8,17 @@ RUN apk add --no-cache libc6-compat
 
 WORKDIR /app
 
+# Defaults to the public registry so this Dockerfile still builds anywhere;
+# Jenkins passes --build-arg NPM_REGISTRY=http://192.168.100.223:4873 to
+# route through the local Verdaccio mirror on that network instead.
+ARG NPM_REGISTRY=https://registry.npmjs.org/
+
 COPY package.json package-lock.json* ./
 # Longer timeout/retry tolerance than npm's defaults (5min timeout, 2 retries)
 # — the arm64 leg of a multi-arch buildx build runs under QEMU emulation,
 # which is CPU-throttled enough that ordinary registry fetches occasionally
 # exceed npm's default fetch-timeout even though the network itself is fine.
-RUN npm ci --fetch-timeout=600000 --fetch-retries=8 --fetch-retry-maxtimeout=120000
+RUN npm ci --registry=${NPM_REGISTRY} --fetch-timeout=600000 --fetch-retries=8 --fetch-retry-maxtimeout=120000
 
 # ─── Stage 2: Build the application ───────────────────────────────────────────
 FROM node:22-alpine AS builder
