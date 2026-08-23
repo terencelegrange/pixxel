@@ -9,7 +9,11 @@ RUN apk add --no-cache libc6-compat
 WORKDIR /app
 
 COPY package.json package-lock.json* ./
-RUN npm ci
+# Longer timeout/retry tolerance than npm's defaults (5min timeout, 2 retries)
+# — the arm64 leg of a multi-arch buildx build runs under QEMU emulation,
+# which is CPU-throttled enough that ordinary registry fetches occasionally
+# exceed npm's default fetch-timeout even though the network itself is fine.
+RUN npm ci --fetch-timeout=600000 --fetch-retries=8 --fetch-retry-maxtimeout=120000
 
 # ─── Stage 2: Build the application ───────────────────────────────────────────
 FROM node:22-alpine AS builder
