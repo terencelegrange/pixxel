@@ -33,6 +33,19 @@ pipeline {
             }
         }
 
+        stage('Setup: Buildx (multi-arch)') {
+            steps {
+                sh '''
+                    # Registers QEMU emulators so this (amd64) agent can build
+                    # an arm64 layer too, not just its native platform.
+                    docker run --rm --privileged tonistiigi/binfmt --install all
+
+                    docker buildx create --name pixxel-builder --use || docker buildx use pixxel-builder
+                    docker buildx inspect --bootstrap
+                '''
+            }
+        }
+
         stage('Checkout') {
             steps {
                 checkout scm
@@ -68,15 +81,12 @@ pipeline {
             }
         }
 
-        stage('Build Image') {
+        stage('Build & Push (multi-arch)') {
             steps {
-                sh "docker build -t ${IMAGE_NAME}:${IMAGE_VERSION} ."
-                sh "docker tag ${IMAGE_NAME}:${IMAGE_VERSION} ${IMAGE_NAME}:latest"
-            }
-        }
-
-        stage('Push to Docker Hub') {
-            steps {
+                // buildx can't produce a multi-platform image as a local
+                // `docker images` entry — pushing directly to the registry
+                // in the same command is the only way to end up with one
+                // manifest list covering both platforms.
                 withCredentials([usernamePassword(
                     credentialsId: DOCKERHUB_CREDENTIALS_ID,
                     usernameVariable: 'DOCKERHUB_USER',
@@ -84,8 +94,11 @@ pipeline {
                 )]) {
                     sh '''
                         echo "$DOCKERHUB_PASS" | docker login -u "$DOCKERHUB_USER" --password-stdin
-                        docker push ${IMAGE_NAME}:${IMAGE_VERSION}
-                        docker push ${IMAGE_NAME}:latest
+                        docker buildx build \
+                            --platform linux/amd64,linux/arm64 \
+                            -t ${IMAGE_NAME}:${IMAGE_VERSION} \
+                            -t ${IMAGE_NAME}:latest \
+                            --push .
                         docker logout
                     '''
                 }
