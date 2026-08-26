@@ -34,6 +34,12 @@ describe('GET /api/plantuml', () => {
     const res = await GET(new NextRequest('http://localhost/api/plantuml'))
     expect(await res.json()).toEqual({ diagrams: [{ id: 'd1', name: 'Diagram One' }] })
   })
+
+  it('returns 500 when the DB throws', async () => {
+    mockExecute.mockRejectedValueOnce(new Error('db error'))
+    const res = await GET(new NextRequest('http://localhost/api/plantuml'))
+    expect(res.status).toBe(500)
+  })
 })
 
 describe('POST /api/plantuml', () => {
@@ -59,5 +65,14 @@ describe('POST /api/plantuml', () => {
       oldValues: null,
       newValues: { name: 'New Diagram', description: 'a desc' },
     })
+  })
+
+  it('returns 500 when the DB throws', async () => {
+    mockExecute.mockRejectedValueOnce(new Error('db error'))
+    const req = new NextRequest('http://localhost/api/plantuml', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'New Diagram' }),
+    })
+    const res = await POST(req)
+    expect(res.status).toBe(500)
   })
 })

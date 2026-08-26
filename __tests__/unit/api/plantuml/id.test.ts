@@ -45,6 +45,12 @@ describe('GET /api/plantuml/[id]', () => {
     const res = await GET(new NextRequest('http://localhost/api/plantuml/diagram-1'), params)
     expect(await res.json()).toEqual({ diagram: { id: 'diagram-1', name: 'My Diagram' }, latestVersion: { id: 'v1', version_number: 2 } })
   })
+
+  it('returns 500 when the DB throws', async () => {
+    mockExecute.mockRejectedValueOnce(new Error('db error'))
+    const res = await GET(new NextRequest('http://localhost/api/plantuml/diagram-1'), params)
+    expect(res.status).toBe(500)
+  })
 })
 
 describe('PUT /api/plantuml/[id]', () => {
@@ -83,6 +89,13 @@ describe('PUT /api/plantuml/[id]', () => {
       newValues: { name: 'Renamed', description: 'new desc' },
     })
   })
+
+  it('returns 500 when the DB throws', async () => {
+    mockExecute.mockRejectedValueOnce(new Error('db error'))
+    const req = new NextRequest('http://localhost/api/plantuml/diagram-1', { method: 'PUT', body: JSON.stringify({ name: 'x' }) })
+    const res = await PUT(req, params)
+    expect(res.status).toBe(500)
+  })
 })
 
 describe('DELETE /api/plantuml/[id]', () => {
@@ -113,5 +126,11 @@ describe('DELETE /api/plantuml/[id]', () => {
       performedById: 'u1', performedByName: 'Test User',
       oldValues: { name: 'My Diagram', description: 'a desc' }, newValues: null,
     })
+  })
+
+  it('returns 500 when the DB throws', async () => {
+    mockExecute.mockRejectedValueOnce(new Error('db error'))
+    const res = await DELETE(new NextRequest('http://localhost/api/plantuml/diagram-1', { method: 'DELETE' }), params)
+    expect(res.status).toBe(500)
   })
 })
