@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getDb, setupDatabase } from "@/lib/db";
 import mysql from "mysql2/promise";
 import { randomUUID } from "crypto";
+import { writeAudit } from "@/lib/audit";
 import { requireUser } from "@/lib/require-user";
 
 export async function GET(req: NextRequest) {
@@ -40,5 +41,13 @@ export async function POST(req: NextRequest) {
     "INSERT INTO plantuml_versions (id, diagram_id, version_number, source, created_by_id, created_by_name) VALUES (?, ?, 1, ?, ?, ?)",
     [versionId, id, defaultSource, user.id, user.name]
   );
+
+  await writeAudit({
+    tableName: "plantuml_diagrams", recordId: id, action: "CREATE",
+    performedById: user.id, performedByName: user.name,
+    oldValues: null,
+    newValues: { name, description: description ?? null },
+  });
+
   return NextResponse.json({ id, versionNumber: 1 }, { status: 201 });
 }
