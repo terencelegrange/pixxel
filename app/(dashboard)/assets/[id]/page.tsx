@@ -206,6 +206,82 @@ function AuditRow({ entry }: { entry: AuditLog }) {
 const DEP_NODE_TYPES: NodeTypes = { dependencyNode: DependencyNode };
 const DEP_EDGE_TYPES: EdgeTypes = { dependencyEdge: DependencyEdge };
 
+// ── Dependency mini-map builder — a pure, module-level function (not a
+// per-render closure) so it has a stable reference for useCallback below,
+// without needing to be listed as a dependency.
+function computeDepMiniMap(
+  downstream: AssetDependency[],
+  upstream: AssetDependency[],
+  currentId: string,
+  currentAsset: { name: string; icon: string | null; shortCode: string | null; lifecycleStatus: string; domainName: string | null }
+): { nodes: Node<DependencyNodeData>[]; edges: Edge<DependencyEdgeData>[] } {
+  const miniNodes: Node<DependencyNodeData>[] = [];
+  const miniEdges: Edge<DependencyEdgeData>[] = [];
+  const seenIds = new Set<string>();
+  const upstreamX = -240;
+  const centerX = 0;
+  const downstreamX = 240;
+
+  miniNodes.push({
+    id: currentId,
+    type: "dependencyNode",
+    position: { x: centerX - 95, y: 0 },
+    data: {
+      name: currentAsset.name,
+      shortCode: currentAsset.shortCode,
+      icon: currentAsset.icon,
+      domain: currentAsset.domainName ?? null,
+      lifecycleStatus: currentAsset.lifecycleStatus,
+      isCenter: true,
+    },
+  });
+  seenIds.add(currentId);
+
+  const downstreamUniq = downstream.filter((d) => {
+    const otherId = d.sourceAssetId === currentId ? d.targetAssetId : d.sourceAssetId;
+    return !seenIds.has(otherId);
+  });
+  downstreamUniq.forEach((d, i) => {
+    const otherId = d.sourceAssetId === currentId ? d.targetAssetId : d.sourceAssetId;
+    const otherName = d.sourceAssetId === currentId ? d.targetAssetName : d.sourceAssetName;
+    const otherIcon = d.sourceAssetId === currentId ? d.targetAssetIcon : d.sourceAssetIcon;
+    const otherDomain = d.sourceAssetId === currentId ? d.targetAssetDomain : d.sourceAssetDomain;
+    seenIds.add(otherId);
+    miniNodes.push({
+      id: otherId, type: "dependencyNode",
+      position: { x: downstreamX - 95, y: i * 80 - ((downstreamUniq.length - 1) * 80) / 2 },
+      data: { name: otherName, shortCode: null, icon: otherIcon, domain: otherDomain, lifecycleStatus: null },
+    });
+    miniEdges.push({
+      id: `down-${d.id}`, source: currentId, target: otherId, type: "dependencyEdge",
+      data: { type: d.type, direction: d.direction, notes: d.notes, dependencyId: d.id },
+    });
+  });
+
+  const upstreamUniq = upstream.filter((d) => {
+    const otherId = d.targetAssetId === currentId ? d.sourceAssetId : d.targetAssetId;
+    return !seenIds.has(otherId);
+  });
+  upstreamUniq.forEach((d, i) => {
+    const otherId = d.targetAssetId === currentId ? d.sourceAssetId : d.targetAssetId;
+    const otherName = d.targetAssetId === currentId ? d.sourceAssetName : d.targetAssetName;
+    const otherIcon = d.targetAssetId === currentId ? d.sourceAssetIcon : d.targetAssetIcon;
+    const otherDomain = d.targetAssetId === currentId ? d.sourceAssetDomain : d.targetAssetDomain;
+    seenIds.add(otherId);
+    miniNodes.push({
+      id: otherId, type: "dependencyNode",
+      position: { x: upstreamX - 95, y: i * 80 - ((upstreamUniq.length - 1) * 80) / 2 },
+      data: { name: otherName, shortCode: null, icon: otherIcon, domain: otherDomain, lifecycleStatus: null },
+    });
+    miniEdges.push({
+      id: `up-${d.id}`, source: otherId, target: currentId, type: "dependencyEdge",
+      data: { type: d.type, direction: d.direction, notes: d.notes, dependencyId: d.id },
+    });
+  });
+
+  return { nodes: miniNodes, edges: miniEdges };
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Page
 // ─────────────────────────────────────────────────────────────────────────────
@@ -260,6 +336,20 @@ export default function AssetDetailPage() {
   const [isPushing, setIsPushing] = useState(false);
   const [pushResult, setPushResult] = useState<{ url: string; title: string } | null>(null);
   const [pushError, setPushError] = useState<string | null>(null);
+
+  // ── Dependency mini-map builder — stable identity via useCallback (the
+  // actual computation is the pure, module-level computeDepMiniMap above)
+  // so fetchAll (below) doesn't get a new function reference every render.
+  const buildDepMiniMap = useCallback((
+    downstream: AssetDependency[],
+    upstream: AssetDependency[],
+    currentId: string,
+    currentAsset: { name: string; icon: string | null; shortCode: string | null; lifecycleStatus: string; domainName: string | null }
+  ) => {
+    const { nodes, edges } = computeDepMiniMap(downstream, upstream, currentId, currentAsset);
+    setDepNodes(nodes);
+    setDepEdges(edges);
+  }, [setDepNodes, setDepEdges]);
 
   // ── Data loading ──────────────────────────────────────────────────────────
   const fetchAll = useCallback(async () => {
@@ -333,7 +423,7 @@ export default function AssetDetailPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [id]);
+  }, [id, buildDepMiniMap]);
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
 
@@ -354,81 +444,6 @@ export default function AssetDetailPage() {
         : null;
     return heroEntry ? [heroEntry, ...nonHero] : assetDiagrams;
   }, [asset, assetDiagrams, diagrams]);
-
-  // ── Dependency mini-map builder ───────────────────────────────────────────
-  function buildDepMiniMap(
-    downstream: AssetDependency[],
-    upstream: AssetDependency[],
-    currentId: string,
-    currentAsset: { name: string; icon: string | null; shortCode: string | null; lifecycleStatus: string; domainName: string | null }
-  ) {
-    const miniNodes: Node<DependencyNodeData>[] = [];
-    const miniEdges: Edge<DependencyEdgeData>[] = [];
-    const seenIds = new Set<string>();
-    const upstreamX = -240;
-    const centerX = 0;
-    const downstreamX = 240;
-
-    miniNodes.push({
-      id: currentId,
-      type: "dependencyNode",
-      position: { x: centerX - 95, y: 0 },
-      data: {
-        name: currentAsset.name,
-        shortCode: currentAsset.shortCode,
-        icon: currentAsset.icon,
-        domain: currentAsset.domainName ?? null,
-        lifecycleStatus: currentAsset.lifecycleStatus,
-        isCenter: true,
-      },
-    });
-    seenIds.add(currentId);
-
-    const downstreamUniq = downstream.filter((d) => {
-      const otherId = d.sourceAssetId === currentId ? d.targetAssetId : d.sourceAssetId;
-      return !seenIds.has(otherId);
-    });
-    downstreamUniq.forEach((d, i) => {
-      const otherId = d.sourceAssetId === currentId ? d.targetAssetId : d.sourceAssetId;
-      const otherName = d.sourceAssetId === currentId ? d.targetAssetName : d.sourceAssetName;
-      const otherIcon = d.sourceAssetId === currentId ? d.targetAssetIcon : d.sourceAssetIcon;
-      const otherDomain = d.sourceAssetId === currentId ? d.targetAssetDomain : d.sourceAssetDomain;
-      seenIds.add(otherId);
-      miniNodes.push({
-        id: otherId, type: "dependencyNode",
-        position: { x: downstreamX - 95, y: i * 80 - ((downstreamUniq.length - 1) * 80) / 2 },
-        data: { name: otherName, shortCode: null, icon: otherIcon, domain: otherDomain, lifecycleStatus: null },
-      });
-      miniEdges.push({
-        id: `down-${d.id}`, source: currentId, target: otherId, type: "dependencyEdge",
-        data: { type: d.type, direction: d.direction, notes: d.notes, dependencyId: d.id },
-      });
-    });
-
-    const upstreamUniq = upstream.filter((d) => {
-      const otherId = d.targetAssetId === currentId ? d.sourceAssetId : d.targetAssetId;
-      return !seenIds.has(otherId);
-    });
-    upstreamUniq.forEach((d, i) => {
-      const otherId = d.targetAssetId === currentId ? d.sourceAssetId : d.targetAssetId;
-      const otherName = d.targetAssetId === currentId ? d.sourceAssetName : d.targetAssetName;
-      const otherIcon = d.targetAssetId === currentId ? d.sourceAssetIcon : d.targetAssetIcon;
-      const otherDomain = d.targetAssetId === currentId ? d.sourceAssetDomain : d.targetAssetDomain;
-      seenIds.add(otherId);
-      miniNodes.push({
-        id: otherId, type: "dependencyNode",
-        position: { x: upstreamX - 95, y: i * 80 - ((upstreamUniq.length - 1) * 80) / 2 },
-        data: { name: otherName, shortCode: null, icon: otherIcon, domain: otherDomain, lifecycleStatus: null },
-      });
-      miniEdges.push({
-        id: `up-${d.id}`, source: otherId, target: currentId, type: "dependencyEdge",
-        data: { type: d.type, direction: d.direction, notes: d.notes, dependencyId: d.id },
-      });
-    });
-
-    setDepNodes(miniNodes);
-    setDepEdges(miniEdges);
-  }
 
   // ── Delete dependency ─────────────────────────────────────────────────────
   async function handleDeleteDep(depId: string) {

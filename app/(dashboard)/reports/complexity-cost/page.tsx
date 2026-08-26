@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import Link from "next/link";
 import {
-  AlertTriangle, Filter, X, TrendingDown, DollarSign,
+  AlertTriangle, Filter, X, TrendingDown,
   ArrowUpDown, ArrowUp, ArrowDown, Target,
 } from "lucide-react";
 import { Button } from "@/components/ui/Button";

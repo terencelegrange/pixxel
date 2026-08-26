@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useCallback, useRef } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Save, Download, Loader2, Check, History, RotateCcw, Layers, Trash2, Tag } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
@@ -50,7 +50,6 @@ interface DiagramDetail {
 
 export default function PlantUMLEditorPage() {
   const { id } = useParams<{ id: string }>();
-  const router = useRouter();
   const { user, canWrite } = useAuth();
 
   const [diagram, setDiagram] = useState<DiagramDetail | null>(null);

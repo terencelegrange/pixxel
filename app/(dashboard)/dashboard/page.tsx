@@ -50,15 +50,6 @@ function useChartTheme(isDark: boolean) {
   };
 }
 
-// ── Stat icon background — light colour needs a dark equivalent ───────────────
-const ICON_BG_DARK: Record<string, string> = {
-  "bg-violet-50":  "dark:bg-violet-900/30",
-  "bg-emerald-50": "dark:bg-emerald-900/30",
-  "bg-amber-50":   "dark:bg-amber-900/30",
-  "bg-blue-50":    "dark:bg-blue-900/30",
-  "bg-brand-50":   "dark:bg-brand-900/30",
-};
-
 export default function DashboardPage() {
   const { theme } = useTheme();
   const isDark = theme === "dark";

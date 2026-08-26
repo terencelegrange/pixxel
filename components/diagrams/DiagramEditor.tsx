@@ -124,7 +124,7 @@ export default function DiagramEditor({
         files: {},
       };
     }
-  }, [initialContent]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [initialContent]);
 
   // ── Load assets ───────────────────────────────────────────────────────────
   useEffect(() => {

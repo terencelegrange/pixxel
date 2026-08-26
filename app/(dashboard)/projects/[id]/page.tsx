@@ -330,7 +330,7 @@ function AssetRow({
 // ---------------------------------------------------------------------------
 export default function ProjectDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const { user, canWrite } = useAuth();
+  const { canWrite } = useAuth();
 
   const [project, setProject] = useState<Project | null>(null);
   const [assets, setAssets] = useState<ProjectAsset[]>([]);
