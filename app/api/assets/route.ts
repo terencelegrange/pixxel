@@ -7,9 +7,8 @@ import { insertIgnoreSql } from "@/lib/sql-compat";
 import { writeAudit } from "@/lib/audit";
 import { Asset, AssetCategory, AssetType, LifecycleStatus } from "@/types";
 import { requireUser } from "@/lib/require-user";
-
-const VALID_TYPES: AssetType[] = ["SaaS", "On-Premise", "Hybrid", "Cloud", "Open Source", "Other"];
-const VALID_STATUSES: LifecycleStatus[] = ["Proposed", "Approved", "In Development", "Production", "Sunset", "Retired"];
+import { validate } from "@/lib/validate";
+import { CreateAssetSchema } from "@/lib/schemas";
 
 function rowToAsset(row: mysql.RowDataPacket): Asset {
   const toISO = (v: unknown) => v instanceof Date ? v.toISOString() : v ? String(v) : null;
@@ -138,20 +137,16 @@ export async function POST(req: NextRequest) {
   const { user } = auth;
   try {
     await setupDatabase();
-    const body = await req.json();
+
+    const result = await validate(req, CreateAssetSchema);
+    if (!result.ok) return result.response;
     const {
       name, shortCode, description, type, category, icon, lifecycleStatus,
       departmentIds, architectIds, capabilityIds, tierId, strategyId, complexityId, domainId, vendorId, businessOwner, technicalOwner,
       slaAvailability, slaRto, slaRpo,
       goLiveDate, retirementDate, appUrl, docUrl, notes,
       heroDiagramId,
-    } = body;
-
-    if (!name?.trim()) return NextResponse.json({ error: "Asset name is required." }, { status: 400 });
-    if (!Array.isArray(departmentIds) || departmentIds.length === 0)
-      return NextResponse.json({ error: "At least one department is required." }, { status: 400 });
-    if (!VALID_TYPES.includes(type)) return NextResponse.json({ error: "Invalid asset type." }, { status: 400 });
-    if (!VALID_STATUSES.includes(lifecycleStatus)) return NextResponse.json({ error: "Invalid lifecycle status." }, { status: 400 });
+    } = result.data;
 
     const id = randomUUID();
 

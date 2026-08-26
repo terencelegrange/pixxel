@@ -4,11 +4,11 @@ import { randomUUID } from "crypto";
 import mysql from "mysql2/promise";
 import { getDb, setupDatabase } from "@/lib/db";
 import { writeAudit } from "@/lib/audit";
-import { Contract, ContractStatus } from "@/types";
+import { Contract } from "@/types";
 import { requireUser } from "@/lib/require-user";
 import { isExpiringWithin } from "@/lib/contracts";
-
-const VALID_STATUSES: ContractStatus[] = ["Active", "Terminated"];
+import { validate } from "@/lib/validate";
+import { CreateContractSchema } from "@/lib/schemas";
 
 function rowToContract(row: mysql.RowDataPacket): Contract {
   const toISO = (v: unknown) => (v instanceof Date ? v.toISOString() : v ? String(v) : null);
@@ -83,18 +83,13 @@ export async function POST(req: NextRequest) {
   const { user } = auth;
   try {
     await setupDatabase();
-    const body = await req.json();
+
+    const result = await validate(req, CreateContractSchema);
+    if (!result.ok) return result.response;
     const {
       vendorId, assetId, title, value, startDate, endDate,
       noticePeriodDays, autoRenews, owner, status, docUrl, notes,
-    } = body;
-
-    if (!title?.trim()) return NextResponse.json({ error: "Contract title is required." }, { status: 400 });
-
-    const resolvedStatus: ContractStatus = status ?? "Active";
-    if (!VALID_STATUSES.includes(resolvedStatus)) {
-      return NextResponse.json({ error: "Invalid contract status." }, { status: 400 });
-    }
+    } = result.data;
 
     const db = getDb();
     const id = randomUUID();
@@ -102,14 +97,14 @@ export async function POST(req: NextRequest) {
     const values = {
       vendorId: vendorId || null,
       assetId: assetId || null,
-      title: title.trim(),
-      value: value != null && value !== "" ? Number(value) : null,
+      title,
+      value,
       startDate: startDate || null,
       endDate: endDate || null,
-      noticePeriodDays: noticePeriodDays != null && noticePeriodDays !== "" ? Number(noticePeriodDays) : null,
+      noticePeriodDays,
       autoRenews: !!autoRenews,
       owner: owner?.trim() || null,
-      status: resolvedStatus,
+      status,
       docUrl: docUrl?.trim() || null,
       notes: notes?.trim() || null,
     };
