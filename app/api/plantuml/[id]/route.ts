@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getDb, setupDatabase } from "@/lib/db";
+import { getDb, setupDatabase, withTransaction } from "@/lib/db";
 import mysql from "mysql2/promise";
 import { requireUser } from "@/lib/require-user";
 
@@ -35,8 +35,10 @@ export async function DELETE(req: NextRequest, props: { params: Promise<{ id: st
   const auth = await requireUser(req, ["Admin", "Member"]);
   if (!auth.ok) return auth.response;
   await setupDatabase();
-  const db = getDb();
-  await db.execute("DELETE FROM plantuml_versions WHERE diagram_id = ?", [params.id]);
-  await db.execute("DELETE FROM plantuml_diagrams WHERE id = ?", [params.id]);
+  await withTransaction(async (tx) => {
+    await tx.execute("DELETE FROM plantuml_diagram_assets WHERE diagram_id = ?", [params.id]);
+    await tx.execute("DELETE FROM plantuml_versions WHERE diagram_id = ?", [params.id]);
+    await tx.execute("DELETE FROM plantuml_diagrams WHERE id = ?", [params.id]);
+  });
   return NextResponse.json({ ok: true });
 }
