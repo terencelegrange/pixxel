@@ -3,8 +3,13 @@
  *
  * Encrypts TOTP secrets at rest. Unlike passwords, a TOTP secret must be
  * recoverable (HMAC-ing a code requires the raw secret), so it can't be
- * hashed — it's encrypted instead, with a key derived from the existing
- * JWT_SECRET so no new required env var is introduced.
+ * hashed — it's encrypted instead.
+ *
+ * Key source: MFA_ENCRYPTION_KEY if set, otherwise derived from JWT_SECRET
+ * (so no new required env var for existing installs). Keeping these two
+ * secrets independent means rotating JWT_SECRET doesn't silently make every
+ * user's MFA secret undecryptable — set MFA_ENCRYPTION_KEY once and JWT
+ * rotation becomes safe to do without a mass MFA lockout.
  */
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from "crypto";
 
@@ -12,7 +17,7 @@ const ALGORITHM = "aes-256-gcm";
 const IV_LENGTH = 12;
 
 function getKey(): Buffer {
-  const secret = process.env.JWT_SECRET!;
+  const secret = process.env.MFA_ENCRYPTION_KEY ?? process.env.JWT_SECRET!;
   return createHash("sha256").update(`${secret}:mfa-secret-key`).digest();
 }
 

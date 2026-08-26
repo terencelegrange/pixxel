@@ -33,4 +33,34 @@ describe('mfa-crypto', () => {
     void ciphertext
     expect(() => decryptSecret(tampered)).toThrow()
   })
+
+  describe('MFA_ENCRYPTION_KEY', () => {
+    const ORIGINAL_MFA_KEY = process.env.MFA_ENCRYPTION_KEY
+
+    afterEach(() => {
+      process.env.MFA_ENCRYPTION_KEY = ORIGINAL_MFA_KEY
+    })
+
+    it('uses MFA_ENCRYPTION_KEY over JWT_SECRET when set, and still round-trips', () => {
+      process.env.MFA_ENCRYPTION_KEY = 'b'.repeat(32)
+      const plaintext = 'JBSWY3DPEHPK3PXP'
+      const encrypted = encryptSecret(plaintext)
+      expect(decryptSecret(encrypted)).toBe(plaintext)
+    })
+
+    it('produces ciphertext undecryptable by the JWT_SECRET-derived key alone (keys are actually independent)', () => {
+      process.env.MFA_ENCRYPTION_KEY = 'b'.repeat(32)
+      const encryptedWithMfaKey = encryptSecret('JBSWY3DPEHPK3PXP')
+
+      delete process.env.MFA_ENCRYPTION_KEY
+      expect(() => decryptSecret(encryptedWithMfaKey)).toThrow()
+    })
+
+    it('falls back to the JWT_SECRET derivation, unchanged, when MFA_ENCRYPTION_KEY is unset', () => {
+      delete process.env.MFA_ENCRYPTION_KEY
+      const plaintext = 'JBSWY3DPEHPK3PXP'
+      const encrypted = encryptSecret(plaintext)
+      expect(decryptSecret(encrypted)).toBe(plaintext)
+    })
+  })
 })
