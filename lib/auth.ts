@@ -83,3 +83,20 @@ export async function registerUser(
 export async function logoutUser(): Promise<void> {
   await fetch("/api/auth/logout", { method: "POST" }).catch(() => {});
 }
+
+// Verifies the current session against the server — returns the fresh user
+// if the authToken cookie is still valid, or null if it's missing/expired/
+// revoked (a normal outcome, not an error: an expired session isn't a bug).
+// Returns "unknown" on a network error, distinct from null, so callers can
+// choose to keep trusting a locally-stored user through a transient blip
+// rather than treating it the same as a confirmed logged-out state.
+export async function fetchCurrentUser(): Promise<User | null | "unknown"> {
+  try {
+    const res = await fetch("/api/auth/me");
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data.user as User;
+  } catch {
+    return "unknown";
+  }
+}

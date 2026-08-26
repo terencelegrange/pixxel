@@ -4,7 +4,7 @@
 
 global.fetch = jest.fn()
 
-import { getStoredUser, storeUser, clearStoredUser, loginUser, registerUser, verifyMfaChallenge } from '@/lib/auth'
+import { getStoredUser, storeUser, clearStoredUser, loginUser, registerUser, verifyMfaChallenge, fetchCurrentUser } from '@/lib/auth'
 import { User } from '@/types'
 
 const mockUser: User = {
@@ -129,5 +129,29 @@ describe('registerUser', () => {
       json: async () => ({ error: 'Email already exists.' }),
     })
     await expect(registerUser('Jane', 'jane@example.com', 'password123')).rejects.toThrow('Email already exists.')
+  })
+})
+
+describe('fetchCurrentUser', () => {
+  it('returns the user when the session is valid', async () => {
+    ;(fetch as jest.Mock).mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ user: mockUser }),
+    })
+    const result = await fetchCurrentUser()
+    expect(fetch).toHaveBeenCalledWith('/api/auth/me')
+    expect(result).toEqual(mockUser)
+  })
+
+  it('returns null (not an error) when the session is missing/expired/revoked', async () => {
+    ;(fetch as jest.Mock).mockResolvedValueOnce({ ok: false })
+    const result = await fetchCurrentUser()
+    expect(result).toBeNull()
+  })
+
+  it('returns "unknown" on a network error, distinct from a confirmed logged-out state', async () => {
+    ;(fetch as jest.Mock).mockRejectedValueOnce(new Error('network down'))
+    const result = await fetchCurrentUser()
+    expect(result).toBe('unknown')
   })
 })

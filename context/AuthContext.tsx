@@ -18,6 +18,7 @@ import {
   registerUser,
   logoutUser,
   verifyMfaChallenge,
+  fetchCurrentUser,
   LoginResult,
 } from "@/lib/auth";
 
@@ -50,11 +51,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
 
-  // Rehydrate from localStorage on mount
+  // Rehydrate from localStorage on mount, then verify the session against
+  // the server — a stored user alone doesn't mean the session is still
+  // valid (the authToken cookie may have expired, or token_version may
+  // have been bumped by a role change or MFA disable elsewhere).
   useEffect(() => {
     const stored = getStoredUser();
     if (stored) setUser(stored);
-    setIsLoading(false);
+
+    fetchCurrentUser().then((result) => {
+      if (result === "unknown") {
+        // Network error: keep whatever was in localStorage rather than
+        // logging the user out over a transient connectivity issue.
+      } else if (result === null) {
+        clearStoredUser();
+        setUser(null);
+      } else {
+        storeUser(result);
+        setUser(result);
+      }
+      setIsLoading(false);
+    });
   }, []);
 
   const login = useCallback(async (email: string, password: string): Promise<LoginResult> => {
