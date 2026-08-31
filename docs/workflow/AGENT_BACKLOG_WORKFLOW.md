@@ -76,11 +76,15 @@ template's trigger/resting pattern from there.
   port **3030**, not 3000 — 3000 is already used by Grafana on that host).
   Verify a deploy by hitting that health endpoint and reading the body,
   not just watching for a green Jenkins build.
-- **Docker Hub image job**: `pixxel-dockerhub` is a separate job that just
-  builds and pushes an image — it is not part of the deploy-to-`.228` path
-  and isn't a "trigger column" in this board. Check `PIXXEL-1` in the
-  tracker before touching it — it has a known OOM issue on the Jenkins
-  Proxmox build agent that may still need resolving.
+- **Docker Hub image publish**: `scripts/build-and-push.sh` is the primary
+  way to publish a multi-arch (`linux/amd64`+`linux/arm64`) image to
+  `tlgrange/pixxel` — run it from an Apple Silicon Mac with `docker login`
+  already done. It builds natively for arm64 and via Rosetta for amd64,
+  taking under 4 minutes total; the old Jenkins path
+  (`pixxel-dockerhub`, QEMU-emulated on an amd64 agent) took 3h25m for the
+  same multi-arch build and is kept only as a spare/fallback, not the
+  primary path — check `PIXXEL-1` in the tracker before touching it, it
+  has a known OOM issue on the Jenkins Proxmox build agent.
 - **Repo-specific gotchas**:
   - Next.js 15 dynamic route params are `Promise<{id: string}>`, must be
     `await`ed — `tsc --noEmit` does **not** catch a missed `await` here,
