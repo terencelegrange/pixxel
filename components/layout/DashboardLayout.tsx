@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { GetStartedProvider } from "@/context/GetStartedContext";
@@ -15,6 +15,7 @@ export default function DashboardLayout({
 }) {
   const { isAuthenticated, isLoading } = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
@@ -22,6 +23,20 @@ export default function DashboardLayout({
       router.replace("/login");
     }
   }, [isAuthenticated, isLoading, router]);
+
+  // Page-navigation logging (PIXXEL-2) — one log line per route change,
+  // only once actually authenticated (avoids logging the pre-redirect flash
+  // on /login etc.).
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    fetch("/api/log/pageview", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ path: pathname }),
+    }).catch(() => {
+      // best-effort only — a failed log call shouldn't affect navigation
+    });
+  }, [pathname, isAuthenticated]);
 
   if (isLoading) {
     return (

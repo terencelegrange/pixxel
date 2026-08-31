@@ -23,6 +23,7 @@ import mysql from "mysql2/promise";
 import { verifyJwt } from "@/lib/jwt";
 import { getDb } from "@/lib/db";
 import { isSecureRequest } from "@/lib/cookie-secure";
+import logger from "@/lib/logger";
 
 export interface AuthUser {
   id: string;
@@ -74,7 +75,28 @@ function isTrustedOrigin(req: NextRequest): boolean {
 }
 
 export async function requireUser(req: NextRequest, requiredRole?: string | string[]): Promise<RequireUserResult> {
+  const start = Date.now();
+  const method = req.method;
+  const path = req.nextUrl.pathname;
+
+  // Central request-logging point (PIXXEL-2): every route that calls
+  // requireUser() gets one structured log line here, with no per-route
+  // logging code. "durationMs" is requireUser()'s own execution time (the
+  // token_version DB round-trip on success), not full end-to-end request
+  // latency — requireUser() returns before the route does its actual work,
+  // so it can't know the eventual response status/timing. Still useful for
+  // traffic/auth visibility (who's hitting what, auth pass/fail rates,
+  // DB-lookup latency) — a "real" per-route status/duration would need each
+  // route to report back, which the acceptance criteria explicitly avoided.
+  function logRequest(outcome: string, status: number, user?: AuthUser) {
+    logger.info(
+      { method, path, status, outcome, durationMs: Date.now() - start, userId: user?.id, role: user?.role },
+      "api_request"
+    );
+  }
+
   if (!SAFE_METHODS.has(req.method) && !isTrustedOrigin(req)) {
+    logRequest("cross_site_blocked", 403);
     return {
       ok: false,
       response: NextResponse.json(
@@ -87,6 +109,7 @@ export async function requireUser(req: NextRequest, requiredRole?: string | stri
   const token = req.cookies.get("authToken")?.value;
 
   if (!token) {
+    logRequest("unauthenticated", 401);
     return {
       ok: false,
       response: NextResponse.json(
@@ -98,6 +121,7 @@ export async function requireUser(req: NextRequest, requiredRole?: string | stri
 
   const payload = verifyJwt(token);
   if (!payload) {
+    logRequest("session_expired", 401);
     return {
       ok: false,
       response: NextResponse.json(
@@ -113,6 +137,7 @@ export async function requireUser(req: NextRequest, requiredRole?: string | stri
   );
   const currentVersion = rows[0]?.token_version;
   if (currentVersion == null || currentVersion !== payload.tokenVersion) {
+    logRequest("session_expired", 401);
     return {
       ok: false,
       response: NextResponse.json(
@@ -131,6 +156,7 @@ export async function requireUser(req: NextRequest, requiredRole?: string | stri
 
   const allowedRoles = Array.isArray(requiredRole) ? requiredRole : requiredRole ? [requiredRole] : null;
   if (allowedRoles && !allowedRoles.includes(user.role)) {
+    logRequest("forbidden", 403, user);
     return {
       ok: false,
       response: NextResponse.json(
@@ -140,5 +166,6 @@ export async function requireUser(req: NextRequest, requiredRole?: string | stri
     };
   }
 
+  logRequest("ok", 200, user);
   return { ok: true, user };
 }

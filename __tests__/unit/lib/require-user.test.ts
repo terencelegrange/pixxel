@@ -6,10 +6,15 @@ jest.mock('@/lib/db', () => ({
 jest.mock('@/lib/jwt', () => ({
   verifyJwt: jest.fn(),
 }))
+jest.mock('@/lib/logger', () => ({
+  __esModule: true,
+  default: { info: jest.fn(), error: jest.fn() },
+}))
 
 import { getDb } from '@/lib/db'
 import { verifyJwt } from '@/lib/jwt'
 import { requireUser } from '@/lib/require-user'
+import logger from '@/lib/logger'
 
 const mockExecute = jest.fn()
 
@@ -179,5 +184,46 @@ describe('requireUser — basic auth checks', () => {
     const res = await requireUser(makeReq({ cookie: 'authToken=x' }), 'Admin')
     expect(res.ok).toBe(false)
     if (!res.ok) expect(res.response.status).toBe(403)
+  })
+})
+
+describe('requireUser — central request logging (PIXXEL-2)', () => {
+  it('logs a single "api_request" line on success, with user/role', async () => {
+    (verifyJwt as jest.Mock).mockReturnValue(payload)
+    mockExecute.mockResolvedValueOnce([[{ token_version: 3 }]])
+    await requireUser(makeReq({ cookie: 'authToken=x' }))
+    expect(logger.info).toHaveBeenCalledTimes(1)
+    expect(logger.info).toHaveBeenCalledWith(
+      expect.objectContaining({
+        method: 'GET', path: '/api/assets', status: 200, outcome: 'ok',
+        userId: 'u1', role: 'Member',
+      }),
+      'api_request'
+    )
+  })
+
+  it('logs with no user/role when there is no cookie', async () => {
+    await requireUser(makeReq())
+    expect(logger.info).toHaveBeenCalledWith(
+      expect.objectContaining({ status: 401, outcome: 'unauthenticated', userId: undefined, role: undefined }),
+      'api_request'
+    )
+  })
+
+  it('logs the forbidden outcome (with user/role, since auth succeeded before the role check) when the role does not match', async () => {
+    (verifyJwt as jest.Mock).mockReturnValue(payload)
+    mockExecute.mockResolvedValueOnce([[{ token_version: 3 }]])
+    await requireUser(makeReq({ cookie: 'authToken=x' }), 'Admin')
+    expect(logger.info).toHaveBeenCalledWith(
+      expect.objectContaining({ status: 403, outcome: 'forbidden', userId: 'u1', role: 'Member' }),
+      'api_request'
+    )
+  })
+
+  it('never logs more than once per call, regardless of which branch returns', async () => {
+    (verifyJwt as jest.Mock).mockReturnValue(payload)
+    mockExecute.mockResolvedValueOnce([[{ token_version: 4 }]]) // mismatched -> session_expired branch
+    await requireUser(makeReq({ cookie: 'authToken=x' }))
+    expect(logger.info).toHaveBeenCalledTimes(1)
   })
 })
