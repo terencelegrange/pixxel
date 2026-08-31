@@ -39,6 +39,8 @@ export const users = mysqlTable("users", {
   language: varchar("language", { length: 10 }).notNull().default("en"),
   notifyNewFeedback: boolean("notify_new_feedback").notNull().default(true),
   notifyContractsExpiring: boolean("notify_contracts_expiring").notNull().default(true),
+  tourEnabled: boolean("tour_enabled").notNull().default(true),
+  tourSeenAt: datetime("tour_seen_at"),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 });

@@ -3,6 +3,7 @@ import { NextRequest } from 'next/server'
 jest.mock('@/lib/db', () => ({
   setupDatabase: jest.fn().mockResolvedValue(undefined),
   getDb: jest.fn(),
+  getDbDialect: jest.fn().mockReturnValue('mysql'),
 }))
 jest.mock('@/lib/require-user', () => ({
   requireUser: jest.fn().mockReturnValue({ ok: true, user: { id: 'u1', name: 'Test User', email: 'test@example.com', role: 'Member' } }),
@@ -29,16 +30,21 @@ describe('GET /api/profile/preferences', () => {
   it('returns defaults when no row is found', async () => {
     mockExecute.mockResolvedValueOnce([[]])
     const res = await GET(new NextRequest('http://localhost/api/profile/preferences'))
-    expect(await res.json()).toEqual({ timezone: null, language: 'en', notifyNewFeedback: false, notifyContractsExpiring: false })
+    expect(await res.json()).toEqual({
+      timezone: null, language: 'en', notifyNewFeedback: false, notifyContractsExpiring: false,
+      tourEnabled: true, tourSeenAt: null,
+    })
   })
 
   it('returns the stored preferences', async () => {
     mockExecute.mockResolvedValueOnce([[{
       timezone: 'Australia/Sydney', language: 'en', notify_new_feedback: 1, notify_contracts_expiring: 0,
+      tour_enabled: 0, tour_seen_at: '2026-01-01T00:00:00.000Z',
     }]])
     const res = await GET(new NextRequest('http://localhost/api/profile/preferences'))
     expect(await res.json()).toEqual({
       timezone: 'Australia/Sydney', language: 'en', notifyNewFeedback: true, notifyContractsExpiring: false,
+      tourEnabled: false, tourSeenAt: '2026-01-01T00:00:00.000Z',
     })
   })
 })
@@ -72,6 +78,36 @@ describe('PUT /api/profile/preferences', () => {
     expect(mockExecute).toHaveBeenCalledWith(
       'UPDATE users SET notify_new_feedback = ?, notify_contracts_expiring = ? WHERE id = ?',
       [false, true, 'u1']
+    )
+  })
+
+  it('updates tourEnabled independently of other fields', async () => {
+    mockExecute.mockResolvedValueOnce([{}])
+    const res = await PUT(makeReq({ tourEnabled: false }))
+    expect(res.status).toBe(200)
+    expect(mockExecute).toHaveBeenCalledWith(
+      'UPDATE users SET tour_enabled = ? WHERE id = ?',
+      [false, 'u1']
+    )
+  })
+
+  it('marks the tour seen (server-set NOW(), never a client-supplied timestamp) when tourSeen: true', async () => {
+    mockExecute.mockResolvedValueOnce([{}])
+    const res = await PUT(makeReq({ tourSeen: true }))
+    expect(res.status).toBe(200)
+    expect(mockExecute).toHaveBeenCalledWith(
+      'UPDATE users SET tour_seen_at = NOW() WHERE id = ?',
+      ['u1']
+    )
+  })
+
+  it('clears the tour seen-at timestamp when tourSeen: false (Replay)', async () => {
+    mockExecute.mockResolvedValueOnce([{}])
+    const res = await PUT(makeReq({ tourSeen: false }))
+    expect(res.status).toBe(200)
+    expect(mockExecute).toHaveBeenCalledWith(
+      'UPDATE users SET tour_seen_at = NULL WHERE id = ?',
+      ['u1']
     )
   })
 })

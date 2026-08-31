@@ -36,6 +36,8 @@ export const users = sqliteTable("users", {
   language: text("language").notNull().default("en"),
   notifyNewFeedback: integer("notify_new_feedback", { mode: "boolean" }).notNull().default(true),
   notifyContractsExpiring: integer("notify_contracts_expiring", { mode: "boolean" }).notNull().default(true),
+  tourEnabled: integer("tour_enabled", { mode: "boolean" }).notNull().default(true),
+  tourSeenAt: text("tour_seen_at"),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 });

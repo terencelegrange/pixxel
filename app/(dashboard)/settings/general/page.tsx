@@ -5,8 +5,26 @@ import Link from "next/link";
 import { ArrowLeft, Check, Upload, X } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useBranding } from "@/context/BrandingContext";
+import { useTour } from "@/context/TourContext";
+import { navigationConfig } from "@/config/navigation";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
+
+function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      onClick={() => onChange(!checked)}
+      className={`relative h-6 w-11 flex-shrink-0 rounded-full transition-colors ${checked ? "bg-brand-600" : "bg-slate-200 dark:bg-slate-700"}`}
+    >
+      <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${checked ? "translate-x-5" : "translate-x-0.5"}`} />
+    </button>
+  );
+}
+
+const ALL_NAV_ITEMS = navigationConfig.flatMap((g) => g.items);
 
 const MAX_LOGO_BYTES = 200 * 1024; // 200KB — stored inline as a data URI, not a file upload
 
@@ -29,6 +47,7 @@ function getTimezones(): string[] {
 export default function GeneralSettingsPage() {
   const { user } = useAuth();
   const { refreshBranding } = useBranding();
+  const { startTour } = useTour();
   const isAdmin = user?.role === "Admin";
 
   // Branding (admin only)
@@ -42,9 +61,19 @@ export default function GeneralSettingsPage() {
   // Preferences (everyone)
   const [timezone, setTimezone] = useState("");
   const [language, setLanguage] = useState("en");
+  const [tourEnabled, setTourEnabled] = useState(true);
   const [prefsError, setPrefsError] = useState("");
   const [isSavingPrefs, setIsSavingPrefs] = useState(false);
   const [prefsSaved, setPrefsSaved] = useState(false);
+  const [replaySent, setReplaySent] = useState(false);
+
+  // Onboarding tour steps (admin only) — href -> 1-based order, only for
+  // included items. Populated from GET /api/tour, which already returns the
+  // admin's currently-configured steps in order.
+  const [tourStepOrder, setTourStepOrder] = useState<Record<string, string>>({});
+  const [tourStepsError, setTourStepsError] = useState("");
+  const [isSavingTourSteps, setIsSavingTourSteps] = useState(false);
+  const [tourStepsSaved, setTourStepsSaved] = useState(false);
 
   const [isLoading, setIsLoading] = useState(true);
   const timezones = useState(getTimezones)[0];
@@ -52,13 +81,19 @@ export default function GeneralSettingsPage() {
   useEffect(() => {
     async function load() {
       try {
-        const requests: Promise<Response>[] = [fetch("/api/profile/preferences")];
+        const requests: Promise<Response>[] = [fetch("/api/profile/preferences"), fetch("/api/tour")];
         if (isAdmin) requests.push(fetch("/api/settings"));
-        const [prefsRes, settingsRes] = await Promise.all(requests);
+        const [prefsRes, tourRes, settingsRes] = await Promise.all(requests);
 
         const prefs = await prefsRes.json();
         setTimezone(prefs.timezone ?? "");
         setLanguage(prefs.language ?? "en");
+        setTourEnabled(prefs.tourEnabled ?? true);
+
+        const tourData = await tourRes.json();
+        const order: Record<string, string> = {};
+        (tourData.steps ?? []).forEach((s: { href: string }, i: number) => { order[s.href] = String(i + 1); });
+        setTourStepOrder(order);
 
         if (settingsRes) {
           const data = await settingsRes.json();
@@ -122,7 +157,7 @@ export default function GeneralSettingsPage() {
       const res = await fetch("/api/profile/preferences", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ timezone: timezone || null, language }),
+        body: JSON.stringify({ timezone: timezone || null, language, tourEnabled }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Failed to save.");
@@ -132,6 +167,45 @@ export default function GeneralSettingsPage() {
       setPrefsError(err instanceof Error ? err.message : "Failed to save.");
     } finally {
       setIsSavingPrefs(false);
+    }
+  }
+
+  async function handleReplayTour() {
+    // Clear tour_seen_at server-side (so a refresh doesn't re-trust a stale
+    // "already seen" value) and start it immediately.
+    await fetch("/api/profile/preferences", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tourSeen: false }),
+    }).catch(() => {});
+    startTour();
+    setReplaySent(true);
+    setTimeout(() => setReplaySent(false), 3000);
+  }
+
+  async function handleSaveTourSteps(e: FormEvent) {
+    e.preventDefault();
+    setTourStepsError("");
+    setIsSavingTourSteps(true);
+    try {
+      const hrefs = Object.entries(tourStepOrder)
+        .filter(([, order]) => order.trim() !== "")
+        .sort(([, a], [, b]) => Number(a) - Number(b))
+        .map(([href]) => href);
+
+      const res = await fetch("/api/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ settings: { "tour.steps": JSON.stringify(hrefs) } }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Failed to save.");
+      setTourStepsSaved(true);
+      setTimeout(() => setTourStepsSaved(false), 3000);
+    } catch (err) {
+      setTourStepsError(err instanceof Error ? err.message : "Failed to save.");
+    } finally {
+      setIsSavingTourSteps(false);
     }
   }
 
@@ -249,6 +323,21 @@ export default function GeneralSettingsPage() {
               </div>
             </div>
 
+            <div className="mt-4 flex items-center justify-between rounded-lg border border-slate-200 p-4 dark:border-slate-700">
+              <div>
+                <p className="text-sm font-medium text-slate-800 dark:text-slate-200">Onboarding tour</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Guided walkthrough of the sidebar on first use.
+                </p>
+              </div>
+              <div className="flex items-center gap-3">
+                <Button type="button" variant="ghost" size="sm" onClick={handleReplayTour}>
+                  {replaySent ? "Started!" : "Replay tour"}
+                </Button>
+                <Toggle checked={tourEnabled} onChange={setTourEnabled} />
+              </div>
+            </div>
+
             {prefsError && <p className="mt-4 text-sm text-red-500">{prefsError}</p>}
 
             <div className="mt-6 flex items-center gap-3">
@@ -258,6 +347,61 @@ export default function GeneralSettingsPage() {
               </Button>
             </div>
           </form>
+
+          {isAdmin && (
+            <form onSubmit={handleSaveTourSteps} className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm dark:bg-slate-900 dark:border-slate-700">
+              <h2 className="font-semibold text-slate-800 dark:text-slate-200">Onboarding tour steps</h2>
+              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                Choose which sidebar items the onboarding tour walks a new user through, and in what order.
+                A viewer only sees steps for items they actually have access to.
+              </p>
+
+              <div className="mt-4 divide-y divide-slate-100 dark:divide-slate-800">
+                {ALL_NAV_ITEMS.map((item) => {
+                  const included = item.href in tourStepOrder;
+                  return (
+                    <div key={item.href} className="flex items-center gap-3 py-2">
+                      <input
+                        type="checkbox"
+                        checked={included}
+                        onChange={(e) => {
+                          setTourStepOrder((prev) => {
+                            const next = { ...prev };
+                            if (e.target.checked) {
+                              next[item.href] = String(Object.keys(prev).length + 1);
+                            } else {
+                              delete next[item.href];
+                            }
+                            return next;
+                          });
+                        }}
+                        className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+                      />
+                      <span className="flex-1 text-sm text-slate-700 dark:text-slate-300">{item.label}</span>
+                      <span className="text-xs text-slate-400 dark:text-slate-500">{item.href}</span>
+                      <input
+                        type="number"
+                        min={1}
+                        disabled={!included}
+                        value={tourStepOrder[item.href] ?? ""}
+                        onChange={(e) => setTourStepOrder((prev) => ({ ...prev, [item.href]: e.target.value }))}
+                        className="h-8 w-16 rounded-lg border border-slate-300 bg-white px-2 text-sm text-slate-900 disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 dark:bg-slate-800 dark:border-slate-600 dark:text-slate-100"
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+
+              {tourStepsError && <p className="mt-4 text-sm text-red-500">{tourStepsError}</p>}
+
+              <div className="mt-6 flex items-center gap-3">
+                <Button type="submit" isLoading={isSavingTourSteps}>
+                  {tourStepsSaved ? <Check className="h-4 w-4" /> : null}
+                  {tourStepsSaved ? "Saved!" : "Save tour steps"}
+                </Button>
+              </div>
+            </form>
+          )}
         </>
       )}
     </div>

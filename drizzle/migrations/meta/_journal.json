@@ -43,6 +43,13 @@
       "when": 1786690929607,
       "tag": "0005_lyrical_sentinel",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "5",
+      "when": 1788184161674,
+      "tag": "0006_military_odin",
+      "breakpoints": true
     }
   ]
 }

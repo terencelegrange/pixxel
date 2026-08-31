@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import mysql from "mysql2/promise";
-import { getDb, setupDatabase } from "@/lib/db";
+import { getDb, setupDatabase, getDbDialect } from "@/lib/db";
+import { nowSql } from "@/lib/sql-compat";
 import { requireUser } from "@/lib/require-user";
 import logger from "@/lib/logger";
 
@@ -14,7 +15,7 @@ export async function GET(req: NextRequest) {
     await setupDatabase();
     const db = getDb();
     const [rows] = await db.execute<mysql.RowDataPacket[]>(
-      "SELECT timezone, language, notify_new_feedback, notify_contracts_expiring FROM users WHERE id = ? LIMIT 1",
+      "SELECT timezone, language, notify_new_feedback, notify_contracts_expiring, tour_enabled, tour_seen_at FROM users WHERE id = ? LIMIT 1",
       [auth.user.id]
     );
     const row = rows[0];
@@ -23,6 +24,8 @@ export async function GET(req: NextRequest) {
       language: row?.language ?? "en",
       notifyNewFeedback: !!row?.notify_new_feedback,
       notifyContractsExpiring: !!row?.notify_contracts_expiring,
+      tourEnabled: row?.tour_enabled == null ? true : !!row.tour_enabled,
+      tourSeenAt: row?.tour_seen_at ? new Date(row.tour_seen_at).toISOString() : null,
     });
   } catch (err) {
     logger.error({ err, route: "GET /api/profile/preferences" }, "request failed");
@@ -40,8 +43,13 @@ export async function PUT(req: NextRequest) {
   try {
     await setupDatabase();
     const body = await req.json();
-    const { timezone, language, notifyNewFeedback, notifyContractsExpiring } = body as {
+    const { timezone, language, notifyNewFeedback, notifyContractsExpiring, tourEnabled, tourSeen } = body as {
       timezone?: string | null; language?: string; notifyNewFeedback?: boolean; notifyContractsExpiring?: boolean;
+      tourEnabled?: boolean;
+      // Client sends true to mark the tour seen (completed/skipped) or false
+      // to reset it (Replay) -- the timestamp itself is always server-set,
+      // never trusted from the client.
+      tourSeen?: boolean;
     };
 
     const sets: string[] = [];
@@ -50,6 +58,8 @@ export async function PUT(req: NextRequest) {
     if (language !== undefined) { sets.push("language = ?"); params.push(language?.trim() || "en"); }
     if (notifyNewFeedback !== undefined) { sets.push("notify_new_feedback = ?"); params.push(!!notifyNewFeedback); }
     if (notifyContractsExpiring !== undefined) { sets.push("notify_contracts_expiring = ?"); params.push(!!notifyContractsExpiring); }
+    if (tourEnabled !== undefined) { sets.push("tour_enabled = ?"); params.push(!!tourEnabled); }
+    if (tourSeen !== undefined) { sets.push(`tour_seen_at = ${tourSeen ? nowSql(getDbDialect()) : "NULL"}`); }
 
     if (sets.length === 0) return NextResponse.json({ error: "No fields to update." }, { status: 400 });
 

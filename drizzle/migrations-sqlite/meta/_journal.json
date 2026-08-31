@@ -43,6 +43,13 @@
       "when": 1786690939608,
       "tag": "0005_boring_big_bertha",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1788184166592,
+      "tag": "0006_cloudy_blue_shield",
+      "breakpoints": true
     }
   ]
 }

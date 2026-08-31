@@ -5,6 +5,7 @@ import { useRouter, usePathname } from "next/navigation";
 import { useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { GetStartedProvider } from "@/context/GetStartedContext";
+import { TourProvider } from "@/context/TourContext";
 import Header from "./Header";
 import Sidebar from "./Sidebar";
 
@@ -50,6 +51,7 @@ export default function DashboardLayout({
 
   return (
     <GetStartedProvider>
+      <TourProvider>
       <div className="flex h-screen overflow-hidden bg-slate-50 dark:bg-slate-950">
         <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
@@ -91,6 +93,7 @@ export default function DashboardLayout({
           </footer>
         </div>
       </div>
+      </TourProvider>
     </GetStartedProvider>
   );
 }
