@@ -27,6 +27,16 @@ export interface NavGroup {
   items: NavItem[];
 }
 
+export interface SearchableItem {
+  label: string;
+  href: string;
+  icon: string;
+  group: string;
+  description?: string;
+  /** If set, hidden from search results unless the active feature tier includes this key. */
+  featureKey?: string;
+}
+
 export interface Department {
   id: string;
   name: string;

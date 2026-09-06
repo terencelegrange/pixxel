@@ -2,10 +2,11 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import Link from "next/link";
-import { Bell, Menu, Moon, Search, Sun, UserCircle, LogOut, MessageSquare, FileText } from "lucide-react";
+import { Bell, Menu, Moon, Sun, UserCircle, LogOut, MessageSquare, FileText } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useTheme } from "@/context/ThemeContext";
 import { useBranding } from "@/context/BrandingContext";
+import { GlobalSearch } from "@/components/layout/GlobalSearch";
 
 interface HeaderProps {
   onMenuToggle: () => void;
@@ -115,14 +116,7 @@ export default function Header({ onMenuToggle }: HeaderProps) {
 
       {/* Search bar */}
       <div className="hidden flex-1 sm:flex">
-        <div className="relative w-full max-w-sm">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-          <input
-            type="search"
-            placeholder="Search..."
-            className="h-9 w-full rounded-lg border border-slate-200 bg-slate-50 pl-9 pr-3 text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-500"
-          />
-        </div>
+        <GlobalSearch />
       </div>
 
       <div className="ml-auto flex items-center gap-2">
