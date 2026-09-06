@@ -54,6 +54,11 @@ template's trigger/resting pattern from there.
   npm test
   npm run build
   ```
+- **API documentation**: any card that adds or changes an API route must
+  update `openapi.yaml` in the same commit — see CLAUDE.md's "API
+  documentation" section for the exact convention. Treat this the same as
+  the build/verify commands above: a route change isn't done until the
+  spec reflects it.
 - **Migrations**: edit `drizzle/schema.ts` **and** `drizzle/schema.sqlite.ts`
   together, then `npx drizzle-kit generate` (MySQL) and the sqlite
   equivalent — see `CLAUDE.md`'s "Schema migrations" section. Applied

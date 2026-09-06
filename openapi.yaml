@@ -1,0 +1,4369 @@
+openapi: 3.0.3
+info:
+  title: Pixxel API
+  version: 1.0.0
+  description: 'Enterprise Architecture Repository Platform — internal REST API.
+
+
+    Hand-maintained per the project convention in CLAUDE.md: every new or changed route must have its
+    entry added/updated here as part of the same change. Auth is a single HttpOnly `authToken` cookie
+    set by /api/auth/login or /api/auth/register — there is no separate API key/bearer scheme.'
+servers:
+- url: /
+  description: Same-origin (this app serves its own API)
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: authToken
+      description: HttpOnly session cookie. Most routes also enforce a role via requireUser(req, role)
+        — see each operation's description.
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        avatarInitials:
+          type: string
+        role:
+          type: string
+          enum:
+          - Admin
+          - Member
+          - Viewer
+        createdAt:
+          type: string
+          format: date-time
+    AuditEntry:
+      type: object
+      properties:
+        id:
+          type: string
+        tableName:
+          type: string
+        recordId:
+          type: string
+        action:
+          type: string
+          enum:
+          - CREATE
+          - UPDATE
+          - DELETE
+        performedById:
+          type: string
+        performedByName:
+          type: string
+        performedAt:
+          type: string
+          format: date-time
+        oldValues:
+          type: object
+          nullable: true
+        newValues:
+          type: object
+          nullable: true
+    Asset:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        shortCode:
+          type: string
+        description:
+          type: string
+        type:
+          type: string
+        category:
+          type: string
+        icon:
+          type: string
+        lifecycleStatus:
+          type: string
+        departmentIds:
+          type: array
+          items:
+            type: string
+        tierId:
+          type: string
+        strategyId:
+          type: string
+        domainId:
+          type: string
+        vendorId:
+          type: string
+        businessOwner:
+          type: string
+        technicalOwner:
+          type: string
+        slaAvailability:
+          type: string
+        slaRto:
+          type: string
+        slaRpo:
+          type: string
+        goLiveDate:
+          type: string
+          format: date
+        retirementDate:
+          type: string
+          format: date
+        appUrl:
+          type: string
+        docUrl:
+          type: string
+        notes:
+          type: string
+    AssetInput:
+      type: object
+      properties:
+        name:
+          type: string
+        shortCode:
+          type: string
+        description:
+          type: string
+        type:
+          type: string
+          enum:
+          - SaaS
+          - On-Premise
+          - Hybrid
+          - Cloud
+          - Open Source
+          - Other
+        category:
+          type: string
+        icon:
+          type: string
+        lifecycleStatus:
+          type: string
+          enum:
+          - Proposed
+          - Approved
+          - In Development
+          - Production
+          - Sunset
+          - Retired
+        departmentIds:
+          type: array
+          items:
+            type: string
+        architectIds:
+          type: array
+          items:
+            type: string
+        capabilityIds:
+          type: array
+          items:
+            type: string
+        tierId:
+          type: string
+        strategyId:
+          type: string
+        complexityId:
+          type: string
+        domainId:
+          type: string
+        vendorId:
+          type: string
+        businessOwner:
+          type: string
+        technicalOwner:
+          type: string
+        slaAvailability:
+          type: string
+        slaRto:
+          type: string
+        slaRpo:
+          type: string
+        goLiveDate:
+          type: string
+          format: date
+        retirementDate:
+          type: string
+          format: date
+        appUrl:
+          type: string
+        docUrl:
+          type: string
+        notes:
+          type: string
+        heroDiagramId:
+          type: string
+    Contract:
+      type: object
+      properties:
+        id:
+          type: string
+        vendorId:
+          type: string
+        vendorName:
+          type: string
+        assetId:
+          type: string
+        assetName:
+          type: string
+        title:
+          type: string
+        value:
+          type: number
+        startDate:
+          type: string
+          format: date
+        endDate:
+          type: string
+          format: date
+        noticePeriodDays:
+          type: number
+        autoRenews:
+          type: boolean
+        owner:
+          type: string
+        status:
+          type: string
+          enum:
+          - Active
+          - Terminated
+        docUrl:
+          type: string
+        notes:
+          type: string
+    ContractInput:
+      type: object
+      properties:
+        vendorId:
+          type: string
+        assetId:
+          type: string
+        title:
+          type: string
+        value:
+          type: number
+        startDate:
+          type: string
+          format: date
+        endDate:
+          type: string
+          format: date
+        noticePeriodDays:
+          type: number
+        autoRenews:
+          type: boolean
+        owner:
+          type: string
+        status:
+          type: string
+          enum:
+          - Active
+          - Terminated
+        docUrl:
+          type: string
+        notes:
+          type: string
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+paths:
+  /api/asset-complexity:
+    get:
+      summary: List asset complexities
+      tags:
+      - Asset Complexity
+      description: 'Requires: any authenticated user'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                    name: &id001
+                      type: string
+                    description: &id002
+                      type: string
+                    sortOrder: &id003
+                      type: number
+        '401':
+          description: Not authenticated
+      security: &id004
+      - cookieAuth: []
+    post:
+      summary: Create an asset complexity
+      tags:
+      - Asset Complexity
+      description: 'Requires: Admin or Member'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: *id001
+                description: *id002
+                sortOrder: *id003
+      responses:
+        '201':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+        '401':
+          description: Not authenticated
+        '403':
+          description: Insufficient role
+      security: *id004
+  /api/asset-complexity/{id}:
+    put:
+      summary: Update an asset complexity
+      tags:
+      - Asset Complexity
+      description: 'Requires: Admin or Member'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+        description: Resource id (UUID)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: *id001
+                description: *id002
+                sortOrder: *id003
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Not authenticated
+        '403':
+          description: Insufficient role
+      security: *id004
+    delete:
+      summary: Delete an asset complexity
+      tags:
+      - Asset Complexity
+      description: 'Requires: Admin or Member'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+        description: Resource id (UUID)
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Not authenticated
+        '403':
+          description: Insufficient role
+      security: *id004
+  /api/asset-risks:
+    get:
+      summary: List ad-hoc asset risks (register, not the risk-factor framework)
+      tags:
+      - Security
+      description: 'Requires: any authenticated user'
+      parameters:
+      - name: asset
+        in: query
+        required: false
+        schema:
+          type: string
+        description: filter by asset id
+      - name: status
+        in: query
+        required: false
+        schema:
+          type: string
+        description: ''
+      - name: category
+        in: query
+        required: false
+        schema:
+          type: string
+        description: ''
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Not authenticated
+      security: *id004
+    post:
+      summary: Create an asset risk entry
+      tags:
+      - Security
+      description: 'Requires: Admin or Member'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                assetId:
+                  type: string
+                title:
+                  type: string
+                description:
+                  type: string
+                category:
+                  type: string
+                likelihood:
+                  type: string
+                impact:
+                  type: string
+                status:
+                  type: string
+                owner:
+                  type: string
+      responses:
+        '201':
+          description: OK
+        '401':
+          description: Not authenticated
+        '403':
+          description: Insufficient role
+      security: *id004
+  /api/asset-risks/{id}:
+    put:
+      summary: Update an asset risk entry
+      tags:
+      - Security
+      description: 'Requires: Admin or Member'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+        description: Resource id (UUID)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                assetId:
+                  type: string
+                title:
+                  type: string
+                description:
+                  type: string
+                category:
+                  type: string
+                likelihood:
+                  type: string
+                impact:
+                  type: string
+                status:
+                  type: string
+                owner:
+                  type: string
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Not authenticated
+        '403':
+          description: Insufficient role
+      security: *id004
+    delete:
+      summary: Delete an asset risk entry
+      tags:
+      - Security
+      description: 'Requires: Admin or Member'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+        description: Resource id (UUID)
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Not authenticated
+        '403':
+          description: Insufficient role
+      security: *id004
+  /api/asset-strategy:
+    get:
+      summary: List asset strategies
+      tags:
+      - Asset Strategy
+      description: 'Requires: any authenticated user'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                    name: &id005
+                      type: string
+                    description: &id006
+                      type: string
+                    sortOrder: &id007
+                      type: number
+        '401':
+          description: Not authenticated
+      security: *id004
+    post:
+      summary: Create an asset strategy
+      tags:
+      - Asset Strategy
+      description: 'Requires: Admin or Member'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: *id005
+                description: *id006
+                sortOrder: *id007
+      responses:
+        '201':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+        '401':
+          description: Not authenticated
+        '403':
+          description: Insufficient role
+      security: *id004
+  /api/asset-strategy/{id}:
+    put:
+      summary: Update an asset strategy
+      tags:
+      - Asset Strategy
+      description: 'Requires: Admin or Member'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+        description: Resource id (UUID)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: *id005
+                description: *id006
+                sortOrder: *id007
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Not authenticated
+        '403':
+          description: Insufficient role
+      security: *id004
+    delete:
+      summary: Delete an asset strategy
+      tags:
+      - Asset Strategy
+      description: 'Requires: Admin or Member'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+        description: Resource id (UUID)
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Not authenticated
+        '403':
+          description: Insufficient role
+      security: *id004
+  /api/assets:
+    get:
+      summary: List assets (joins department/vendor/domain/strategy/tier names)
+      tags:
+      - Assets
+      description: 'Requires: any authenticated user'
+      parameters:
+      - name: q
+        in: query
+        required: false
+        schema:
+          type: string
+        description: search name/short_code/description/business_owner/technical_owner/notes
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Asset'
+        '401':
+          description: Not authenticated
+      security: *id004
+    post:
+      summary: Create an asset
+      tags:
+      - Assets
+      description: 'Requires: Admin or Member'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssetInput'
+      responses:
+        '201':
+          description: OK
+        '401':
+          description: Not authenticated
+        '403':
+          description: Insufficient role
+      security: *id004
+  /api/assets/my-assets:
+    get:
+      summary: Assets where the given user is business or technical owner
+      tags:
+      - Assets
+      description: 'Requires: any authenticated user'
+      parameters:
+      - name: userId
+        in: query
+        required: true
+        schema:
+          type: string
+        description: ''
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Asset'
+        '401':
+          description: Not authenticated
+      security: *id004
+  /api/assets/{id}:
+    get:
+      summary: Get a single asset
+      tags:
+      - Assets
+      description: 'Requires: any authenticated user'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+        description: Resource id (UUID)
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Asset'
+        '401':
+          description: Not authenticated
+      security: *id004
+    put:
+      summary: Update an asset
+      tags:
+      - Assets
+      description: 'Requires: Admin or Member'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+        description: Resource id (UUID)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssetInput'
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Not authenticated
+        '403':
+          description: Insufficient role
+      security: *id004
+    delete:
+      summary: Delete an asset
+      tags:
+      - Assets
+      description: 'Requires: Admin or Member'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+        description: Resource id (UUID)
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Not authenticated
+        '403':
+          description: Insufficient role
+      security: *id004
+  /api/assets/{id}/dependencies:
+    get:
+      summary: Upstream/downstream dependency links for one asset
+      tags:
+      - Dependencies
+      description: 'Requires: any authenticated user'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+        description: Resource id (UUID)
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Not authenticated
+      security: *id004
+  /api/assets/{id}/diagrams:
+    get:
+      summary: Diagrams linked to one asset
+      tags:
+      - Diagrams
+      description: 'Requires: any authenticated user'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+        description: Resource id (UUID)
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Not authenticated
+      security: *id004
+  /api/assets/{id}/history:
+    get:
+      summary: Audit history for one asset
+      tags:
+      - Assets
+      description: 'Requires: any authenticated user'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+        description: Resource id (UUID)
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AuditEntry'
+        '401':
+          description: Not authenticated
+      security: *id004
+  /api/assets/{id}/plantuml-diagrams:
+    get:
+      summary: PlantUML diagrams linked to one asset
+      tags:
+      - PlantUML
+      description: 'Requires: any authenticated user'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+        description: Resource id (UUID)
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Not authenticated
+      security: *id004
+  /api/assets/{id}/projects:
+    get:
+      summary: Projects this asset is linked to
+      tags:
+      - Projects
+      description: 'Requires: any authenticated user'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+        description: Resource id (UUID)
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Not authenticated
+      security: *id004
+  /api/assets/{id}/risk-assessments:
+    get:
+      summary: Risk factor assessments for one asset
+      tags:
+      - Security
+      description: 'Requires: any authenticated user'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+        description: Resource id (UUID)
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Not authenticated
+      security: *id004
+  /api/assets/{id}/risk-assessments/{riskFactorId}:
+    put:
+      summary: Set the status/notes of one risk factor assessment for one asset
+      tags:
+      - Security
+      description: 'Requires: Admin or Member'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+        description: Resource id (UUID)
+      - name: riskFactorId
+        in: path
+        required: true
+        schema:
+          type: string
+        description: Resource id (UUID)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  type: string
+                notes:
+                  type: string
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Not authenticated
+        '403':
+          description: Insufficient role
+      security: *id004
+  /api/audit:
+    get:
+      summary: Paginated, filterable audit log
+      tags:
+      - Audit
+      description: 'Requires: Admin'
+      parameters:
+      - name: page
+        in: query
+        required: false
+        schema:
+          type: string
+        description: 1-based page number
+      - name: pageSize
+        in: query
+        required: false
+        schema:
+          type: string
+        description: max 100
+      - name: table
+        in: query
+        required: false
+        schema:
+          type: string
+        description: filter by table_name
+      - name: action
+        in: query
+        required: false
+        schema:
+          type: string
+        description: CREATE|UPDATE|DELETE
+      - name: performer
+        in: query
+        required: false
+        schema:
+          type: string
+        description: filter by performed_by_name
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  entries:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AuditEntry'
+                  total:
+                    type: number
+        '401':
+          description: Not authenticated
+        '403':
+          description: Insufficient role
+      security: *id004
+  /api/auth/login:
+    post:
+      summary: Log in with email/password. Returns mfaRequired instead of a session if MFA is enabled.
+      tags:
+      - Auth
+      description: 'Requires: none'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                oneOf:
+                - type: object
+                  properties:
+                    user:
+                      $ref: '#/components/schemas/User'
+                - type: object
+                  properties:
+                    mfaRequired:
+                      type: boolean
+                    mfaToken:
+                      type: string
+        '401':
+          description: Not authenticated
+        '403':
+          description: Insufficient role
+      security: *id004
+  /api/auth/logout:
+    post:
+      summary: Clear the session cookie
+      tags:
+      - Auth
+      description: 'Requires: none'
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Not authenticated
+        '403':
+          description: Insufficient role
+      security: *id004
+  /api/auth/me:
+    get:
+      summary: Verify the current session and return the fresh user record
+      tags:
+      - Auth
+      description: 'Requires: any authenticated user'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user:
+                    $ref: '#/components/schemas/User'
+        '401':
+          description: Not authenticated
+      security: *id004
+  /api/auth/mfa/challenge:
+    post:
+      summary: Complete login for an MFA-enabled account using a TOTP code or a recovery code
+      tags:
+      - Auth (MFA)
+      description: 'Requires: none (short-lived mfaToken from /login instead)'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                mfaToken:
+                  type: string
+                code:
+                  type: string
+                  description: 6-digit TOTP code, or omit and use recoveryCode instead
+                recoveryCode:
+                  type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user:
+                    $ref: '#/components/schemas/User'
+        '401':
+          description: Not authenticated
+        '403':
+          description: Insufficient role
+      security: *id004
+  /api/auth/mfa/disable:
+    post:
+      summary: Disable MFA (requires password re-confirmation)
+      tags:
+      - Auth (MFA)
+      description: 'Requires: any authenticated user'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                password:
+                  type: string
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Not authenticated
+      security: *id004
+  /api/auth/mfa/setup:
+    post:
+      summary: 'Begin MFA setup: generates a pending TOTP secret + QR code'
+      tags:
+      - Auth (MFA)
+      description: 'Requires: any authenticated user'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  secret:
+                    type: string
+                  otpauthUri:
+                    type: string
+                  qrCodeDataUrl:
+                    type: string
+        '401':
+          description: Not authenticated
+      security: *id004
+  /api/auth/mfa/status:
+    get:
+      summary: Check whether MFA is enabled for the current user
+      tags:
+      - Auth (MFA)
+      description: 'Requires: any authenticated user'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  enabled:
+                    type: boolean
+        '401':
+          description: Not authenticated
+      security: *id004
+  /api/auth/mfa/verify-setup:
+    post:
+      summary: Confirm MFA setup with a 6-digit code; enables MFA and returns one-time recovery codes
+      tags:
+      - Auth (MFA)
+      description: 'Requires: any authenticated user'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                code:
+                  type: string
+                  description: 6-digit TOTP code
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  recoveryCodes:
+                    type: array
+                    items:
+                      type: string
+        '401':
+          description: Not authenticated
+      security: *id004
+  /api/auth/register:
+    post:
+      summary: Register a new account
+      tags:
+      - Auth
+      description: 'Requires: none'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+      responses:
+        '201':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user:
+                    $ref: '#/components/schemas/User'
+        '401':
+          description: Not authenticated
+        '403':
+          description: Insufficient role
+      security: *id004
+  /api/branding:
+    get:
+      summary: Install-wide branding (company name, logo) — visible to every authenticated user
+      tags:
+      - Settings
+      description: 'Requires: any authenticated user'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  companyName:
+                    type: string
+                  logoDataUrl:
+                    type: string
+        '401':
+          description: Not authenticated
+      security: *id004
+  /api/business-capabilities:
+    get:
+      summary: List business capabilities
+      tags:
+      - Business Capabilities
+      description: 'Requires: any authenticated user'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                    name: &id008
+                      type: string
+                    description: &id009
+                      type: string
+                    industrySectorId: &id010
+                      type: string
+                    sortOrder: &id011
+                      type: number
+        '401':
+          description: Not authenticated
+      security: *id004
+    post:
+      summary: Create a business capabilitie
+      tags:
+      - Business Capabilities
+      description: 'Requires: Admin or Member'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: *id008
+                description: *id009
+                industrySectorId: *id010
+                sortOrder: *id011
+      responses:
+        '201':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+        '401':
+          description: Not authenticated
+        '403':
+          description: Insufficient role
+      security: *id004
+  /api/business-capabilities/{id}:
+    put:
+      summary: Update a business capabilitie
+      tags:
+      - Business Capabilities
+      description: 'Requires: Admin or Member'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+        description: Resource id (UUID)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: *id008
+                description: *id009
+                industrySectorId: *id010
+                sortOrder: *id011
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Not authenticated
+        '403':
+          description: Insufficient role
+      security: *id004
+    delete:
+      summary: Delete a business capabilitie
+      tags:
+      - Business Capabilities
+      description: 'Requires: Admin or Member'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+        description: Resource id (UUID)
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Not authenticated
+        '403':
+          description: Insufficient role
+      security: *id004
+  /api/changelog:
+    get:
+      summary: List changelogs
+      tags:
+      - Changelog
+      description: 'Requires: any authenticated user'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                    version: &id012
+                      type: string
+                    title: &id013
+                      type: string
+                    description: &id014
+                      type: string
+                    type: &id015
+                      type: string
+                      enum:
+                      - feature
+                      - fix
+                      - improvement
+                      - breaking
+                    releasedAt: &id016
+                      type: string
+                      format: date
+        '401':
+          description: Not authenticated
+      security: *id004
+    post:
+      summary: Create a changelog
+      tags:
+      - Changelog
+      description: 'Requires: Admin or Member'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                version: *id012
+                title: *id013
+                description: *id014
+                type: *id015
+                releasedAt: *id016
+      responses:
+        '201':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+        '401':
+          description: Not authenticated
+        '403':
+          description: Insufficient role
+      security: *id004
+  /api/changelog/{id}:
+    put:
+      summary: Update a changelog
+      tags:
+      - Changelog
+      description: 'Requires: Admin or Member'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+        description: Resource id (UUID)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                version: *id012
+                title: *id013
+                description: *id014
+                type: *id015
+                releasedAt: *id016
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Not authenticated
+        '403':
+          description: Insufficient role
+      security: *id004
+    delete:
+      summary: Delete a changelog
+      tags:
+      - Changelog
+      description: 'Requires: Admin or Member'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+        description: Resource id (UUID)
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Not authenticated
+        '403':
+          description: Insufficient role
+      security: *id004
+  /api/confluence/push:
+    post:
+      summary: Push a diagram to a Confluence page
+      tags:
+      - Integrations
+      description: 'Requires: Admin or Member'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                assetId:
+                  type: string
+                pageTitle:
+                  type: string
+                parentPageId:
+                  type: string
+                diagramPng:
+                  type: string
+                  description: base64 PNG
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Not authenticated
+        '403':
+          description: Insufficient role
+      security: *id004
+  /api/contracts:
+    get:
+      summary: List contracts (with urgency computed at read time)
+      tags:
+      - Contracts
+      description: 'Requires: any authenticated user'
+      parameters:
+      - name: vendor
+        in: query
+        required: false
+        schema:
+          type: string
+        description: filter by vendor id
+      - name: asset
+        in: query
+        required: false
+        schema:
+          type: string
+        description: filter by asset id
+      - name: expiring
+        in: query
+        required: false
+        schema:
+          type: string
+        description: days window, e.g. 90
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Contract'
+        '401':
+          description: Not authenticated
+      security: *id004
+    post:
+      summary: Create a contract
+      tags:
+      - Contracts
+      description: 'Requires: Admin or Member'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ContractInput'
+      responses:
+        '201':
+          description: OK
+        '401':
+          description: Not authenticated
+        '403':
+          description: Insufficient role
+      security: *id004
+  /api/contracts/expiring-count:
+    get:
+      summary: Count of Active contracts expiring within N days (header bell)
+      tags:
+      - Contracts
+      description: 'Requires: any authenticated user'
+      parameters:
+      - name: days
+        in: query
+        required: false
+        schema:
+          type: string
+        description: default 90
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  count:
+                    type: number
+        '401':
+          description: Not authenticated
+      security: *id004
+  /api/contracts/{id}:
+    get:
+      summary: Get a single contract
+      tags:
+      - Contracts
+      description: 'Requires: any authenticated user'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+        description: Resource id (UUID)
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Contract'
+        '401':
+          description: Not authenticated
+      security: *id004
+    put:
+      summary: Update a contract
+      tags:
+      - Contracts
+      description: 'Requires: Admin or Member'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+        description: Resource id (UUID)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ContractInput'
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Not authenticated
+        '403':
+          description: Insufficient role
+      security: *id004
+    delete:
+      summary: Delete a contract
+      tags:
+      - Contracts
+      description: 'Requires: Admin or Member'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+        description: Resource id (UUID)
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Not authenticated
+        '403':
+          description: Insufficient role
+      security: *id004
+  /api/dashboard/stats:
+    get:
+      summary: Dashboard summary stats (assets by tier, published departments)
+      tags:
+      - Reports
+      description: 'Requires: any authenticated user'
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Not authenticated
+      security: *id004
+  /api/dependencies:
+    get:
+      summary: List asset-to-asset dependencies
+      tags:
+      - Dependencies
+      description: 'Requires: any authenticated user'
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Not authenticated
+      security: *id004
+    post:
+      summary: Create an asset-to-asset dependency
+      tags:
+      - Dependencies
+      description: 'Requires: Admin or Member'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                sourceAssetId:
+                  type: string
+                targetAssetId:
+                  type: string
+                type:
+                  type: string
+                direction:
+                  type: string
+                notes:
+                  type: string
+      responses:
+        '201':
+          description: OK
+        '401':
+          description: Not authenticated
+        '403':
+          description: Insufficient role
+      security: *id004
+  /api/dependencies/{id}:
+    put:
+      summary: Update a dependency
+      tags:
+      - Dependencies
+      description: 'Requires: Admin or Member'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+        description: Resource id (UUID)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                type:
+                  type: string
+                direction:
+                  type: string
+                notes:
+                  type: string
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Not authenticated
+        '403':
+          description: Insufficient role
+      security: *id004
+    delete:
+      summary: Delete a dependency
+      tags:
+      - Dependencies
+      description: 'Requires: Admin or Member'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+        description: Resource id (UUID)
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Not authenticated
+        '403':
+          description: Insufficient role
+      security: *id004
+  /api/diagram-types:
+    get:
+      summary: List diagram types
+      tags:
+      - Diagram Types
+      description: 'Requires: any authenticated user'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                    name: &id017
+                      type: string
+                    description: &id018
+                      type: string
+                    sortOrder: &id019
+                      type: number
+        '401':
+          description: Not authenticated
+      security: *id004
+    post:
+      summary: Create a diagram type
+      tags:
+      - Diagram Types
+      description: 'Requires: Admin or Member'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: *id017
+                description: *id018
+                sortOrder: *id019
+      responses:
+        '201':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+        '401':
+          description: Not authenticated
+        '403':
+          description: Insufficient role
+      security: *id004
+  /api/diagram-types/{id}:
+    put:
+      summary: Update a diagram type
+      tags:
+      - Diagram Types
+      description: 'Requires: Admin or Member'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+        description: Resource id (UUID)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: *id017
+                description: *id018
+                sortOrder: *id019
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Not authenticated
+        '403':
+          description: Insufficient role
+      security: *id004
+    delete:
+      summary: Delete a diagram type
+      tags:
+      - Diagram Types
+      description: 'Requires: Admin or Member'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+        description: Resource id (UUID)
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Not authenticated
+        '403':
+          description: Insufficient role
+      security: *id004
+  /api/diagrams:
+    get:
+      summary: List diagrams (latest version, asset count)
+      tags:
+      - Diagrams
+      description: 'Requires: any authenticated user'
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Not authenticated
+      security: *id004
+    post:
+      summary: Create a diagram (+ its first empty version)
+      tags:
+      - Diagrams
+      description: 'Requires: Admin or Member'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
+                projectId:
+                  type: string
+                diagramTypeId:
+                  type: string
+      responses:
+        '201':
+          description: OK
+        '401':
+          description: Not authenticated
+        '403':
+          description: Insufficient role
+      security: *id004
+  /api/diagrams/{id}:
+    get:
+      summary: Get a diagram + its latest version content
+      tags:
+      - Diagrams
+      description: 'Requires: any authenticated user'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+        description: Resource id (UUID)
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Not authenticated
+      security: *id004
+    put:
+      summary: Update diagram metadata
+      tags:
+      - Diagrams
+      description: 'Requires: Admin or Member'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+        description: Resource id (UUID)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
+                projectId:
+                  type: string
+                diagramTypeId:
+                  type: string
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Not authenticated
+        '403':
+          description: Insufficient role
+      security: *id004
+    delete:
+      summary: Delete a diagram and all its versions
+      tags:
+      - Diagrams
+      description: 'Requires: Admin or Member'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+        description: Resource id (UUID)
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Not authenticated
+        '403':
+          description: Insufficient role
+      security: *id004
+  /api/diagrams/{id}/versions:
+    get:
+      summary: Version history for a diagram
+      tags:
+      - Diagrams
+      description: 'Requires: any authenticated user'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+        description: Resource id (UUID)
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Not authenticated
+      security: *id004
+    post:
+      summary: Save a new version (content = Excalidraw JSON) and optionally tag linked assets
+      tags:
+      - Diagrams
+      description: 'Requires: Admin or Member'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+        description: Resource id (UUID)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                content:
+                  type: string
+                assetIds:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        '201':
+          description: OK
+        '401':
+          description: Not authenticated
+        '403':
+          description: Insufficient role
+      security: *id004
+  /api/diagrams/{id}/versions/{versionId}:
+    get:
+      summary: Get one specific diagram version
+      tags:
+      - Diagrams
+      description: 'Requires: any authenticated user'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+        description: Resource id (UUID)
+      - name: versionId
+        in: path
+        required: true
+        schema:
+          type: string
+        description: Resource id (UUID)
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Not authenticated
+      security: *id004
+  /api/domains:
+    get:
+      summary: List domains
+      tags:
+      - Domains
+      description: 'Requires: any authenticated user'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                    name: &id020
+                      type: string
+                    description: &id021
+                      type: string
+        '401':
+          description: Not authenticated
+      security: *id004
+    post:
+      summary: Create a domain
+      tags:
+      - Domains
+      description: 'Requires: Admin or Member'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: *id020
+                description: *id021
+      responses:
+        '201':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+        '401':
+          description: Not authenticated
+        '403':
+          description: Insufficient role
+      security: *id004
+  /api/domains/{id}:
+    put:
+      summary: Update a domain
+      tags:
+      - Domains
+      description: 'Requires: Admin or Member'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+        description: Resource id (UUID)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: *id020
+                description: *id021
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Not authenticated
+        '403':
+          description: Insufficient role
+      security: *id004
+    delete:
+      summary: Delete a domain
+      tags:
+      - Domains
+      description: 'Requires: Admin or Member'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+        description: Resource id (UUID)
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Not authenticated
+        '403':
+          description: Insufficient role
+      security: *id004
+  /api/feature-tier/active:
+    get:
+      summary: The install's currently active feature tier
+      tags:
+      - Settings
+      description: 'Requires: any authenticated user'
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Not authenticated
+      security: *id004
+    put:
+      summary: Set the install's active feature tier
+      tags:
+      - Settings
+      description: 'Requires: Admin or Member'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                tierId:
+                  type: string
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Not authenticated
+        '403':
+          description: Insufficient role
+      security: *id004
+  /api/feature-tiers:
+    get:
+      summary: List feature tiers
+      tags:
+      - Feature Tiers
+      description: 'Requires: any authenticated user'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                    name: &id022
+                      type: string
+                    description: &id023
+                      type: string
+                    sortOrder: &id024
+                      type: number
+                    isDefault: &id025
+                      type: boolean
+                    features: &id026
+                      type: array
+                      items:
+                        type: string
+        '401':
+          description: Not authenticated
+      security: *id004
+    post:
+      summary: Create a feature tier
+      tags:
+      - Feature Tiers
+      description: 'Requires: Admin or Member'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: *id022
+                description: *id023
+                sortOrder: *id024
+                isDefault: *id025
+                features: *id026
+      responses:
+        '201':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+        '401':
+          description: Not authenticated
+        '403':
+          description: Insufficient role
+      security: *id004
+  /api/feature-tiers/{id}:
+    put:
+      summary: Update a feature tier
+      tags:
+      - Feature Tiers
+      description: 'Requires: Admin or Member'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+        description: Resource id (UUID)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: *id022
+                description: *id023
+                sortOrder: *id024
+                isDefault: *id025
+                features: *id026
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Not authenticated
+        '403':
+          description: Insufficient role
+      security: *id004
+    delete:
+      summary: Delete a feature tier
+      tags:
+      - Feature Tiers
+      description: 'Requires: Admin or Member'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+        description: Resource id (UUID)
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Not authenticated
+        '403':
+          description: Insufficient role
+      security: *id004
+  /api/get-started:
+    get:
+      summary: Counts behind the Get Started checklist (has the account added departments/assets/etc.)
+      tags:
+      - Misc
+      description: 'Requires: any authenticated user'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  type: number
+        '401':
+          description: Not authenticated
+      security: *id004
+  /api/health:
+    get:
+      summary: Liveness check
+      tags:
+      - Misc
+      description: 'Requires: none'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+        '401':
+          description: Not authenticated
+        '403':
+          description: Insufficient role
+      security: *id004
+  /api/industry-sectors:
+    get:
+      summary: List industry sectors
+      tags:
+      - Industry Sectors
+      description: 'Requires: any authenticated user'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                    name: &id027
+                      type: string
+                    description: &id028
+                      type: string
+        '401':
+          description: Not authenticated
+      security: *id004
+    post:
+      summary: Create an industry sector
+      tags:
+      - Industry Sectors
+      description: 'Requires: Admin or Member'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: *id027
+                description: *id028
+      responses:
+        '201':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+        '401':
+          description: Not authenticated
+        '403':
+          description: Insufficient role
+      security: *id004
+  /api/industry-sectors/{id}:
+    put:
+      summary: Update an industry sector
+      tags:
+      - Industry Sectors
+      description: 'Requires: Admin or Member'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+        description: Resource id (UUID)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: *id027
+                description: *id028
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Not authenticated
+        '403':
+          description: Insufficient role
+      security: *id004
+    delete:
+      summary: Delete an industry sector
+      tags:
+      - Industry Sectors
+      description: 'Requires: Admin or Member'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+        description: Resource id (UUID)
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Not authenticated
+        '403':
+          description: Insufficient role
+      security: *id004
+  /api/investment-classifications:
+    get:
+      summary: List investment classifications
+      tags:
+      - Investment Classifications
+      description: 'Requires: any authenticated user'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                    name: &id029
+                      type: string
+                    color: &id030
+                      type: string
+                    sortOrder: &id031
+                      type: number
+        '401':
+          description: Not authenticated
+      security: *id004
+    post:
+      summary: Create an investment classification
+      tags:
+      - Investment Classifications
+      description: 'Requires: Admin or Member'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: *id029
+                color: *id030
+                sortOrder: *id031
+      responses:
+        '201':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+        '401':
+          description: Not authenticated
+        '403':
+          description: Insufficient role
+      security: *id004
+  /api/investment-classifications/{id}:
+    put:
+      summary: Update an investment classification
+      tags:
+      - Investment Classifications
+      description: 'Requires: Admin or Member'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+        description: Resource id (UUID)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: *id029
+                color: *id030
+                sortOrder: *id031
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Not authenticated
+        '403':
+          description: Insufficient role
+      security: *id004
+    delete:
+      summary: Delete an investment classification
+      tags:
+      - Investment Classifications
+      description: 'Requires: Admin or Member'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+        description: Resource id (UUID)
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Not authenticated
+        '403':
+          description: Insufficient role
+      security: *id004
+  /api/log/pageview:
+    post:
+      summary: Record a client-side page navigation (observability)
+      tags:
+      - Misc
+      description: 'Requires: any authenticated user'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                path:
+                  type: string
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Not authenticated
+      security: *id004
+  /api/observability/test:
+    post:
+      summary: Send a test log line to the configured external log collector
+      tags:
+      - Settings
+      description: 'Requires: Admin'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                collectorUrl:
+                  type: string
+                apiKey:
+                  type: string
+                channel:
+                  type: string
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Not authenticated
+        '403':
+          description: Insufficient role
+      security: *id004
+  /api/organisations:
+    get:
+      summary: List departments
+      tags:
+      - Departments
+      description: 'Requires: any authenticated user'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                    name: &id032
+                      type: string
+                    description: &id033
+                      type: string
+                    status: &id034
+                      type: string
+                      enum:
+                      - Published
+                      - Unpublished
+        '401':
+          description: Not authenticated
+      security: *id004
+    post:
+      summary: Create a department
+      tags:
+      - Departments
+      description: 'Requires: Admin or Member'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: *id032
+                description: *id033
+                status: *id034
+      responses:
+        '201':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+        '401':
+          description: Not authenticated
+        '403':
+          description: Insufficient role
+      security: *id004
+  /api/organisations/{id}:
+    put:
+      summary: Update a department
+      tags:
+      - Departments
+      description: 'Requires: Admin or Member'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+        description: Resource id (UUID)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: *id032
+                description: *id033
+                status: *id034
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Not authenticated
+        '403':
+          description: Insufficient role
+      security: *id004
+    delete:
+      summary: Delete a department
+      tags:
+      - Departments
+      description: 'Requires: Admin or Member'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+        description: Resource id (UUID)
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Not authenticated
+        '403':
+          description: Insufficient role
+      security: *id004
+  /api/plantuml:
+    get:
+      summary: List PlantUML diagrams
+      tags:
+      - PlantUML
+      description: 'Requires: any authenticated user'
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Not authenticated
+      security: *id004
+    post:
+      summary: Create a PlantUML diagram (+ a starter version)
+      tags:
+      - PlantUML
+      description: 'Requires: Admin or Member'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
+      responses:
+        '201':
+          description: OK
+        '401':
+          description: Not authenticated
+        '403':
+          description: Insufficient role
+      security: *id004
+  /api/plantuml/render:
+    post:
+      summary: Render PlantUML source to an image (no persistence)
+      tags:
+      - PlantUML
+      description: 'Requires: any authenticated user'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                source:
+                  type: string
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Not authenticated
+      security: *id004
+  /api/plantuml/{id}:
+    get:
+      summary: Get a PlantUML diagram + its latest version
+      tags:
+      - PlantUML
+      description: 'Requires: any authenticated user'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+        description: Resource id (UUID)
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Not authenticated
+      security: *id004
+    put:
+      summary: Update PlantUML diagram metadata
+      tags:
+      - PlantUML
+      description: 'Requires: Admin or Member'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+        description: Resource id (UUID)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Not authenticated
+        '403':
+          description: Insufficient role
+      security: *id004
+    delete:
+      summary: Delete a PlantUML diagram (cascades versions + asset links, transactional)
+      tags:
+      - PlantUML
+      description: 'Requires: Admin or Member'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+        description: Resource id (UUID)
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Not authenticated
+        '403':
+          description: Insufficient role
+      security: *id004
+  /api/plantuml/{id}/assets:
+    get:
+      summary: Assets linked to a PlantUML diagram
+      tags:
+      - PlantUML
+      description: 'Requires: any authenticated user'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+        description: Resource id (UUID)
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Not authenticated
+      security: *id004
+    delete:
+      summary: Unlink an asset from a PlantUML diagram
+      tags:
+      - PlantUML
+      description: 'Requires: Admin or Member'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+        description: Resource id (UUID)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                assetId:
+                  type: string
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Not authenticated
+        '403':
+          description: Insufficient role
+      security: *id004
+  /api/plantuml/{id}/assets/auto-tag:
+    post:
+      summary: Auto-link assets by matching participant names in the PlantUML source
+      tags:
+      - PlantUML
+      description: 'Requires: Admin or Member'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+        description: Resource id (UUID)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                participantNames:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Not authenticated
+        '403':
+          description: Insufficient role
+      security: *id004
+  /api/plantuml/{id}/versions:
+    get:
+      summary: Version history for a PlantUML diagram
+      tags:
+      - PlantUML
+      description: 'Requires: any authenticated user'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+        description: Resource id (UUID)
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Not authenticated
+      security: *id004
+    post:
+      summary: Save a new PlantUML source version
+      tags:
+      - PlantUML
+      description: 'Requires: Admin or Member'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+        description: Resource id (UUID)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                source:
+                  type: string
+      responses:
+        '201':
+          description: OK
+        '401':
+          description: Not authenticated
+        '403':
+          description: Insufficient role
+      security: *id004
+  /api/profile:
+    put:
+      summary: Update the current user's name/email
+      tags:
+      - Profile
+      description: 'Requires: any authenticated user'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                email:
+                  type: string
+                  format: email
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user:
+                    $ref: '#/components/schemas/User'
+        '401':
+          description: Not authenticated
+      security: *id004
+  /api/profile/preferences:
+    get:
+      summary: Get the current user's timezone/language/notification/tour preferences
+      tags:
+      - Profile
+      description: 'Requires: any authenticated user'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  timezone:
+                    type: string
+                  language:
+                    type: string
+                  notifyNewFeedback:
+                    type: boolean
+                  notifyContractsExpiring:
+                    type: boolean
+                  tourEnabled:
+                    type: boolean
+                  tourSeenAt:
+                    type: string
+                    format: date-time
+        '401':
+          description: Not authenticated
+      security: *id004
+    put:
+      summary: Partial update — only fields present in the body are changed
+      tags:
+      - Profile
+      description: 'Requires: any authenticated user'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                timezone:
+                  type: string
+                language:
+                  type: string
+                notifyNewFeedback:
+                  type: boolean
+                notifyContractsExpiring:
+                  type: boolean
+                tourEnabled:
+                  type: boolean
+                tourSeen:
+                  type: boolean
+                  description: true marks the onboarding tour seen (server sets the timestamp); false
+                    clears it (Replay)
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Not authenticated
+      security: *id004
+  /api/projects:
+    get:
+      summary: List projects (with asset count)
+      tags:
+      - Projects
+      description: 'Requires: any authenticated user'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                    name:
+                      type: string
+                    status:
+                      type: string
+        '401':
+          description: Not authenticated
+      security: *id004
+    post:
+      summary: Create a project
+      tags:
+      - Projects
+      description: 'Requires: Admin or Member'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
+                status:
+                  type: string
+                  enum:
+                  - Active
+                  - On Hold
+                  - Completed
+                  - Cancelled
+                startDate:
+                  type: string
+                  format: date
+                endDate:
+                  type: string
+                  format: date
+      responses:
+        '201':
+          description: OK
+        '401':
+          description: Not authenticated
+        '403':
+          description: Insufficient role
+      security: *id004
+  /api/projects/{id}:
+    put:
+      summary: Update a project
+      tags:
+      - Projects
+      description: 'Requires: Admin or Member'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+        description: Resource id (UUID)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
+                status:
+                  type: string
+                startDate:
+                  type: string
+                  format: date
+                endDate:
+                  type: string
+                  format: date
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Not authenticated
+        '403':
+          description: Insufficient role
+      security: *id004
+    delete:
+      summary: Delete a project (cascades project_assets)
+      tags:
+      - Projects
+      description: 'Requires: Admin or Member'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+        description: Resource id (UUID)
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Not authenticated
+        '403':
+          description: Insufficient role
+      security: *id004
+  /api/projects/{id}/assets:
+    get:
+      summary: Linked assets for one project, with dependency metadata
+      tags:
+      - Projects
+      description: 'Requires: any authenticated user'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+        description: Resource id (UUID)
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Not authenticated
+      security: *id004
+    post:
+      summary: Link an asset to a project
+      tags:
+      - Projects
+      description: 'Requires: Admin or Member'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+        description: Resource id (UUID)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                assetId:
+                  type: string
+                dependencyType:
+                  type: string
+                  enum:
+                  - upstream
+                  - downstream
+                notes:
+                  type: string
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Not authenticated
+        '403':
+          description: Insufficient role
+      security: *id004
+  /api/projects/{id}/assets/{assetId}:
+    patch:
+      summary: Update a project-asset link's dependency type/notes
+      tags:
+      - Projects
+      description: 'Requires: Admin or Member'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+        description: Resource id (UUID)
+      - name: assetId
+        in: path
+        required: true
+        schema:
+          type: string
+        description: Resource id (UUID)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                dependencyType:
+                  type: string
+                notes:
+                  type: string
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Not authenticated
+        '403':
+          description: Insufficient role
+      security: *id004
+    delete:
+      summary: Unlink an asset from a project
+      tags:
+      - Projects
+      description: 'Requires: Admin or Member'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+        description: Resource id (UUID)
+      - name: assetId
+        in: path
+        required: true
+        schema:
+          type: string
+        description: Resource id (UUID)
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Not authenticated
+        '403':
+          description: Insufficient role
+      security: *id004
+  /api/reports/capabilities-matrix:
+    get:
+      summary: Business capability coverage matrix data
+      tags:
+      - Reports
+      description: 'Requires: any authenticated user'
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Not authenticated
+      security: *id004
+  /api/risk-assessments:
+    get:
+      summary: All risk assessments across all assets
+      tags:
+      - Security
+      description: 'Requires: any authenticated user'
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Not authenticated
+      security: *id004
+  /api/risk-factor-mappings:
+    get:
+      summary: Risk factor to asset-category mappings
+      tags:
+      - Security
+      description: 'Requires: any authenticated user'
+      parameters:
+      - name: category
+        in: query
+        required: false
+        schema:
+          type: string
+        description: filter by asset category
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Not authenticated
+      security: *id004
+    put:
+      summary: Replace the risk factor mapping for one category
+      tags:
+      - Security
+      description: 'Requires: Admin or Member'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                category:
+                  type: string
+                riskFactorIds:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Not authenticated
+        '403':
+          description: Insufficient role
+      security: *id004
+  /api/risk-factors:
+    get:
+      summary: List risk factors
+      tags:
+      - Security
+      description: 'Requires: any authenticated user'
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Not authenticated
+      security: *id004
+    post:
+      summary: Create a risk factor
+      tags:
+      - Security
+      description: 'Requires: Admin or Member'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
+                kind:
+                  type: string
+                severity:
+                  type: string
+                likelihood:
+                  type: string
+                impact:
+                  type: string
+                categories:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        '201':
+          description: OK
+        '401':
+          description: Not authenticated
+        '403':
+          description: Insufficient role
+      security: *id004
+  /api/risk-factors/{id}:
+    put:
+      summary: Update a risk factor
+      tags:
+      - Security
+      description: 'Requires: Admin or Member'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+        description: Resource id (UUID)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
+                kind:
+                  type: string
+                severity:
+                  type: string
+                likelihood:
+                  type: string
+                impact:
+                  type: string
+                categories:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Not authenticated
+        '403':
+          description: Insufficient role
+      security: *id004
+    delete:
+      summary: Delete a risk factor
+      tags:
+      - Security
+      description: 'Requires: Admin or Member'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+        description: Resource id (UUID)
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Not authenticated
+        '403':
+          description: Insufficient role
+      security: *id004
+  /api/roadmap/phases:
+    get:
+      summary: Roadmap phases within a quarter range
+      tags:
+      - Roadmap
+      description: 'Requires: any authenticated user'
+      parameters:
+      - name: from
+        in: query
+        required: false
+        schema:
+          type: string
+        description: e.g. 2026-Q1
+      - name: to
+        in: query
+        required: false
+        schema:
+          type: string
+        description: e.g. 2028-Q4
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Not authenticated
+      security: *id004
+    post:
+      summary: Create a roadmap phase for an asset
+      tags:
+      - Roadmap
+      description: 'Requires: Admin or Member'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                assetId:
+                  type: string
+                classificationId:
+                  type: string
+                startQuarter:
+                  type: string
+                endQuarter:
+                  type: string
+                notes:
+                  type: string
+      responses:
+        '201':
+          description: OK
+        '401':
+          description: Not authenticated
+        '403':
+          description: Insufficient role
+      security: *id004
+  /api/roadmap/phases/{id}:
+    put:
+      summary: Update a roadmap phase
+      tags:
+      - Roadmap
+      description: 'Requires: Admin or Member'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+        description: Resource id (UUID)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                classificationId:
+                  type: string
+                startQuarter:
+                  type: string
+                endQuarter:
+                  type: string
+                notes:
+                  type: string
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Not authenticated
+        '403':
+          description: Insufficient role
+      security: *id004
+    delete:
+      summary: Delete a roadmap phase
+      tags:
+      - Roadmap
+      description: 'Requires: Admin or Member'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+        description: Resource id (UUID)
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Not authenticated
+        '403':
+          description: Insufficient role
+      security: *id004
+  /api/roles:
+    get:
+      summary: List roles
+      tags:
+      - Roles
+      description: 'Requires: any authenticated user'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                    name: &id035
+                      type: string
+                    description: &id036
+                      type: string
+                    permissionLevel: &id037
+                      type: string
+                      enum:
+                      - read-only
+                      - member
+                      - admin
+        '401':
+          description: Not authenticated
+      security: *id004
+    post:
+      summary: Create a role
+      tags:
+      - Roles
+      description: 'Requires: Admin'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: *id035
+                description: *id036
+                permissionLevel: *id037
+      responses:
+        '201':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+        '401':
+          description: Not authenticated
+        '403':
+          description: Insufficient role
+      security: *id004
+  /api/roles/{id}:
+    put:
+      summary: Update a role
+      tags:
+      - Roles
+      description: 'Requires: Admin'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+        description: Resource id (UUID)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: *id035
+                description: *id036
+                permissionLevel: *id037
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Not authenticated
+        '403':
+          description: Insufficient role
+      security: *id004
+    delete:
+      summary: Delete a role
+      tags:
+      - Roles
+      description: 'Requires: Admin'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+        description: Resource id (UUID)
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Not authenticated
+        '403':
+          description: Insufficient role
+      security: *id004
+  /api/settings:
+    get:
+      summary: Get all install-wide app_settings (secret values masked)
+      tags:
+      - Settings
+      description: 'Requires: Admin'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  settings:
+                    type: object
+                    additionalProperties:
+                      type: string
+        '401':
+          description: Not authenticated
+        '403':
+          description: Insufficient role
+      security: *id004
+    put:
+      summary: Upsert arbitrary app_settings key/value pairs (branding, tour.steps, integration credentials,
+        etc.)
+      tags:
+      - Settings
+      description: 'Requires: Admin'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                settings:
+                  type: object
+                  additionalProperties:
+                    type: string
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Not authenticated
+        '403':
+          description: Insufficient role
+      security: *id004
+  /api/setup/complete:
+    post:
+      summary: 'Finish first-run setup: creates the DB, admin user, and initial org'
+      tags:
+      - Setup
+      description: 'Requires: none'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                db:
+                  type: string
+                appName:
+                  type: string
+                orgName:
+                  type: string
+                admin:
+                  type: object
+                  properties:
+                    name:
+                      type: string
+                    email:
+                      type: string
+                    password:
+                      type: string
+                tierId:
+                  type: string
+      responses:
+        '201':
+          description: OK
+        '401':
+          description: Not authenticated
+        '403':
+          description: Insufficient role
+      security: *id004
+  /api/setup/status:
+    get:
+      summary: Whether first-run setup has been completed
+      tags:
+      - Setup
+      description: 'Requires: none'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  complete:
+                    type: boolean
+        '401':
+          description: Not authenticated
+        '403':
+          description: Insufficient role
+      security: *id004
+  /api/setup/test-db:
+    post:
+      summary: Test a DB connection during first-run setup
+      tags:
+      - Setup
+      description: 'Requires: none'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                dialect:
+                  type: string
+                  enum:
+                  - mysql
+                  - sqlite
+                host:
+                  type: string
+                port:
+                  type: string
+                user:
+                  type: string
+                password:
+                  type: string
+                name:
+                  type: string
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Not authenticated
+        '403':
+          description: Insufficient role
+      security: *id004
+  /api/support:
+    get:
+      summary: List support/feedback submissions
+      tags:
+      - Support
+      description: 'Requires: Admin'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                    type:
+                      type: string
+                    subject:
+                      type: string
+                    status:
+                      type: string
+        '401':
+          description: Not authenticated
+        '403':
+          description: Insufficient role
+      security: *id004
+    post:
+      summary: Submit a support request
+      tags:
+      - Support
+      description: 'Requires: any authenticated user'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                type:
+                  type: string
+                  enum:
+                  - Feature Request
+                  - Report Request
+                  - Bug
+                  - Other
+                subject:
+                  type: string
+                description:
+                  type: string
+      responses:
+        '201':
+          description: OK
+        '401':
+          description: Not authenticated
+      security: *id004
+  /api/support/{id}:
+    patch:
+      summary: Update a support request's status
+      tags:
+      - Support
+      description: 'Requires: Admin'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+        description: Resource id (UUID)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  type: string
+                  enum:
+                  - New
+                  - Acknowledged
+                  - Under Review
+                  - Will Fix
+                  - Will Not Implement
+                  - Completed
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Not authenticated
+        '403':
+          description: Insufficient role
+      security: *id004
+  /api/tiers:
+    get:
+      summary: List tiers
+      tags:
+      - Tiers
+      description: 'Requires: any authenticated user'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                    name: &id038
+                      type: string
+                    description: &id039
+                      type: string
+                    slaAvailability: &id040
+                      type: string
+                    supportHours: &id041
+                      type: string
+                    responseTime: &id042
+                      type: string
+                    resolutionTime: &id043
+                      type: string
+        '401':
+          description: Not authenticated
+      security: *id004
+    post:
+      summary: Create a tier
+      tags:
+      - Tiers
+      description: 'Requires: Admin or Member'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: *id038
+                description: *id039
+                slaAvailability: *id040
+                supportHours: *id041
+                responseTime: *id042
+                resolutionTime: *id043
+      responses:
+        '201':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+        '401':
+          description: Not authenticated
+        '403':
+          description: Insufficient role
+      security: *id004
+  /api/tiers/{id}:
+    put:
+      summary: Update a tier
+      tags:
+      - Tiers
+      description: 'Requires: Admin or Member'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+        description: Resource id (UUID)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: *id038
+                description: *id039
+                slaAvailability: *id040
+                supportHours: *id041
+                responseTime: *id042
+                resolutionTime: *id043
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Not authenticated
+        '403':
+          description: Insufficient role
+      security: *id004
+    delete:
+      summary: Delete a tier
+      tags:
+      - Tiers
+      description: 'Requires: Admin or Member'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+        description: Resource id (UUID)
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Not authenticated
+        '403':
+          description: Insufficient role
+      security: *id004
+  /api/tour:
+    get:
+      summary: Get the admin-configured onboarding tour steps, resolved and filtered for the current viewer
+      tags:
+      - Profile
+      description: 'Requires: any authenticated user'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  steps:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        href:
+                          type: string
+                        label:
+                          type: string
+                        icon:
+                          type: string
+                        featureKey:
+                          type: string
+        '401':
+          description: Not authenticated
+      security: *id004
+  /api/users:
+    get:
+      summary: List users (password excluded)
+      tags:
+      - Users
+      description: 'Requires: Admin'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/User'
+        '401':
+          description: Not authenticated
+        '403':
+          description: Insufficient role
+      security: *id004
+    post:
+      summary: Create a user
+      tags:
+      - Users
+      description: 'Requires: Admin'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                role:
+                  type: string
+                  enum:
+                  - Admin
+                  - Member
+                  - Viewer
+      responses:
+        '201':
+          description: OK
+        '401':
+          description: Not authenticated
+        '403':
+          description: Insufficient role
+      security: *id004
+  /api/users/{id}:
+    put:
+      summary: Update a user's name/role
+      tags:
+      - Users
+      description: 'Requires: Admin'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+        description: Resource id (UUID)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                role:
+                  type: string
+                  enum:
+                  - Admin
+                  - Member
+                  - Viewer
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Not authenticated
+        '403':
+          description: Insufficient role
+      security: *id004
+    delete:
+      summary: Delete a user (cannot delete yourself)
+      tags:
+      - Users
+      description: 'Requires: Admin'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+        description: Resource id (UUID)
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Not authenticated
+        '403':
+          description: Insufficient role
+      security: *id004
+  /api/vendors:
+    get:
+      summary: List vendors
+      tags:
+      - Vendors
+      description: 'Requires: any authenticated user'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                    name: &id044
+                      type: string
+                    website: &id045
+                      type: string
+                    email: &id046
+                      type: string
+                    phone: &id047
+                      type: string
+                    addressLine1: &id048
+                      type: string
+                    addressLine2: &id049
+                      type: string
+                    city: &id050
+                      type: string
+                    stateProvince: &id051
+                      type: string
+                    country: &id052
+                      type: string
+                    postalCode: &id053
+                      type: string
+                    primaryContactName: &id054
+                      type: string
+                    primaryContactRole: &id055
+                      type: string
+                    primaryContactEmail: &id056
+                      type: string
+                    primaryContactPhone: &id057
+                      type: string
+                    notes: &id058
+                      type: string
+        '401':
+          description: Not authenticated
+      security: *id004
+    post:
+      summary: Create a vendor
+      tags:
+      - Vendors
+      description: 'Requires: Admin or Member'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: *id044
+                website: *id045
+                email: *id046
+                phone: *id047
+                addressLine1: *id048
+                addressLine2: *id049
+                city: *id050
+                stateProvince: *id051
+                country: *id052
+                postalCode: *id053
+                primaryContactName: *id054
+                primaryContactRole: *id055
+                primaryContactEmail: *id056
+                primaryContactPhone: *id057
+                notes: *id058
+      responses:
+        '201':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+        '401':
+          description: Not authenticated
+        '403':
+          description: Insufficient role
+      security: *id004
+  /api/vendors/{id}:
+    put:
+      summary: Update a vendor
+      tags:
+      - Vendors
+      description: 'Requires: Admin or Member'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+        description: Resource id (UUID)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: *id044
+                website: *id045
+                email: *id046
+                phone: *id047
+                addressLine1: *id048
+                addressLine2: *id049
+                city: *id050
+                stateProvince: *id051
+                country: *id052
+                postalCode: *id053
+                primaryContactName: *id054
+                primaryContactRole: *id055
+                primaryContactEmail: *id056
+                primaryContactPhone: *id057
+                notes: *id058
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Not authenticated
+        '403':
+          description: Insufficient role
+      security: *id004
+    delete:
+      summary: Delete a vendor
+      tags:
+      - Vendors
+      description: 'Requires: Admin or Member'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+        description: Resource id (UUID)
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Not authenticated
+        '403':
+          description: Insufficient role
+      security: *id004

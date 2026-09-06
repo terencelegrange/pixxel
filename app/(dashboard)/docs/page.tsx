@@ -1,10 +1,12 @@
 import { readFile } from "fs/promises";
 import path from "path";
+import { load as loadYaml } from "js-yaml";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { Components } from "react-markdown";
 import type { ReactNode } from "react";
 import { TocNav } from "@/components/docs/TocNav";
+import { DocsTabs } from "@/components/docs/DocsTabs";
 
 // ---------------------------------------------------------------------------
 // Heading id helpers — shared between the TOC (built from raw markdown) and
@@ -35,6 +37,18 @@ async function getContent(): Promise<string> {
     return await readFile(filePath, "utf-8");
   } catch {
     return "# Documentation\n\nDocumentation is not available in this environment.";
+  }
+}
+
+// openapi.yaml is hand-maintained at the repo root (see its own description
+// field for the "update this alongside any route change" convention).
+async function getApiSpec(): Promise<object> {
+  try {
+    const filePath = path.join(process.cwd(), "openapi.yaml");
+    const raw = await readFile(filePath, "utf-8");
+    return loadYaml(raw) as object;
+  } catch {
+    return { openapi: "3.0.3", info: { title: "Pixxel API", version: "1.0.0" }, paths: {} };
   }
 }
 
@@ -169,43 +183,39 @@ function extractToc(markdown: string): { id: string; label: string }[] {
 // Page
 // ---------------------------------------------------------------------------
 export default async function DocsPage() {
-  const content = await getContent();
+  const [content, apiSpec] = await Promise.all([getContent(), getApiSpec()]);
   const toc = extractToc(content);
 
-  return (
-    <div className="flex gap-8">
-
-      {/* Sidebar TOC — hidden on small screens */}
-      <aside className="hidden xl:block w-56 flex-shrink-0">
-        <div className="sticky top-6">
-          <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
-            On this page
-          </p>
-          <TocNav items={toc} />
-        </div>
-      </aside>
-
-      {/* Main content */}
-      <div className="min-w-0 flex-1">
-        {/* Header */}
-        <div className="mb-6 rounded-xl border border-slate-200 bg-white px-8 py-6 shadow-sm dark:bg-slate-900 dark:border-slate-700">
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Platform Documentation</h1>
-          <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-            Technical reference for the Pixxel Enterprise Architecture Repository.
-          </p>
-        </div>
-
-        {/* Rendered markdown */}
-        <div className="rounded-xl border border-slate-200 bg-white px-8 py-8 shadow-sm dark:bg-slate-900 dark:border-slate-700">
-          <ReactMarkdown
-            remarkPlugins={[remarkGfm]}
-            components={components}
-          >
-            {content}
-          </ReactMarkdown>
-        </div>
+  const guide = (
+    <>
+      {/* Header */}
+      <div className="mb-6 rounded-xl border border-slate-200 bg-white px-8 py-6 shadow-sm dark:bg-slate-900 dark:border-slate-700">
+        <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Platform Documentation</h1>
+        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+          Technical reference for the Pixxel Enterprise Architecture Repository.
+        </p>
       </div>
 
-    </div>
+      {/* Rendered markdown */}
+      <div className="rounded-xl border border-slate-200 bg-white px-8 py-8 shadow-sm dark:bg-slate-900 dark:border-slate-700">
+        <ReactMarkdown
+          remarkPlugins={[remarkGfm]}
+          components={components}
+        >
+          {content}
+        </ReactMarkdown>
+      </div>
+    </>
   );
+
+  const tocNav = (
+    <>
+      <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+        On this page
+      </p>
+      <TocNav items={toc} />
+    </>
+  );
+
+  return <DocsTabs guide={guide} apiSpec={apiSpec} toc={tocNav} />;
 }

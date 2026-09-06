@@ -15,6 +15,32 @@ conventions) before elaborating, building, or shipping a card.
 
 ---
 
+## API documentation (standing convention)
+
+**Every new or changed API route must have its entry added/updated in
+[`openapi.yaml`](openapi.yaml) as part of the same change — not a follow-up,
+not a separate card.** This is a hand-maintained OpenAPI 3.0 spec (93 paths,
+one entry per `app/api/**/route.ts` method handler as of this writing),
+rendered as an interactive "API Reference" tab on the `/docs` page (Swagger
+UI, via `swagger-ui-react`) alongside the existing CLAUDE.md-rendering
+"Overview" tab (`components/docs/DocsTabs.tsx`).
+
+- Adding a route: add its path (or a new method under an existing path) to
+  `openapi.yaml`, following the shape of a similar existing entry — most
+  reference-data CRUD resources (name/description/sortOrder-shaped) share a
+  near-identical pattern already in the file.
+- Changing a route's request/response shape: update the corresponding
+  schema in `openapi.yaml` in the same commit.
+- `openapi.yaml` documents the actual `requireUser(req, role?)` requirement
+  per operation (`any authenticated user`, `Admin or Member`, or `Admin`) —
+  keep that in sync with the real auth check, since it's the one thing a
+  consumer can't verify by reading the UI.
+- No separate PUT/generation endpoint exists for the spec itself — it's a
+  plain file read server-side (`js-yaml`) in `app/(dashboard)/docs/page.tsx`
+  and passed to the client Swagger UI component as a prop.
+
+---
+
 ## Development Environment
 
 - **Runtime:** Node.js v25.8.1 via Homebrew (`/opt/homebrew/Cellar/node/25.8.1_1/bin/node`)
