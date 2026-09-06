@@ -201,6 +201,20 @@ export interface Role {
   updatedAt: string;
 }
 
+export interface ApiKey {
+  id: string;
+  name: string;
+  contact: string | null;
+  keyPrefix: string;
+  createdById: string;
+  createdByName: string;
+  expiresAt: string | null;
+  lastUsedAt: string | null;
+  useCount: number;
+  revokedAt: string | null;
+  createdAt: string;
+}
+
 export type ProjectStatus = "Active" | "On Hold" | "Completed" | "Cancelled";
 export type DependencyType = "upstream" | "downstream";
 

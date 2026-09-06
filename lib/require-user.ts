@@ -6,6 +6,10 @@
  * and — for state-changing requests — same-origin), and returns the
  * authenticated user or a ready-made error response.
  *
+ * Also accepts an `Authorization: Bearer <api-key>` header as an alternative
+ * to the cookie (see lib/api-keys.ts) — resolves to the key's creating
+ * user's CURRENT role, looked up fresh on every request.
+ *
  * Usage:
  *   const auth = await requireUser(req);
  *   if (!auth.ok) return auth.response;
@@ -24,6 +28,7 @@ import { verifyJwt } from "@/lib/jwt";
 import { getDb } from "@/lib/db";
 import { isSecureRequest } from "@/lib/cookie-secure";
 import logger from "@/lib/logger";
+import { hashApiKey, looksLikeApiKey } from "@/lib/api-keys";
 
 export interface AuthUser {
   id: string;
@@ -93,6 +98,84 @@ export async function requireUser(req: NextRequest, requiredRole?: string | stri
       { method, path, status, outcome, durationMs: Date.now() - start, userId: user?.id, role: user?.role },
       "api_request"
     );
+  }
+
+  // API key (bearer token) auth path — checked before the cookie/CSRF flow
+  // since a bearer token is not an ambient browser credential and can't be
+  // CSRF'd. Falls through to the cookie flow below when no Authorization
+  // header is present at all.
+  const authHeader = req.headers.get("authorization");
+  const bearerMatch = authHeader?.match(/^Bearer\s+(.+)$/i);
+  if (bearerMatch) {
+    const rawKey = bearerMatch[1].trim();
+    if (!looksLikeApiKey(rawKey)) {
+      logRequest("api_key_invalid", 401);
+      return {
+        ok: false,
+        response: NextResponse.json({ error: "Invalid API key." }, { status: 401 }),
+      };
+    }
+
+    const db = getDb();
+    const [keyRows] = await db.execute<mysql.RowDataPacket[]>(
+      "SELECT id, created_by_id, expires_at, revoked_at FROM api_keys WHERE key_hash = ? LIMIT 1",
+      [hashApiKey(rawKey)]
+    );
+    const keyRow = keyRows[0];
+    if (!keyRow) {
+      logRequest("api_key_invalid", 401);
+      return {
+        ok: false,
+        response: NextResponse.json({ error: "Invalid API key." }, { status: 401 }),
+      };
+    }
+    if (keyRow.revoked_at != null) {
+      logRequest("api_key_revoked", 401);
+      return {
+        ok: false,
+        response: NextResponse.json({ error: "This API key has been revoked." }, { status: 401 }),
+      };
+    }
+    if (keyRow.expires_at != null && new Date(keyRow.expires_at).getTime() < Date.now()) {
+      logRequest("api_key_expired", 401);
+      return {
+        ok: false,
+        response: NextResponse.json({ error: "This API key has expired." }, { status: 401 }),
+      };
+    }
+
+    // Fresh role lookup — mirrors the token_version fresh-lookup below, so a
+    // key always reflects its creator's CURRENT role, never a baked-in one.
+    const [userRows] = await db.execute<mysql.RowDataPacket[]>(
+      "SELECT id, name, email, role FROM users WHERE id = ? LIMIT 1", [keyRow.created_by_id]
+    );
+    const creator = userRows[0];
+    if (!creator) {
+      logRequest("api_key_invalid", 401);
+      return {
+        ok: false,
+        response: NextResponse.json({ error: "Invalid API key." }, { status: 401 }),
+      };
+    }
+
+    const user: AuthUser = { id: creator.id, name: creator.name, email: creator.email, role: creator.role };
+    const allowedRoles = Array.isArray(requiredRole) ? requiredRole : requiredRole ? [requiredRole] : null;
+    if (allowedRoles && !allowedRoles.includes(user.role)) {
+      logRequest("forbidden", 403, user);
+      return {
+        ok: false,
+        response: NextResponse.json({ error: "You do not have permission to perform this action." }, { status: 403 }),
+      };
+    }
+
+    // Fire-and-forget usage bump — must never fail the outer request.
+    db.execute(
+      "UPDATE api_keys SET last_used_at = CURRENT_TIMESTAMP, use_count = use_count + 1 WHERE id = ?",
+      [keyRow.id]
+    ).catch((err) => logger.error({ err, keyId: keyRow.id }, "api_key usage bump failed"));
+
+    logRequest("api_key_ok", 200, user);
+    return { ok: true, user };
   }
 
   if (!SAFE_METHODS.has(req.method) && !isTrustedOrigin(req)) {

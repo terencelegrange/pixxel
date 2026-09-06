@@ -6,8 +6,12 @@ info:
 
 
     Hand-maintained per the project convention in CLAUDE.md: every new or changed route must have its
-    entry added/updated here as part of the same change. Auth is a single HttpOnly `authToken` cookie
-    set by /api/auth/login or /api/auth/register — there is no separate API key/bearer scheme.'
+    entry added/updated here as part of the same change. Primary auth is a single HttpOnly `authToken`
+    cookie set by /api/auth/login or /api/auth/register. Every cookie-authenticated route also accepts
+    `Authorization: Bearer <api-key>` as an alternative — see the `bearerAuth` security scheme — since
+    that check lives inside the shared `requireUser()` gate and applies uniformly. API keys are managed
+    at /settings/api-keys (Admin only) and resolve to the creating user''s CURRENT role, looked up fresh
+    on every request.'
 servers:
 - url: /
   description: Same-origin (this app serves its own API)
@@ -19,6 +23,13 @@ components:
       name: authToken
       description: HttpOnly session cookie. Most routes also enforce a role via requireUser(req, role)
         — see each operation's description.
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: 'API key issued via /api/api-keys (Admin only, see /settings/api-keys), sent as
+        Authorization: Bearer <key>. Accepted anywhere cookieAuth is, since the check lives inside
+        the shared requireUser() gate. Resolves to the key''s creating user''s CURRENT role, looked up
+        fresh from the database on every request — not baked in at key-creation time.'
   schemas:
     User:
       type: object
@@ -3713,6 +3724,138 @@ paths:
           description: Not authenticated
         '403':
           description: Insufficient role
+      security: *id004
+  /api/api-keys:
+    get:
+      summary: List API keys
+      tags:
+      - API Keys
+      description: 'Requires: Admin'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  apiKeys:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        name:
+                          type: string
+                        contact:
+                          type: string
+                          nullable: true
+                        keyPrefix:
+                          type: string
+                        createdById:
+                          type: string
+                        createdByName:
+                          type: string
+                        expiresAt:
+                          type: string
+                          format: date-time
+                          nullable: true
+                        lastUsedAt:
+                          type: string
+                          format: date-time
+                          nullable: true
+                        useCount:
+                          type: number
+                        revokedAt:
+                          type: string
+                          format: date-time
+                          nullable: true
+                        createdAt:
+                          type: string
+                          format: date-time
+        '401':
+          description: Not authenticated
+        '403':
+          description: Insufficient role
+      security: *id004
+    post:
+      summary: Generate a new API key
+      tags:
+      - API Keys
+      description: 'Requires: Admin. The response''s `rawKey` field is the only time the full key is
+        ever returned — only a SHA-256 hash is stored, so it cannot be retrieved again.'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                contact:
+                  type: string
+                expiresInDays:
+                  type: number
+                  nullable: true
+                  enum:
+                  - 30
+                  - 90
+                  - 365
+      responses:
+        '201':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  rawKey:
+                    type: string
+                  name:
+                    type: string
+                  contact:
+                    type: string
+                    nullable: true
+                  keyPrefix:
+                    type: string
+                  expiresAt:
+                    type: string
+                    format: date-time
+                    nullable: true
+        '400':
+          description: Missing name or invalid expiresInDays
+        '401':
+          description: Not authenticated
+        '403':
+          description: Insufficient role
+      security: *id004
+  /api/api-keys/{id}:
+    delete:
+      summary: Revoke an API key
+      tags:
+      - API Keys
+      description: 'Requires: Admin. Soft-revoke (sets revokedAt); idempotent on an already-revoked
+        key.'
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+        description: Resource id (UUID)
+      responses:
+        '200':
+          description: OK
+        '401':
+          description: Not authenticated
+        '403':
+          description: Insufficient role
+        '404':
+          description: API key not found
       security: *id004
   /api/settings:
     get:

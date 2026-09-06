@@ -36,6 +36,7 @@ function makeReq(opts: {
   host?: string
   forwardedHost?: string
   url?: string
+  authorization?: string
 } = {}) {
   const headers: Record<string, string> = {}
   if (opts.cookie !== undefined) headers['Cookie'] = opts.cookie
@@ -46,11 +47,14 @@ function makeReq(opts: {
   // so tests exercise the same code path production traffic does.
   headers['Host'] = opts.host ?? 'localhost'
   if (opts.forwardedHost) headers['X-Forwarded-Host'] = opts.forwardedHost
+  if (opts.authorization) headers['Authorization'] = opts.authorization
   return new NextRequest(opts.url ?? 'http://localhost/api/assets', {
     method: opts.method ?? 'GET',
     headers,
   })
 }
+
+const RAW_KEY = 'pxk_' + 'a'.repeat(43)
 
 describe('requireUser — CSRF origin check', () => {
   it('blocks a POST with a mismatched Origin header', async () => {
@@ -184,6 +188,93 @@ describe('requireUser — basic auth checks', () => {
     const res = await requireUser(makeReq({ cookie: 'authToken=x' }), 'Admin')
     expect(res.ok).toBe(false)
     if (!res.ok) expect(res.response.status).toBe(403)
+  })
+})
+
+describe('requireUser — API key (bearer) auth', () => {
+  const creatorRow = { id: 'creator-1', name: 'Key Creator', email: 'creator@example.com', role: 'Admin' }
+
+  it('rejects a malformed bearer value without hitting the DB', async () => {
+    const res = await requireUser(makeReq({ authorization: 'Bearer not-a-key' }))
+    expect(res.ok).toBe(false)
+    if (!res.ok) expect(res.response.status).toBe(401)
+    expect(mockExecute).not.toHaveBeenCalled()
+  })
+
+  it('rejects an unknown key hash', async () => {
+    mockExecute.mockResolvedValueOnce([[]]) // no api_keys row
+    const res = await requireUser(makeReq({ authorization: `Bearer ${RAW_KEY}` }))
+    expect(res.ok).toBe(false)
+    if (!res.ok) expect(res.response.status).toBe(401)
+  })
+
+  it('rejects a revoked key', async () => {
+    mockExecute.mockResolvedValueOnce([[{ id: 'k1', created_by_id: 'creator-1', expires_at: null, revoked_at: new Date() }]])
+    const res = await requireUser(makeReq({ authorization: `Bearer ${RAW_KEY}` }))
+    expect(res.ok).toBe(false)
+    if (!res.ok) expect(res.response.status).toBe(401)
+  })
+
+  it('rejects an expired key', async () => {
+    mockExecute.mockResolvedValueOnce([[{
+      id: 'k1', created_by_id: 'creator-1', revoked_at: null,
+      expires_at: new Date(Date.now() - 1000),
+    }]])
+    const res = await requireUser(makeReq({ authorization: `Bearer ${RAW_KEY}` }))
+    expect(res.ok).toBe(false)
+    if (!res.ok) expect(res.response.status).toBe(401)
+  })
+
+  it('resolves to the creating user\'s CURRENT role on a valid key, and bumps usage', async () => {
+    mockExecute
+      .mockResolvedValueOnce([[{ id: 'k1', created_by_id: 'creator-1', expires_at: null, revoked_at: null }]])
+      .mockResolvedValueOnce([[creatorRow]])
+      .mockResolvedValueOnce([{}]) // usage-bump UPDATE
+    const res = await requireUser(makeReq({ authorization: `Bearer ${RAW_KEY}` }))
+    expect(res.ok).toBe(true)
+    if (res.ok) {
+      expect(res.user.id).toBe('creator-1')
+      expect(res.user.role).toBe('Admin')
+    }
+    expect(mockExecute).toHaveBeenCalledTimes(3)
+  })
+
+  it('rejects when the creating user no longer exists', async () => {
+    mockExecute
+      .mockResolvedValueOnce([[{ id: 'k1', created_by_id: 'creator-1', expires_at: null, revoked_at: null }]])
+      .mockResolvedValueOnce([[]])
+    const res = await requireUser(makeReq({ authorization: `Bearer ${RAW_KEY}` }))
+    expect(res.ok).toBe(false)
+    if (!res.ok) expect(res.response.status).toBe(401)
+  })
+
+  it('enforces requiredRole on a bearer-authed request', async () => {
+    mockExecute
+      .mockResolvedValueOnce([[{ id: 'k1', created_by_id: 'creator-1', expires_at: null, revoked_at: null }]])
+      .mockResolvedValueOnce([[{ ...creatorRow, role: 'Member' }]])
+    const res = await requireUser(makeReq({ authorization: `Bearer ${RAW_KEY}` }), 'Admin')
+    expect(res.ok).toBe(false)
+    if (!res.ok) expect(res.response.status).toBe(403)
+  })
+
+  it('bypasses the CSRF/origin check for bearer-authed requests', async () => {
+    mockExecute
+      .mockResolvedValueOnce([[{ id: 'k1', created_by_id: 'creator-1', expires_at: null, revoked_at: null }]])
+      .mockResolvedValueOnce([[creatorRow]])
+      .mockResolvedValueOnce([{}])
+    const res = await requireUser(makeReq({
+      method: 'POST', authorization: `Bearer ${RAW_KEY}`, origin: 'https://evil.com',
+    }))
+    expect(res.ok).toBe(true)
+  })
+
+  it('still succeeds when the usage-bump write fails', async () => {
+    mockExecute
+      .mockResolvedValueOnce([[{ id: 'k1', created_by_id: 'creator-1', expires_at: null, revoked_at: null }]])
+      .mockResolvedValueOnce([[creatorRow]])
+      .mockRejectedValueOnce(new Error('db unavailable'))
+    const res = await requireUser(makeReq({ authorization: `Bearer ${RAW_KEY}` }))
+    expect(res.ok).toBe(true)
   })
 })
 

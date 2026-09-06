@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Settings, Bell, Lock, Globe, ShieldCheck, ShieldAlert, MessageSquare, ChevronRight, Layers, GitBranch, Gauge, Building2, Network, Target, Package2, BarChart2, ScrollText, MapPin, Users, ClipboardList, Activity, Blocks } from "lucide-react";
+import { Settings, Bell, Lock, Globe, ShieldCheck, ShieldAlert, MessageSquare, ChevronRight, Layers, GitBranch, Gauge, Building2, Network, Target, Package2, BarChart2, ScrollText, MapPin, Users, ClipboardList, Activity, Blocks, KeyRound } from "lucide-react";
 import { useFeatureTier } from "@/context/FeatureTierContext";
 
 // ---------------------------------------------------------------------------
@@ -141,6 +141,13 @@ export default function SettingsPage() {
           description="Define roles and permission levels for users."
         />
         <SettingsTile
+          href="/settings/api-keys"
+          icon={KeyRound}
+          iconBg="bg-lime-600"
+          title="API Keys"
+          description="Generate and manage keys for programmatic API access."
+        />
+        <SettingsTile
           href="/settings/feedback"
           icon={MessageSquare}
           iconBg="bg-sky-500"
@@ -234,7 +241,7 @@ export default function SettingsPage() {
           icon={Globe}
           iconBg="bg-sky-500"
           title="Integrations"
-          description="Connect third-party services and manage API keys."
+          description="Connect third-party services such as Confluence."
         />
         <SettingsTile
           href="/settings/observability"

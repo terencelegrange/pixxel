@@ -492,6 +492,25 @@ export const assetRisks = sqliteTable("asset_risks", {
   index("idx_asset_risks_asset").on(t.assetId),
 ]);
 
+export const apiKeys = sqliteTable("api_keys", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  contact: text("contact"),
+  keyPrefix: text("key_prefix").notNull(),
+  keyHash: text("key_hash").notNull(),
+  ...createdBy(),
+  expiresAt: text("expires_at"),
+  lastUsedAt: text("last_used_at"),
+  useCount: integer("use_count").notNull().default(0),
+  revokedAt: text("revoked_at"),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+}, (t) => [
+  uniqueIndex("uq_api_keys_key_hash").on(t.keyHash),
+  index("idx_api_keys_revoked_at").on(t.revokedAt),
+  index("idx_api_keys_created_by").on(t.createdById),
+]);
+
 export const userMfaRecoveryCodes = sqliteTable("user_mfa_recovery_codes", {
   id: text("id").primaryKey(),
   userId: text("user_id").notNull(),

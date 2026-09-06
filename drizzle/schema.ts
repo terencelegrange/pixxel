@@ -491,6 +491,24 @@ export const assetRisks = mysqlTable("asset_risks", {
   index("idx_asset_risks_asset").on(t.assetId),
 ]);
 
+export const apiKeys = mysqlTable("api_keys", {
+  id: char("id", { length: 36 }).primaryKey(),
+  name: varchar("name", { length: 255 }).notNull(),
+  contact: varchar("contact", { length: 255 }),
+  keyPrefix: varchar("key_prefix", { length: 12 }).notNull(),
+  keyHash: char("key_hash", { length: 64 }).notNull().unique("uq_api_keys_key_hash"),
+  ...createdBy(),
+  expiresAt: datetime("expires_at"),
+  lastUsedAt: datetime("last_used_at"),
+  useCount: int("use_count", { unsigned: true }).notNull().default(0),
+  revokedAt: datetime("revoked_at"),
+  createdAt: createdAt(),
+  updatedAt: updatedAt(),
+}, (t) => [
+  index("idx_api_keys_revoked_at").on(t.revokedAt),
+  index("idx_api_keys_created_by").on(t.createdById),
+]);
+
 export const userMfaRecoveryCodes = mysqlTable("user_mfa_recovery_codes", {
   id: char("id", { length: 36 }).primaryKey(),
   userId: char("user_id", { length: 36 }).notNull(),
