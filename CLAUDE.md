@@ -38,6 +38,17 @@ UI, via `swagger-ui-react`) alongside the existing CLAUDE.md-rendering
 - No separate PUT/generation endpoint exists for the spec itself — it's a
   plain file read server-side (`js-yaml`) in `app/(dashboard)/docs/page.tsx`
   and passed to the client Swagger UI component as a prop.
+- **Breaking changes get a new version, not an in-place change.** If
+  uplifting a route would break an existing consumer's backwards
+  compatibility (removing/renaming a field, changing a field's type or
+  meaning, tightening validation that previously passed, changing a
+  status code an existing caller depends on, etc.), do not edit the
+  existing route in place. Instead, introduce it under a new `/api/v2/...`
+  path (the current unversioned routes are implicitly v1), leave the
+  original route and its `openapi.yaml` entry untouched and working, and
+  add the v2 route as a new, separate entry in `openapi.yaml`. A purely
+  additive change (a new optional field, a new endpoint, a widened enum)
+  is not breaking and does not need a new version.
 
 ---
 

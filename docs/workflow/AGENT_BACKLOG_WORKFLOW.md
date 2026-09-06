@@ -59,6 +59,11 @@ template's trigger/resting pattern from there.
   documentation" section for the exact convention. Treat this the same as
   the build/verify commands above: a route change isn't done until the
   spec reflects it.
+- **Breaking API changes get a new version**: if a route uplift would break
+  an existing consumer's backwards compatibility, don't change the route
+  in place — add it under a new `/api/v2/...` path instead and leave the
+  original route working. See CLAUDE.md's "API documentation" section for
+  what counts as breaking vs. additive.
 - **Migrations**: edit `drizzle/schema.ts` **and** `drizzle/schema.sqlite.ts`
   together, then `npx drizzle-kit generate` (MySQL) and the sqlite
   equivalent — see `CLAUDE.md`'s "Schema migrations" section. Applied
