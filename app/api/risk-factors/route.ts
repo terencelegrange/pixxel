@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { randomUUID } from "crypto";
 import mysql from "mysql2/promise";
-import { getDb, setupDatabase } from "@/lib/db";
+import { getDb, getDbDialect, setupDatabase } from "@/lib/db";
 import { writeAudit } from "@/lib/audit";
 import { requireUser } from "@/lib/require-user";
 import logger from "@/lib/logger";
@@ -36,10 +36,15 @@ export async function GET(req: NextRequest) {
   try {
     await setupDatabase();
     const db = getDb();
-    // Correlated subquery instead of GROUP_CONCAT(... ORDER BY ... SEPARATOR ...)
-    // — the SEPARATOR/ORDER BY form is MySQL-only; this shape works on both
-    // MySQL and SQLite (see app/api/assets/route.ts for the same pattern).
-    const [rows] = await db.execute<mysql.RowDataPacket[]>(`
+    // MySQL/MariaDB rejects a correlated reference (rf.id) from inside a
+    // derived table in the FROM clause — "Unknown column 'rf.id' in
+    // 'WHERE'" — since a derived table is materialized independently of
+    // the outer query. SQLite has no such restriction, and its GROUP_CONCAT
+    // has no ORDER BY clause of its own, so the derived-table wrapper is
+    // needed there to get a deterministic category order. Branch per
+    // dialect, same as app/api/assets/route.ts and app/api/feature-tiers/route.ts.
+    const dialect = getDbDialect();
+    const query = dialect === "sqlite" ? `
       SELECT rf.*,
         (SELECT GROUP_CONCAT(category, ',') FROM (
           SELECT rfc.category AS category FROM risk_factor_categories rfc
@@ -47,7 +52,15 @@ export async function GET(req: NextRequest) {
         )) AS categories
       FROM risk_factors rf
       ORDER BY rf.kind ASC, rf.name ASC
-    `);
+    ` : `
+      SELECT rf.*,
+        GROUP_CONCAT(DISTINCT rfc.category ORDER BY rfc.category SEPARATOR ',') AS categories
+      FROM risk_factors rf
+      LEFT JOIN risk_factor_categories rfc ON rfc.risk_factor_id = rf.id
+      GROUP BY rf.id
+      ORDER BY rf.kind ASC, rf.name ASC
+    `;
+    const [rows] = await db.execute<mysql.RowDataPacket[]>(query);
     return NextResponse.json({ riskFactors: rows.map(rowToRiskFactor) });
   } catch (err) {
     logger.error({ err, route: "GET /api/risk-factors" }, "request failed");

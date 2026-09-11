@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { randomUUID } from "crypto";
 import mysql from "mysql2/promise";
-import { getDb, setupDatabase } from "@/lib/db";
+import { getDb, getDbDialect, setupDatabase } from "@/lib/db";
 import { writeAudit } from "@/lib/audit";
 import { requireUser } from "@/lib/require-user";
 import logger from "@/lib/logger";
@@ -29,9 +29,15 @@ export async function GET(req: NextRequest) {
   try {
     await setupDatabase();
     const db = getDb();
-    // Correlated subquery instead of GROUP_CONCAT(... ORDER BY ... SEPARATOR ...)
-    // — portable across MySQL and SQLite (see app/api/assets/route.ts).
-    const [rows] = await db.execute<mysql.RowDataPacket[]>(`
+    // MySQL/MariaDB rejects a correlated reference (ft.id) from inside a
+    // derived table in the FROM clause — "Unknown column 'ft.id' in
+    // 'WHERE'" — since a derived table is materialized independently of
+    // the outer query. SQLite has no such restriction, and its GROUP_CONCAT
+    // has no ORDER BY clause of its own, so the derived-table wrapper is
+    // needed there to get a deterministic feature order. Branch per dialect,
+    // same as app/api/assets/route.ts's department/architect/capability lists.
+    const dialect = getDbDialect();
+    const query = dialect === "sqlite" ? `
       SELECT ft.*,
         (SELECT GROUP_CONCAT(feature_key, ',') FROM (
           SELECT ftf.feature_key AS feature_key FROM feature_tier_features ftf
@@ -39,7 +45,15 @@ export async function GET(req: NextRequest) {
         )) AS features
       FROM feature_tiers ft
       ORDER BY ft.sort_order IS NULL, ft.sort_order ASC, ft.name ASC
-    `);
+    ` : `
+      SELECT ft.*,
+        GROUP_CONCAT(DISTINCT ftf.feature_key ORDER BY ftf.feature_key SEPARATOR ',') AS features
+      FROM feature_tiers ft
+      LEFT JOIN feature_tier_features ftf ON ftf.tier_id = ft.id
+      GROUP BY ft.id
+      ORDER BY ft.sort_order IS NULL, ft.sort_order ASC, ft.name ASC
+    `;
+    const [rows] = await db.execute<mysql.RowDataPacket[]>(query);
     return NextResponse.json({ tiers: rows.map(rowToFeatureTier) });
   } catch (err) {
     logger.error({ err, route: "GET /api/feature-tiers" }, "request failed");
