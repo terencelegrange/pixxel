@@ -1,9 +1,13 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import mysql from "mysql2/promise";
 import { getDb, setupDatabase } from "@/lib/db";
+import { requireUser } from "@/lib/require-user";
+import logger from "@/lib/logger";
 
 // GET /api/risk-assessments — all assessment rows, for client-side reporting joins
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const auth = await requireUser(req);
+  if (!auth.ok) return auth.response;
   try {
     await setupDatabase();
     const db = getDb();
@@ -18,7 +22,7 @@ export async function GET() {
       })),
     });
   } catch (err) {
-    console.error("[GET /api/risk-assessments]", err);
+    logger.error({ err, route: "GET /api/risk-assessments" }, "request failed");
     return NextResponse.json({ error: "Failed to load risk assessments." }, { status: 500 });
   }
 }

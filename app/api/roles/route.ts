@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
+import logger from "@/lib/logger";
 import { randomUUID } from "crypto";
 import mysql from "mysql2/promise";
 import { getDb, setupDatabase } from "@/lib/db";
 import { writeAudit } from "@/lib/audit";
+import { requireUser } from "@/lib/require-user";
 
 const VALID_PERMISSION_LEVELS = ["read-only", "member", "admin"] as const;
 type PermissionLevel = typeof VALID_PERMISSION_LEVELS[number];
@@ -21,8 +23,10 @@ function rowToRole(row: mysql.RowDataPacket) {
   };
 }
 
-// GET /api/roles
-export async function GET() {
+// GET /api/roles — Admin only
+export async function GET(req: NextRequest) {
+  const auth = await requireUser(req, "Admin");
+  if (!auth.ok) return auth.response;
   try {
     await setupDatabase();
     const db = getDb();
@@ -31,17 +35,20 @@ export async function GET() {
     );
     return NextResponse.json({ roles: rows.map(rowToRole) });
   } catch (err) {
-    console.error("[GET /api/roles]", err);
+    logger.error({ err, route: "GET /api/roles" }, "request failed");
     return NextResponse.json({ error: "Failed to load roles." }, { status: 500 });
   }
 }
 
 // POST /api/roles
 export async function POST(req: NextRequest) {
+  const auth = await requireUser(req, "Admin");
+  if (!auth.ok) return auth.response;
+  const { user } = auth;
   try {
     await setupDatabase();
     const body = await req.json();
-    const { name, description, permissionLevel, userId, userName } = body;
+    const { name, description, permissionLevel } = body;
 
     if (!name?.trim()) return NextResponse.json({ error: "Role name is required." }, { status: 400 });
     if (!permissionLevel || !VALID_PERMISSION_LEVELS.includes(permissionLevel as PermissionLevel)) {
@@ -50,7 +57,6 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
-    if (!userId || !userName) return NextResponse.json({ error: "Authenticated user is required." }, { status: 401 });
 
     const db = getDb();
     const id = randomUUID();
@@ -64,18 +70,18 @@ export async function POST(req: NextRequest) {
       `INSERT INTO roles
          (id, name, description, permission_level, created_by_id, created_by_name)
        VALUES (?, ?, ?, ?, ?, ?)`,
-      [id, values.name, values.description, values.permissionLevel, userId, userName]
+      [id, values.name, values.description, values.permissionLevel, user.id, user.name]
     );
 
     await writeAudit({
       tableName: "roles", recordId: id, action: "CREATE",
-      performedById: userId, performedByName: userName,
+      performedById: user.id, performedByName: user.name,
       oldValues: null, newValues: values,
     });
 
     return NextResponse.json({ id }, { status: 201 });
   } catch (err) {
-    console.error("[POST /api/roles]", err);
+    logger.error({ err, route: "POST /api/roles" }, "request failed");
     return NextResponse.json({ error: "Failed to create role." }, { status: 500 });
   }
 }

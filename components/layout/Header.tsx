@@ -2,9 +2,11 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import Link from "next/link";
-import { Bell, Menu, Moon, Search, Sun, UserCircle, LogOut, MessageSquare } from "lucide-react";
+import { Bell, Menu, Moon, Sun, UserCircle, LogOut, MessageSquare, FileText } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useTheme } from "@/context/ThemeContext";
+import { useBranding } from "@/context/BrandingContext";
+import { GlobalSearch } from "@/components/layout/GlobalSearch";
 
 interface HeaderProps {
   onMenuToggle: () => void;
@@ -14,6 +16,7 @@ export default function Header({ onMenuToggle }: HeaderProps) {
   const { user, logout } = useAuth();
   const isAdmin = user?.role === "Admin";
   const { theme, toggleTheme } = useTheme();
+  const { companyName } = useBranding();
 
   // Avatar dropdown
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -22,7 +25,24 @@ export default function Header({ onMenuToggle }: HeaderProps) {
   // Notifications dropdown
   const [notifOpen, setNotifOpen] = useState(false);
   const [newCount, setNewCount] = useState(0);
+  const [expiringCount, setExpiringCount] = useState(0);
+  const [notifyNewFeedback, setNotifyNewFeedback] = useState(true);
+  const [notifyContractsExpiring, setNotifyContractsExpiring] = useState(true);
   const notifRef = useRef<HTMLDivElement>(null);
+
+  // Load the current user's notification preferences (admin only — the bell
+  // itself is admin-only today).
+  useEffect(() => {
+    if (!isAdmin) return;
+    fetch("/api/profile/preferences")
+      .then((res) => res.ok ? res.json() : null)
+      .then((data) => {
+        if (!data) return;
+        setNotifyNewFeedback(data.notifyNewFeedback ?? true);
+        setNotifyContractsExpiring(data.notifyContractsExpiring ?? true);
+      })
+      .catch(() => {});
+  }, [isAdmin]);
 
   // Close both dropdowns on outside click
   useEffect(() => {
@@ -38,9 +58,10 @@ export default function Header({ onMenuToggle }: HeaderProps) {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Poll for new feedback count (admin only)
+  // Poll for new feedback count (admin only, and only if the user hasn't
+  // turned this notification off in Settings → Notifications)
   const fetchNewCount = useCallback(async () => {
-    if (!isAdmin) return;
+    if (!isAdmin || !notifyNewFeedback) { setNewCount(0); return; }
     try {
       const res = await fetch("/api/support");
       if (!res.ok) return;
@@ -50,13 +71,32 @@ export default function Header({ onMenuToggle }: HeaderProps) {
     } catch {
       // silently ignore
     }
-  }, [isAdmin]);
+  }, [isAdmin, notifyNewFeedback]);
+
+  // Poll for expiring contracts count (admin only, same preference gate)
+  const fetchExpiringCount = useCallback(async () => {
+    if (!isAdmin || !notifyContractsExpiring) { setExpiringCount(0); return; }
+    try {
+      const res = await fetch("/api/contracts/expiring-count");
+      if (!res.ok) return;
+      const data = await res.json();
+      setExpiringCount(data.count ?? 0);
+    } catch {
+      // silently ignore
+    }
+  }, [isAdmin, notifyContractsExpiring]);
 
   useEffect(() => {
     fetchNewCount();
-    const interval = setInterval(fetchNewCount, 60_000); // refresh every minute
+    fetchExpiringCount();
+    const interval = setInterval(() => {
+      fetchNewCount();
+      fetchExpiringCount();
+    }, 60_000); // refresh every minute
     return () => clearInterval(interval);
-  }, [fetchNewCount]);
+  }, [fetchNewCount, fetchExpiringCount]);
+
+  const totalNotifications = newCount + expiringCount;
 
   return (
     <header className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-slate-200 bg-white px-4 shadow-sm dark:bg-slate-900 dark:border-slate-800">
@@ -71,19 +111,12 @@ export default function Header({ onMenuToggle }: HeaderProps) {
 
       {/* Logo / Brand (visible on mobile) */}
       <span className="text-base font-semibold text-slate-900 lg:hidden dark:text-slate-100">
-        Pixxel
+        {companyName || "Pixxel"}
       </span>
 
       {/* Search bar */}
       <div className="hidden flex-1 sm:flex">
-        <div className="relative w-full max-w-sm">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-          <input
-            type="search"
-            placeholder="Search..."
-            className="h-9 w-full rounded-lg border border-slate-200 bg-slate-50 pl-9 pr-3 text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-500"
-          />
-        </div>
+        <GlobalSearch />
       </div>
 
       <div className="ml-auto flex items-center gap-2">
@@ -96,9 +129,9 @@ export default function Header({ onMenuToggle }: HeaderProps) {
               aria-label="Notifications"
             >
               <Bell className="h-5 w-5" />
-              {newCount > 0 && (
+              {totalNotifications > 0 && (
                 <span className="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white leading-none">
-                  {newCount > 9 ? "9+" : newCount}
+                  {totalNotifications > 9 ? "9+" : totalNotifications}
                 </span>
               )}
             </button>
@@ -107,32 +140,57 @@ export default function Header({ onMenuToggle }: HeaderProps) {
               <div className="absolute right-0 top-full mt-1.5 w-72 rounded-xl border border-slate-200 bg-white shadow-lg z-50 dark:bg-slate-900 dark:border-slate-700 overflow-hidden">
                 <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 dark:border-slate-800">
                   <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">Notifications</p>
-                  {newCount > 0 && (
+                  {totalNotifications > 0 && (
                     <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-600">
-                      {newCount} new
+                      {totalNotifications} new
                     </span>
                   )}
                 </div>
 
-                {newCount === 0 ? (
+                {totalNotifications === 0 ? (
                   <div className="flex flex-col items-center gap-2 px-4 py-8 text-slate-400">
                     <Bell className="h-8 w-8 text-slate-200 dark:text-slate-700" />
-                    <p className="text-sm">No new feedback submissions</p>
+                    <p className="text-sm">No new notifications</p>
                   </div>
                 ) : (
-                  <div className="px-4 py-4 flex items-start gap-3">
-                    <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-blue-50 dark:bg-blue-900/30">
-                      <MessageSquare className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-slate-800 dark:text-slate-200">
-                        {newCount} new feedback submission{newCount !== 1 ? "s" : ""}
-                      </p>
-                      <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-                        Awaiting review in Settings → Feedback
-                      </p>
-                    </div>
-                  </div>
+                  <>
+                    {newCount > 0 && (
+                      <div className="px-4 py-4 flex items-start gap-3">
+                        <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-blue-50 dark:bg-blue-900/30">
+                          <MessageSquare className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-slate-800 dark:text-slate-200">
+                            {newCount} new feedback submission{newCount !== 1 ? "s" : ""}
+                          </p>
+                          <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+                            Awaiting review in Settings → Feedback
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                    {expiringCount > 0 && (
+                      <div className="px-4 py-4 flex items-start gap-3 border-t border-slate-100 dark:border-slate-800">
+                        <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-red-50 dark:bg-red-900/30">
+                          <FileText className="h-4 w-4 text-red-600 dark:text-red-400" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-slate-800 dark:text-slate-200">
+                            {expiringCount} contract{expiringCount !== 1 ? "s" : ""} expiring soon
+                          </p>
+                          <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+                            <Link
+                              href="/contracts?expiring=90"
+                              onClick={() => setNotifOpen(false)}
+                              className="hover:underline"
+                            >
+                              View expiring contracts
+                            </Link>
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </>
                 )}
 
                 <div className="border-t border-slate-100 dark:border-slate-800">

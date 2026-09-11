@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import mysql from "mysql2/promise";
 import { getDb, setupDatabase } from "@/lib/db";
 import { writeAudit } from "@/lib/audit";
+import { requireUser } from "@/lib/require-user";
+import logger from "@/lib/logger";
 
 const VALID_KINDS = ["Attribute", "Characteristic"] as const;
 const VALID_LEVELS = ["Low", "Medium", "High", "Critical"] as const;
@@ -11,12 +13,16 @@ type Level = typeof VALID_LEVELS[number];
 // PUT /api/risk-factors/[id]
 export async function PUT(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  props: { params: Promise<{ id: string }> }
 ) {
+  const auth = await requireUser(req, ["Admin", "Member"]);
+  if (!auth.ok) return auth.response;
+  const { user } = auth;
   try {
+    const params = await props.params;
     await setupDatabase();
     const body = await req.json();
-    const { name, description, kind, severity, likelihood, impact, categories, userId, userName } = body;
+    const { name, description, kind, severity, likelihood, impact, categories } = body;
 
     if (!name?.trim()) return NextResponse.json({ error: "Name is required." }, { status: 400 });
     if (!VALID_KINDS.includes(kind as Kind))
@@ -25,7 +31,6 @@ export async function PUT(
       if (!VALID_LEVELS.includes(value as Level))
         return NextResponse.json({ error: `${field} must be one of: Low, Medium, High, Critical.` }, { status: 400 });
     }
-    if (!userId || !userName) return NextResponse.json({ error: "Authenticated user is required." }, { status: 401 });
 
     const db = getDb();
     const [rows] = await db.execute<mysql.RowDataPacket[]>(
@@ -59,7 +64,7 @@ export async function PUT(
 
     await writeAudit({
       tableName: "risk_factors", recordId: params.id, action: "UPDATE",
-      performedById: userId, performedByName: userName,
+      performedById: user.id, performedByName: user.name,
       oldValues: {
         name: current.name, description: current.description, kind: current.kind,
         severity: current.severity, likelihood: current.likelihood, impact: current.impact,
@@ -69,7 +74,7 @@ export async function PUT(
 
     return NextResponse.json({ success: true });
   } catch (err) {
-    console.error("[PUT /api/risk-factors/:id]", err);
+    logger.error({ err, route: "PUT /api/risk-factors/:id" }, "request failed");
     return NextResponse.json({ error: "Failed to update risk factor." }, { status: 500 });
   }
 }
@@ -77,13 +82,14 @@ export async function PUT(
 // DELETE /api/risk-factors/[id]
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  props: { params: Promise<{ id: string }> }
 ) {
+  const auth = await requireUser(req, ["Admin", "Member"]);
+  if (!auth.ok) return auth.response;
+  const { user } = auth;
   try {
+    const params = await props.params;
     await setupDatabase();
-    const { userId, userName } = await req.json() as { userId?: string; userName?: string };
-    if (!userId || !userName) return NextResponse.json({ error: "Authenticated user is required." }, { status: 401 });
-
     const db = getDb();
     const [rows] = await db.execute<mysql.RowDataPacket[]>(
       "SELECT * FROM risk_factors WHERE id = ? LIMIT 1", [params.id]
@@ -97,14 +103,14 @@ export async function DELETE(
 
     await writeAudit({
       tableName: "risk_factors", recordId: params.id, action: "DELETE",
-      performedById: userId, performedByName: userName,
+      performedById: user.id, performedByName: user.name,
       oldValues: { name: current.name, kind: current.kind },
       newValues: null,
     });
 
     return NextResponse.json({ success: true });
   } catch (err) {
-    console.error("[DELETE /api/risk-factors/:id]", err);
+    logger.error({ err, route: "DELETE /api/risk-factors/:id" }, "request failed");
     return NextResponse.json({ error: "Failed to delete risk factor." }, { status: 500 });
   }
 }

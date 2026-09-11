@@ -224,7 +224,7 @@ export default function RiskFactorsPage() {
     const res = await fetch(url, {
       method,
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...form, userId: user.id, userName: user.name }),
+      body: JSON.stringify(form),
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error ?? "Save failed.");
@@ -238,8 +238,6 @@ export default function RiskFactorsPage() {
     try {
       const res = await fetch(`/api/risk-factors/${deleteTarget.id}`, {
         method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: user.id, userName: user.name }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Delete failed.");

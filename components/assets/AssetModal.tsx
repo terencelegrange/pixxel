@@ -6,7 +6,7 @@ import type { LucideProps } from "lucide-react";
 import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
-import { Asset, AssetCategory, AssetComplexity, AssetType, AssetStrategy, BusinessCapability, Department, Domain, IndustrySector, LifecycleStatus, Tier, User, Vendor } from "@/types";
+import { Asset, AssetCategory, AssetComplexity, AssetType, AssetStrategy, BusinessCapability, Department, Diagram, Domain, IndustrySector, LifecycleStatus, Tier, User, Vendor } from "@/types";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -70,9 +70,8 @@ export interface AssetFormState {
   retirementDate: string;
   appUrl: string;
   docUrl: string;
-  contractEndDate: string;
-  contractAmount: string;
   notes: string;
+  heroDiagramId: string;
 }
 
 export const EMPTY_FORM: AssetFormState = {
@@ -83,8 +82,9 @@ export const EMPTY_FORM: AssetFormState = {
   businessOwner: "", technicalOwner: "",
   slaAvailability: "", slaRto: "", slaRpo: "",
   goLiveDate: "", retirementDate: "",
-  appUrl: "", docUrl: "", contractEndDate: "", contractAmount: "",
+  appUrl: "", docUrl: "",
   notes: "",
+  heroDiagramId: "",
 };
 
 export function assetToForm(asset: Asset): AssetFormState {
@@ -113,9 +113,8 @@ export function assetToForm(asset: Asset): AssetFormState {
     retirementDate: asset.retirementDate ?? "",
     appUrl: asset.appUrl ?? "",
     docUrl: asset.docUrl ?? "",
-    contractEndDate: asset.contractEndDate ?? "",
-    contractAmount: asset.contractAmount != null ? String(asset.contractAmount) : "",
     notes: asset.notes ?? "",
+    heroDiagramId: asset.heroDiagramId ?? "",
   };
 }
 
@@ -246,11 +245,12 @@ interface AssetModalProps {
   users: User[];
   sectors: IndustrySector[];
   capabilities: BusinessCapability[];
+  diagrams?: Diagram[];
   onSave: (form: AssetFormState) => Promise<void>;
 }
 
 export default function AssetModal({
-  isOpen, onClose, editing, departments, strategies, complexities, domains, tiers, vendors, users, sectors, capabilities, onSave,
+  isOpen, onClose, editing, departments, strategies, complexities, domains, tiers, vendors, users, sectors, capabilities, diagrams = [], onSave,
 }: AssetModalProps) {
   const [form, setForm] = useState<AssetFormState>(EMPTY_FORM);
   const [errors, setErrors] = useState<{ name?: string; departmentIds?: string; general?: string }>({});
@@ -565,22 +565,6 @@ export default function AssetModal({
             />
           </div>
 
-          <Input
-            label="Contract end date"
-            type="date"
-            value={form.contractEndDate}
-            onChange={(e) => set("contractEndDate", e.target.value)}
-          />
-
-          <Input
-            label="Contract amount"
-            type="number"
-            placeholder="e.g. 50000"
-            value={form.contractAmount}
-            onChange={(e) => set("contractAmount", e.target.value)}
-            hint="Annual contract value"
-          />
-
           {/* ── Links & Notes ─────────────────────────────────────────── */}
           <SectionHeading>Links &amp; Notes</SectionHeading>
 
@@ -611,6 +595,16 @@ export default function AssetModal({
             placeholder="Any additional context, known issues, or important notes..."
             rows={3}
           />
+
+          {diagrams.length > 0 && (
+            <div className="col-span-2 sm:col-span-1">
+              <SelectField label="Main diagram" value={form.heroDiagramId} onChange={(v) => set("heroDiagramId", v)}>
+                <option value="">— None —</option>
+                {diagrams.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+              </SelectField>
+              <p className="mt-1 text-xs text-slate-400">Featured architecture diagram shown at the top of the asset detail page.</p>
+            </div>
+          )}
 
           {/* ── Appearance ────────────────────────────────────────────── */}
           <SectionHeading>Appearance</SectionHeading>

@@ -1,0 +1,62 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "6",
+      "when": 1783402463553,
+      "tag": "0000_wealthy_shard",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1783661030156,
+      "tag": "0001_cool_onslaught",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1786544477209,
+      "tag": "0002_cultured_gressill",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1786626681566,
+      "tag": "0003_silky_natasha_romanoff",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1786688400649,
+      "tag": "0004_amused_princess_powerful",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1786690939608,
+      "tag": "0005_boring_big_bertha",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1788184166592,
+      "tag": "0006_cloudy_blue_shield",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1788659565324,
+      "tag": "0007_clean_tony_stark",
+      "breakpoints": true
+    }
+  ]
+}

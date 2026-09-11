@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef, FormEvent } from "react";
+import React, { useState, useEffect, useCallback, useRef, FormEvent } from "react";
 import { ChevronDown, ChevronRight, AlertTriangle, Trash2 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/Button";
@@ -9,6 +9,7 @@ import {
   RoadmapDomainGroup, RoadmapAsset, AssetRoadmapPhase,
   InvestmentClassification, Domain,
 } from "@/types";
+import { hasOverlapWith } from "@/lib/roadmap-utils";
 
 // ---------------------------------------------------------------------------
 // Quarter utilities
@@ -146,6 +147,30 @@ interface PhaseForm {
   notes: string;
 }
 
+// Defined before DragState because DragState.currentPreview references it
+interface DragPreview {
+  phaseId:    string;
+  startIdx:   number;
+  endIdx:     number;
+  hasOverlap: boolean;
+}
+
+interface DragState {
+  phase:            AssetRoadmapPhase;
+  mode:             "move" | "resize";
+  originalStartIdx: number;
+  originalEndIdx:   number;
+  startX:           number;
+  colWidth:         number;
+  hasMoved:         boolean;
+  currentPreview:   DragPreview;
+}
+
+interface ToastItem {
+  id:      number;
+  message: string;
+}
+
 function PhaseModal({
   isOpen, onClose, asset, phase, classifications, fromQuarter, onSaved,
 }: {
@@ -157,7 +182,7 @@ function PhaseModal({
   fromQuarter: string;
   onSaved: () => void;
 }) {
-  const { user } = useAuth();
+  const { user, canWrite } = useAuth();
   const isEdit = phase !== null;
 
   const defaultForm: PhaseForm = {
@@ -304,14 +329,16 @@ function PhaseModal({
           </div>
         </div>
         <div className="mt-6 flex items-center justify-between border-t border-slate-100 pt-4 dark:border-slate-800">
-          {isEdit ? (
+          {isEdit && canWrite ? (
             <Button type="button" variant="danger" isLoading={isDeleting} onClick={handleDelete}>
               <Trash2 className="h-4 w-4" /> Delete
             </Button>
           ) : <div />}
           <div className="flex gap-3">
             <Button type="button" variant="secondary" onClick={onClose}>Cancel</Button>
-            <Button type="submit" isLoading={isSaving}>{isEdit ? "Save changes" : "Add phase"}</Button>
+            {canWrite && (
+              <Button type="submit" isLoading={isSaving}>{isEdit ? "Save changes" : "Add phase"}</Button>
+            )}
           </div>
         </div>
       </form>
@@ -320,17 +347,263 @@ function PhaseModal({
 }
 
 // ---------------------------------------------------------------------------
+// Draggable phase bar
+// ---------------------------------------------------------------------------
+function DraggablePhaseBar({
+  phase,
+  quarters,
+  dragPreview,
+  isSaving,
+  canWrite,
+  onPointerDownMove,
+  onPointerDownResize,
+}: {
+  phase:               AssetRoadmapPhase;
+  quarters:            string[];
+  dragPreview:         DragPreview | null;
+  isSaving:            boolean;
+  canWrite:            boolean;
+  onPointerDownMove:   (e: React.PointerEvent, phase: AssetRoadmapPhase, laneEl: HTMLElement) => void;
+  onPointerDownResize: (e: React.PointerEvent, phase: AssetRoadmapPhase, laneEl: HTMLElement) => void;
+}) {
+  const n              = quarters.length;
+  const isBeingDragged = dragPreview?.phaseId === phase.id;
+  const isOverlap      = isBeingDragged && (dragPreview?.hasOverlap ?? false);
+
+  let left: string;
+  let width: string;
+
+  if (isBeingDragged && dragPreview) {
+    left  = `${(dragPreview.startIdx / n) * 100}%`;
+    width = `${((dragPreview.endIdx - dragPreview.startIdx + 1) / n) * 100}%`;
+  } else {
+    const pos = phasePosition(phase, quarters);
+    if (!pos) return null;
+    ({ left, width } = pos);
+  }
+
+  const bgColor = isOverlap ? "#ef4444" : phase.classificationColor;
+  const opacity = isSaving
+    ? 0.5
+    : isBeingDragged
+    ? (isOverlap ? 0.55 : 0.85)
+    : 1;
+  const cursor = !canWrite
+    ? "pointer"
+    : isSaving
+    ? "wait"
+    : isBeingDragged
+    ? (isOverlap ? "not-allowed" : "grabbing")
+    : "grab";
+
+  return (
+    <div
+      className="absolute inset-y-1.5 flex items-center rounded-md px-2 text-xs font-medium text-white shadow-sm overflow-hidden select-none"
+      style={{
+        left,
+        width,
+        backgroundColor: bgColor,
+        opacity,
+        cursor,
+        zIndex: isBeingDragged ? 10 : 1,
+        pointerEvents: isSaving ? "none" : undefined,
+        boxShadow: isBeingDragged && !isOverlap
+          ? "0 4px 12px rgba(0,0,0,0.25)"
+          : undefined,
+      }}
+      title={`${phase.classificationName}${phase.notes ? `: ${phase.notes}` : ""}`}
+      // Prevent click bubbling to the lane (which would open Add modal)
+      onClick={(e) => e.stopPropagation()}
+      onPointerDown={(e) => {
+        // Always allow: a plain click (no movement) opens the view/edit modal,
+        // which itself gates save/delete behind canWrite. Only actual dragging
+        // (handled inside onPointerDownMove's move-tracking) results in a mutation.
+        const lane = (e.currentTarget as HTMLElement).parentElement!;
+        onPointerDownMove(e, phase, lane);
+      }}
+    >
+      <span className="flex-1 truncate pointer-events-none">{phase.classificationName}</span>
+      {/* Resize handle — 8 px strip on the right edge (mutates via drag, so write-only) */}
+      {canWrite && (
+        <div
+          className="absolute right-0 top-0 bottom-0 w-2 cursor-ew-resize"
+          onPointerDown={(e) => {
+            e.stopPropagation();
+            // parentElement = bar div, parentElement.parentElement = lane div
+            const lane = (e.currentTarget as HTMLElement).parentElement!.parentElement!;
+            onPointerDownResize(e, phase, lane);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Roadmap chart
 // ---------------------------------------------------------------------------
 function RoadmapChart({
-  groups, quarters, onAddPhase, onEditPhase,
+  groups, quarters, canWrite, onAddPhase, onEditPhase, onSavePhase, onError,
 }: {
-  groups: RoadmapDomainGroup[];
-  quarters: string[];
-  onAddPhase: (asset: RoadmapAsset) => void;
+  groups:      RoadmapDomainGroup[];
+  quarters:    string[];
+  canWrite:    boolean;
+  onAddPhase:  (asset: RoadmapAsset) => void;
   onEditPhase: (asset: RoadmapAsset, phase: AssetRoadmapPhase) => void;
+  onSavePhase: (phase: AssetRoadmapPhase, newStart: string, newEnd: string) => Promise<void>;
+  onError:     (message: string) => void;
 }) {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+
+  const dragRef      = useRef<DragState | null>(null);
+  const quartersRef  = useRef(quarters);
+  const groupsRef    = useRef(groups);
+  const phasesMapRef = useRef<Map<string, AssetRoadmapPhase[]>>(new Map());
+  const callbacksRef = useRef({ onEditPhase, onSavePhase, onError });
+  const canWriteRef  = useRef(canWrite);
+  const [dragPreview, setDragPreview] = useState<DragPreview | null>(null);
+  const [savingId,    setSavingId]    = useState<string | null>(null);
+
+  // Mutate refs during render — safe React pattern for keeping refs fresh
+  quartersRef.current  = quarters;
+  groupsRef.current    = groups;
+  callbacksRef.current = { onEditPhase, onSavePhase, onError };
+  canWriteRef.current   = canWrite;
+
+  // Rebuild phase map whenever groups change (needed for overlap check)
+  useEffect(() => {
+    const m = new Map<string, AssetRoadmapPhase[]>();
+    for (const g of groups) for (const a of g.assets) m.set(a.id, a.phases);
+    phasesMapRef.current = m;
+  }, [groups]);
+
+  const startDrag = useCallback((
+    e: React.PointerEvent,
+    phase: AssetRoadmapPhase,
+    laneEl: HTMLElement,
+    mode: "move" | "resize",
+  ) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const qs = quartersRef.current;
+    const n  = qs.length;
+    if (n === 0) return;
+    const colWidth = laneEl.offsetWidth / n;
+    const startQ   = phase.startQuarter < qs[0]     ? qs[0]     : phase.startQuarter;
+    const endQ     = phase.endQuarter   > qs[n - 1] ? qs[n - 1] : phase.endQuarter;
+    const startIdx = qs.indexOf(startQ);
+    const endIdx   = qs.indexOf(endQ);
+    if (startIdx === -1 || endIdx === -1) return;
+    const initialPreview: DragPreview = {
+      phaseId: phase.id, startIdx, endIdx, hasOverlap: false,
+    };
+    dragRef.current = {
+      phase, mode,
+      originalStartIdx: startIdx, originalEndIdx: endIdx,
+      startX: e.clientX, colWidth,
+      hasMoved: false, currentPreview: initialPreview,
+    };
+    setDragPreview(initialPreview);
+    document.body.style.cursor = mode === "resize" ? "ew-resize" : "grabbing";
+  }, []);
+
+  const onPointerDownMove = useCallback(
+    (e: React.PointerEvent, phase: AssetRoadmapPhase, laneEl: HTMLElement) =>
+      startDrag(e, phase, laneEl, "move"),
+    [startDrag],
+  );
+
+  const onPointerDownResize = useCallback(
+    (e: React.PointerEvent, phase: AssetRoadmapPhase, laneEl: HTMLElement) =>
+      startDrag(e, phase, laneEl, "resize"),
+    [startDrag],
+  );
+
+  useEffect(() => {
+    function onPointerMove(e: PointerEvent) {
+      const drag = dragRef.current;
+      if (!drag) return;
+      const qs = quartersRef.current;
+      const n  = qs.length;
+      if (Math.abs(e.clientX - drag.startX) > 4) drag.hasMoved = true;
+      const delta = Math.round((e.clientX - drag.startX) / drag.colWidth);
+
+      let startIdx: number;
+      let endIdx:   number;
+      if (drag.mode === "move") {
+        const span = drag.originalEndIdx - drag.originalStartIdx;
+        startIdx   = Math.max(0, Math.min(n - 1 - span, drag.originalStartIdx + delta));
+        endIdx     = startIdx + span;
+      } else {
+        // resize: only the right edge moves; minimum span = 1 quarter
+        startIdx = drag.originalStartIdx;
+        endIdx   = Math.max(drag.originalStartIdx, Math.min(n - 1, drag.originalEndIdx + delta));
+      }
+
+      const phases     = phasesMapRef.current.get(drag.phase.assetId) ?? [];
+      const hasOverlap = hasOverlapWith(phases, drag.phase.id, qs, startIdx, endIdx);
+      const preview: DragPreview = { phaseId: drag.phase.id, startIdx, endIdx, hasOverlap };
+      drag.currentPreview = preview;
+      setDragPreview(preview);
+    }
+
+    function onPointerUp() {
+      const drag = dragRef.current;
+      if (!drag) return;
+      const preview = drag.currentPreview;
+      dragRef.current = null;
+      document.body.style.cursor = "";
+
+      // Under 4 px travel — treat as click, open edit modal
+      if (!drag.hasMoved) {
+        setDragPreview(null);
+        const asset = groupsRef.current
+          .flatMap((g) => g.assets)
+          .find((a) => a.id === drag.phase.assetId) ?? null;
+        if (asset) callbacksRef.current.onEditPhase(asset, drag.phase);
+        return;
+      }
+
+      // Drop blocked by overlap — snap back
+      if (preview.hasOverlap) {
+        setDragPreview(null);
+        return;
+      }
+
+      // Read-only users cannot commit drag/resize mutations — snap back
+      if (!canWriteRef.current) {
+        setDragPreview(null);
+        return;
+      }
+
+      // Commit the drag
+      const qs       = quartersRef.current;
+      const newStart = qs[preview.startIdx];
+      const newEnd   = qs[preview.endIdx];
+      setSavingId(drag.phase.id);
+      callbacksRef.current
+        .onSavePhase(drag.phase, newStart, newEnd)
+        .then(() => {
+          setDragPreview(null);   // clear AFTER data is refreshed
+        })
+        .catch((err: Error) => {
+          setDragPreview(null);   // still clear on error (snap back)
+          callbacksRef.current.onError(
+            err?.message ?? "Save failed - your change was not saved.",
+          );
+        })
+        .finally(() => {
+          setSavingId(null);
+        });
+    }
+
+    window.addEventListener("pointermove", onPointerMove);
+    window.addEventListener("pointerup",   onPointerUp);
+    return () => {
+      window.removeEventListener("pointermove", onPointerMove);
+      window.removeEventListener("pointerup",   onPointerUp);
+    };
+  }, []); // empty deps — reads all live values via refs
 
   function toggleDomain(id: string) {
     setCollapsed((prev) => {
@@ -396,9 +669,9 @@ function RoadmapChart({
 
                   {/* Phase lane */}
                   <div
-                    className="relative flex-1 cursor-pointer"
+                    className={`relative flex-1 ${canWrite ? "cursor-pointer" : ""}`}
                     style={{ height: "40px" }}
-                    onClick={() => onAddPhase(asset)}
+                    onClick={() => { if (canWrite) onAddPhase(asset); }}
                   >
                     {/* Quarter column guides */}
                     <div
@@ -411,32 +684,25 @@ function RoadmapChart({
                     </div>
 
                     {/* Empty state hint */}
-                    {asset.phases.length === 0 && (
+                    {asset.phases.length === 0 && canWrite && (
                       <div className="pointer-events-none absolute inset-1 rounded-md border-2 border-dashed border-slate-200 flex items-center px-3 dark:border-slate-700">
                         <span className="text-xs text-slate-400">Click to add a phase</span>
                       </div>
                     )}
 
                     {/* Phase bars */}
-                    {asset.phases.map((phase) => {
-                      const pos = phasePosition(phase, quarters);
-                      if (!pos) return null;
-                      return (
-                        <div
-                          key={phase.id}
-                          className="absolute inset-y-1.5 flex cursor-pointer items-center rounded-md px-2 text-xs font-medium text-white shadow-sm overflow-hidden"
-                          style={{
-                            left: pos.left,
-                            width: pos.width,
-                            backgroundColor: phase.classificationColor,
-                          }}
-                          title={`${phase.classificationName}${phase.notes ? `: ${phase.notes}` : ""}`}
-                          onClick={(e) => { e.stopPropagation(); onEditPhase(asset, phase); }}
-                        >
-                          <span className="truncate">{phase.classificationName}</span>
-                        </div>
-                      );
-                    })}
+                    {asset.phases.map((phase) => (
+                      <DraggablePhaseBar
+                        key={phase.id}
+                        phase={phase}
+                        quarters={quarters}
+                        dragPreview={dragPreview}
+                        isSaving={savingId === phase.id}
+                        canWrite={canWrite}
+                        onPointerDownMove={onPointerDownMove}
+                        onPointerDownResize={onPointerDownResize}
+                      />
+                    ))}
                   </div>
                 </div>
               ))}
@@ -474,6 +740,18 @@ export default function RoadmapByPlatformPage() {
   const [activeAsset,  setActiveAsset]  = useState<RoadmapAsset | null>(null);
   const [activePhase,  setActivePhase]  = useState<AssetRoadmapPhase | null>(null);
 
+  // Toast state
+  const [toasts, setToasts] = useState<ToastItem[]>([]);
+  const toastCounterRef = useRef(0);
+
+  function showToast(message: string) {
+    const id = ++toastCounterRef.current;
+    setToasts((prev) => [...prev, { id, message }]);
+    setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 4000);
+  }
+
+  const { user, canWrite } = useAuth();
+
   const quarters = generateQuarters(from, to);
 
   const fetchRoadmap = useCallback(async () => {
@@ -489,6 +767,28 @@ export default function RoadmapByPlatformPage() {
   }, [from, to]);
 
   useEffect(() => { fetchRoadmap(); }, [fetchRoadmap]);
+
+  const handleSavePhase = useCallback(async (
+    phase: AssetRoadmapPhase,
+    newStart: string,
+    newEnd: string,
+  ): Promise<void> => {
+    const res = await fetch(`/api/roadmap/phases/${phase.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        classificationId: phase.classificationId,
+        startQuarter: newStart,
+        endQuarter: newEnd,
+        notes: phase.notes ?? "",
+        userId: user?.id ?? "",
+        userName: user?.name ?? "",
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error ?? "Save failed.");
+    await fetchRoadmap();
+  }, [user, fetchRoadmap]);
 
   useEffect(() => {
     Promise.all([
@@ -563,8 +863,11 @@ export default function RoadmapByPlatformPage() {
         <RoadmapChart
           groups={filteredGroups}
           quarters={quarters}
+          canWrite={canWrite}
           onAddPhase={openAddModal}
           onEditPhase={openEditModal}
+          onSavePhase={handleSavePhase}
+          onError={showToast}
         />
       )}
 
@@ -578,6 +881,21 @@ export default function RoadmapByPlatformPage() {
         fromQuarter={from}
         onSaved={fetchRoadmap}
       />
+
+      {/* Toast notifications */}
+      {toasts.length > 0 && (
+        <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2">
+          {toasts.map((t) => (
+            <div
+              key={t.id}
+              className="flex items-center gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 shadow-lg dark:border-red-900 dark:bg-red-950/80 dark:text-red-400"
+            >
+              <AlertTriangle className="h-4 w-4 flex-shrink-0" />
+              <span>{t.message}</span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

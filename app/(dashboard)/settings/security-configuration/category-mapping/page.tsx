@@ -70,7 +70,6 @@ export default function CategoryMappingPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           category, riskFactorIds: Array.from(selectedIds),
-          userId: user.id, userName: user.name,
         }),
       });
       const data = await res.json();

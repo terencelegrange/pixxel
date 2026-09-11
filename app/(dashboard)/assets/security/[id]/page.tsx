@@ -136,7 +136,7 @@ export default function AssetSecurityDetailPage() {
     const res = await fetch(`/api/assets/${params.id}/risk-assessments/${riskFactorId}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status, notes, userId: user.id, userName: user.name }),
+      body: JSON.stringify({ status, notes }),
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error ?? "Save failed.");
@@ -176,7 +176,7 @@ export default function AssetSecurityDetailPage() {
               <h2 className="flex items-center gap-2 font-semibold text-slate-800 dark:text-slate-200">
                 <ShieldAlert className="h-4 w-4" /> Attributes
               </h2>
-              <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">Fixable gaps for this asset's category.</p>
+              <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">Fixable gaps for this asset&apos;s category.</p>
               <div className="mt-4 flex flex-col gap-3">
                 {attributes.length === 0 ? (
                   <p className="py-6 text-center text-sm italic text-slate-400">No attributes mapped to this category.</p>

@@ -27,6 +27,16 @@ export interface NavGroup {
   items: NavItem[];
 }
 
+export interface SearchableItem {
+  label: string;
+  href: string;
+  icon: string;
+  group: string;
+  description?: string;
+  /** If set, hidden from search results unless the active feature tier includes this key. */
+  featureKey?: string;
+}
+
 export interface Department {
   id: string;
   name: string;
@@ -121,6 +131,30 @@ export interface Vendor {
   updatedAt: string;
 }
 
+export type ContractStatus = "Active" | "Terminated";
+
+export interface Contract {
+  id: string;
+  vendorId: string | null;
+  vendorName: string | null;
+  assetId: string | null;
+  assetName: string | null;
+  title: string;
+  value: number | null;
+  startDate: string | null;
+  endDate: string | null;
+  noticePeriodDays: number | null;
+  autoRenews: boolean;
+  owner: string | null;
+  status: ContractStatus;
+  docUrl: string | null;
+  notes: string | null;
+  createdById: string;
+  createdByName: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface Asset {
   id: string;
   name: string;
@@ -129,6 +163,8 @@ export interface Asset {
   type: AssetType;
   category: AssetCategory;
   icon: string | null;
+  heroDiagramId: string | null;
+  heroDiagramName: string | null;
   lifecycleStatus: LifecycleStatus;
   departmentIds: string[];
   departmentNames: string[];
@@ -155,8 +191,6 @@ export interface Asset {
   retirementDate: string | null;
   appUrl: string | null;
   docUrl: string | null;
-  contractEndDate: string | null;
-  contractAmount: number | null;
   notes: string | null;
   createdById: string;
   createdByName: string;
@@ -207,6 +241,20 @@ export interface Role {
   createdByName: string;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface ApiKey {
+  id: string;
+  name: string;
+  contact: string | null;
+  keyPrefix: string;
+  createdById: string;
+  createdByName: string;
+  expiresAt: string | null;
+  lastUsedAt: string | null;
+  useCount: number;
+  revokedAt: string | null;
+  createdAt: string;
 }
 
 export type ProjectStatus = "Active" | "On Hold" | "Completed" | "Cancelled";
@@ -389,6 +437,26 @@ export interface AssetDependency {
   type: DependencyConnectionType;
   direction: DependencyDirection;
   notes: string | null;
+  createdById: string;
+  createdByName: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type RiskCategory = "Operational" | "Financial" | "Compliance" | "Security" | "Vendor" | "Reputational" | "Other";
+export type RiskStatus = "Open" | "Mitigating" | "Accepted" | "Closed";
+
+export interface AssetRisk {
+  id: string;
+  assetId: string;
+  assetName: string;
+  title: string;
+  description: string | null;
+  category: RiskCategory;
+  likelihood: RiskLevel;
+  impact: RiskLevel;
+  status: RiskStatus;
+  owner: string | null;
   createdById: string;
   createdByName: string;
   createdAt: string;

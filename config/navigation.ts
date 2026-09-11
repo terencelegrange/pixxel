@@ -62,6 +62,17 @@ export const navigationConfig: NavGroup[] = [
         icon: "FolderKanban",
         featureKey: "projects",
       },
+      {
+        label: "Contracts",
+        href: "/contracts",
+        icon: "FileText",
+      },
+      {
+        label: "Risk Register",
+        href: "/risks",
+        icon: "ShieldAlert",
+        featureKey: "risk_register",
+      },
     ],
   },
   {

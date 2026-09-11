@@ -130,7 +130,7 @@ function ProjectModal({
 // Page
 // ---------------------------------------------------------------------------
 export default function ProjectsPage() {
-  const { user } = useAuth();
+  const { user, canWrite } = useAuth();
   const [projects, setProjects] = useState<Project[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
@@ -228,9 +228,11 @@ export default function ProjectsPage() {
             Track initiatives that use assets to deliver a solution.
           </p>
         </div>
-        <Button onClick={() => { setEditTarget(null); setModalOpen(true); }}>
-          <Plus className="h-4 w-4" /> New Project
-        </Button>
+        {canWrite && (
+          <Button onClick={() => { setEditTarget(null); setModalOpen(true); }}>
+            <Plus className="h-4 w-4" /> New Project
+          </Button>
+        )}
       </div>
 
       {/* Filters */}
@@ -308,20 +310,24 @@ export default function ProjectsPage() {
 
                 {/* Actions */}
                 <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button
-                    onClick={() => { setEditTarget(p); setModalOpen(true); }}
-                    className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-300 transition-colors"
-                    aria-label={`Edit ${p.name}`}
-                  >
-                    <Pencil className="h-4 w-4" />
-                  </button>
-                  <button
-                    onClick={() => { setDeleteTarget(p); setDeleteError(null); }}
-                    className="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/40 dark:hover:text-red-400 transition-colors"
-                    aria-label={`Delete ${p.name}`}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
+                  {canWrite && (
+                    <>
+                      <button
+                        onClick={() => { setEditTarget(p); setModalOpen(true); }}
+                        className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-300 transition-colors"
+                        aria-label={`Edit ${p.name}`}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </button>
+                      <button
+                        onClick={() => { setDeleteTarget(p); setDeleteError(null); }}
+                        className="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/40 dark:hover:text-red-400 transition-colors"
+                        aria-label={`Delete ${p.name}`}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </>
+                  )}
                   <Link
                     href={`/projects/${p.id}`}
                     className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-300 transition-colors"

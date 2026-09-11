@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect, useCallback, FormEvent } from "react";
-import { Plus, Pencil, Trash2, AlertTriangle, ExternalLink, Package2 } from "lucide-react";
+import Link from "next/link";
+import { Plus, Pencil, Trash2, AlertTriangle, ExternalLink, Package2, FileText } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
@@ -234,7 +235,7 @@ function VendorModal({
 // Page
 // ---------------------------------------------------------------------------
 export default function VendorsPage() {
-  const { user } = useAuth();
+  const { user, canWrite } = useAuth();
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
@@ -315,9 +316,11 @@ export default function VendorsPage() {
             Manage software and technology suppliers.
           </p>
         </div>
-        <Button onClick={() => { setEditing(null); setModalOpen(true); }}>
-          <Plus className="h-4 w-4" /> Add Vendor
-        </Button>
+        {canWrite && (
+          <Button onClick={() => { setEditing(null); setModalOpen(true); }}>
+            <Plus className="h-4 w-4" /> Add Vendor
+          </Button>
+        )}
       </div>
 
       {/* Search */}
@@ -349,7 +352,7 @@ export default function VendorsPage() {
             <p className="text-sm font-medium">
               {vendors.length === 0 ? "No vendors added yet" : "No vendors match your search"}
             </p>
-            {vendors.length === 0 && (
+            {vendors.length === 0 && canWrite && (
               <Button size="sm" onClick={() => { setEditing(null); setModalOpen(true); }}>
                 <Plus className="h-4 w-4" /> Add Vendor
               </Button>
@@ -417,20 +420,31 @@ export default function VendorsPage() {
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center justify-end gap-2">
-                        <button
-                          onClick={() => { setEditing(vendor); setModalOpen(true); }}
+                        <Link
+                          href={`/contracts?vendor=${vendor.id}`}
                           className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-300 transition-colors"
-                          aria-label={`Edit ${vendor.name}`}
+                          aria-label={`View contracts for ${vendor.name}`}
                         >
-                          <Pencil className="h-4 w-4" />
-                        </button>
-                        <button
-                          onClick={() => { setDeleteTarget(vendor); setDeleteError(null); }}
-                          className="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/40 dark:hover:text-red-400 transition-colors"
-                          aria-label={`Delete ${vendor.name}`}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
+                          <FileText className="h-4 w-4" />
+                        </Link>
+                        {canWrite && (
+                          <>
+                            <button
+                              onClick={() => { setEditing(vendor); setModalOpen(true); }}
+                              className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-300 transition-colors"
+                              aria-label={`Edit ${vendor.name}`}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </button>
+                            <button
+                              onClick={() => { setDeleteTarget(vendor); setDeleteError(null); }}
+                              className="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/40 dark:hover:text-red-400 transition-colors"
+                              aria-label={`Delete ${vendor.name}`}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </>
+                        )}
                       </div>
                     </td>
                   </tr>

@@ -1,4 +1,9 @@
-import { NextRequest } from 'next/server'
+﻿import { NextRequest } from 'next/server'
+
+jest.mock('@/lib/require-user', () => ({
+  requireUser: jest.fn().mockReturnValue({ ok: true, user: { id: 'u1', name: 'Test User', email: 'test@example.com', role: 'Admin' } }),
+}))
+
 
 jest.mock('@/lib/db', () => ({
   setupDatabase: jest.fn().mockResolvedValue(undefined),
@@ -18,7 +23,7 @@ beforeEach(() => {
 describe('GET /api/support', () => {
   it('returns submissions', async () => {
     mockExecute.mockResolvedValueOnce([[{ id: 's1', user_id: 'u1', user_name: 'Jane', type: 'Bug', subject: 'Login broken', description: null, status: 'New', created_at: new Date() }]])
-    const res = await GET()
+    const res = await GET(new NextRequest('http://localhost/'))
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.requests).toHaveLength(1)

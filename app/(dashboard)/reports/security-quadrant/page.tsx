@@ -182,13 +182,12 @@ function GartnerQuadrant({ points, ct }: { points: RiskPoint[]; ct: ReturnType<t
 // sectors group assets by category, like a tech radar.
 // ---------------------------------------------------------------------------
 const RING_LABELS = ["Well Managed", "Low", "Medium", "High", "Critical"];
-const RING_COLOURS = [WELL_MANAGED_COLOUR, SEVERITY_COLOURS.Low, SEVERITY_COLOURS.Medium, SEVERITY_COLOURS.High, SEVERITY_COLOURS.Critical];
 
 function RiskRadar({ points, isDark }: { points: RiskPoint[]; isDark: boolean }) {
   const size = 560;
   const center = size / 2;
   const maxRadius = size / 2 - 60;
-  const ringRadius = (ring: number) => 22 + (ring / 4) * (maxRadius - 22);
+  const ringRadius = useCallback((ring: number) => 22 + (ring / 4) * (maxRadius - 22), [maxRadius]);
 
   const categories = useMemo(
     () => Array.from(new Set(points.map((p) => p.category))).sort(),
@@ -218,7 +217,7 @@ function RiskRadar({ points, isDark }: { points: RiskPoint[]; isDark: boolean })
       });
     });
     return out;
-  }, [points, categories, wedgeWidth]);
+  }, [points, categories, wedgeWidth, ringRadius]);
 
   const gridColour = isDark ? "#334155" : "#cbd5e1";
   const textColour = isDark ? "#cbd5e1" : "#475569";
@@ -367,7 +366,7 @@ export default function SecurityQuadrantReport() {
       <div>
         <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Security Quadrant</h1>
         <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-          Assets plotted by Likelihood × Impact. An asset is "well managed" only once every Critical-severity item is Met.
+          Assets plotted by Likelihood × Impact. An asset is &ldquo;well managed&rdquo; only once every Critical-severity item is Met.
         </p>
       </div>
 

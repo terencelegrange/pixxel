@@ -1,7 +1,9 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+import logger from "@/lib/logger";
 import mysql from "mysql2/promise";
 import { getDb, setupDatabase } from "@/lib/db";
 import { LifecycleStatus } from "@/types";
+import { requireUser } from "@/lib/require-user";
 
 export interface MatrixAsset {
   id: string;
@@ -25,7 +27,9 @@ export interface MatrixSector {
 }
 
 // GET /api/reports/capabilities-matrix
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const auth = await requireUser(req);
+  if (!auth.ok) return auth.response;
   try {
     await setupDatabase();
     const db = getDb();
@@ -107,7 +111,7 @@ export async function GET() {
 
     return NextResponse.json({ matrix, statuses: STATUSES });
   } catch (err) {
-    console.error("[GET /api/reports/capabilities-matrix]", err);
+    logger.error({ err, route: "GET /api/reports/capabilities-matrix" }, "request failed");
     return NextResponse.json({ error: "Failed to load capabilities matrix." }, { status: 500 });
   }
 }

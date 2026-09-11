@@ -1,18 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
+import logger from "@/lib/logger";
 import mysql from "mysql2/promise";
 import { getDb, setupDatabase } from "@/lib/db";
 import { writeAudit } from "@/lib/audit";
+import { requireUser } from "@/lib/require-user";
 
 // PUT /api/diagram-types/[id]
-export async function PUT(
-  req: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function PUT(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
+  const auth = await requireUser(req, ["Admin", "Member"]);
+  if (!auth.ok) return auth.response;
+  const { user } = auth;
   try {
     await setupDatabase();
-    const { name, description, sortOrder, userId, userName } = await req.json();
+    const { name, description, sortOrder } = await req.json();
     if (!name?.trim()) return NextResponse.json({ error: "Name is required." }, { status: 400 });
-    if (!userId || !userName) return NextResponse.json({ error: "Authenticated user is required." }, { status: 401 });
 
     const db = getDb();
     const [rows] = await db.execute<mysql.RowDataPacket[]>(
@@ -27,7 +29,7 @@ export async function PUT(
     );
     await writeAudit({
       tableName: "diagram_types", recordId: params.id, action: "UPDATE",
-      performedById: userId, performedByName: userName,
+      performedById: user.id, performedByName: user.name,
       oldValues: { name: current.name, description: current.description, sortOrder: current.sort_order },
       newValues: { name: name.trim(), description: description?.trim() || null, sortOrder: sortOrder ?? null },
     });
@@ -35,20 +37,19 @@ export async function PUT(
   } catch (err: unknown) {
     const e = err as { code?: string };
     if (e.code === "ER_DUP_ENTRY") return NextResponse.json({ error: "A type with that name already exists." }, { status: 409 });
-    console.error("[PUT /api/diagram-types/:id]", err);
+    logger.error({ err, route: "PUT /api/diagram-types/:id" }, "request failed");
     return NextResponse.json({ error: "Failed to update diagram type." }, { status: 500 });
   }
 }
 
 // DELETE /api/diagram-types/[id]
-export async function DELETE(
-  req: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function DELETE(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
+  const auth = await requireUser(req, ["Admin", "Member"]);
+  if (!auth.ok) return auth.response;
+  const { user } = auth;
   try {
     await setupDatabase();
-    const { userId, userName } = await req.json() as { userId?: string; userName?: string };
-    if (!userId || !userName) return NextResponse.json({ error: "Authenticated user is required." }, { status: 401 });
 
     const db = getDb();
     const [rows] = await db.execute<mysql.RowDataPacket[]>(
@@ -71,12 +72,12 @@ export async function DELETE(
     await db.execute("DELETE FROM diagram_types WHERE id = ?", [params.id]);
     await writeAudit({
       tableName: "diagram_types", recordId: params.id, action: "DELETE",
-      performedById: userId, performedByName: userName,
+      performedById: user.id, performedByName: user.name,
       oldValues: { name: current.name }, newValues: null,
     });
     return NextResponse.json({ success: true });
   } catch (err) {
-    console.error("[DELETE /api/diagram-types/:id]", err);
+    logger.error({ err, route: "DELETE /api/diagram-types/:id" }, "request failed");
     return NextResponse.json({ error: "Failed to delete diagram type." }, { status: 500 });
   }
 }

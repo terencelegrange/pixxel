@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
+import logger from "@/lib/logger";
 import { randomUUID } from "crypto";
 import mysql from "mysql2/promise";
 import { getDb, setupDatabase } from "@/lib/db";
 import { writeAudit } from "@/lib/audit";
 import { Domain } from "@/types";
+import { requireUser } from "@/lib/require-user";
 
 function rowToDomain(row: mysql.RowDataPacket): Domain {
   const toISO = (v: unknown) => v instanceof Date ? v.toISOString() : v ? String(v) : null;
@@ -19,7 +21,9 @@ function rowToDomain(row: mysql.RowDataPacket): Domain {
 }
 
 // GET /api/domains
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const auth = await requireUser(req);
+  if (!auth.ok) return auth.response;
   try {
     await setupDatabase();
     const db = getDb();
@@ -28,20 +32,22 @@ export async function GET() {
     );
     return NextResponse.json({ domains: rows.map(rowToDomain) });
   } catch (err) {
-    console.error("[GET /api/domains]", err);
+    logger.error({ err, route: "GET /api/domains" }, "request failed");
     return NextResponse.json({ error: "Failed to load domains." }, { status: 500 });
   }
 }
 
 // POST /api/domains
 export async function POST(req: NextRequest) {
+  const auth = await requireUser(req, ["Admin", "Member"]);
+  if (!auth.ok) return auth.response;
+  const { user } = auth;
   try {
     await setupDatabase();
     const body = await req.json();
-    const { name, description, userId, userName } = body;
+    const { name, description } = body;
 
     if (!name?.trim()) return NextResponse.json({ error: "Domain name is required." }, { status: 400 });
-    if (!userId || !userName) return NextResponse.json({ error: "Authenticated user is required." }, { status: 401 });
 
     const db = getDb();
     const id = randomUUID();
@@ -53,18 +59,18 @@ export async function POST(req: NextRequest) {
     await db.execute(
       `INSERT INTO domains (id, name, description, created_by_id, created_by_name)
        VALUES (?, ?, ?, ?, ?)`,
-      [id, values.name, values.description, userId, userName]
+      [id, values.name, values.description, user.id, user.name]
     );
 
     await writeAudit({
       tableName: "domains", recordId: id, action: "CREATE",
-      performedById: userId, performedByName: userName,
+      performedById: user.id, performedByName: user.name,
       oldValues: null, newValues: values,
     });
 
     return NextResponse.json({ id }, { status: 201 });
   } catch (err) {
-    console.error("[POST /api/domains]", err);
+    logger.error({ err, route: "POST /api/domains" }, "request failed");
     return NextResponse.json({ error: "Failed to create domain." }, { status: 500 });
   }
 }

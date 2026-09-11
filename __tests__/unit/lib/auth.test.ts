@@ -4,7 +4,7 @@
 
 global.fetch = jest.fn()
 
-import { getStoredUser, storeUser, clearStoredUser, loginUser, registerUser } from '@/lib/auth'
+import { getStoredUser, storeUser, clearStoredUser, loginUser, registerUser, verifyMfaChallenge, fetchCurrentUser } from '@/lib/auth'
 import { User } from '@/types'
 
 const mockUser: User = {
@@ -45,7 +45,7 @@ describe('localStorage helpers', () => {
 })
 
 describe('loginUser', () => {
-  it('calls fetch with correct method and body', async () => {
+  it('calls fetch with correct method and body, returns status "ok" + user', async () => {
     ;(fetch as jest.Mock).mockResolvedValueOnce({
       ok: true,
       json: async () => ({ user: mockUser }),
@@ -55,7 +55,16 @@ describe('loginUser', () => {
       method: 'POST',
       body: JSON.stringify({ email: 'jane@example.com', password: 'password123' }),
     }))
-    expect(result).toEqual(mockUser)
+    expect(result).toEqual({ status: 'ok', user: mockUser })
+  })
+
+  it('returns status "mfa_required" + mfaToken when the account has MFA enabled', async () => {
+    ;(fetch as jest.Mock).mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ mfaRequired: true, mfaToken: 'challenge-token' }),
+    })
+    const result = await loginUser('jane@example.com', 'password123')
+    expect(result).toEqual({ status: 'mfa_required', mfaToken: 'challenge-token' })
   })
 
   it('throws when response is not ok', async () => {
@@ -64,6 +73,40 @@ describe('loginUser', () => {
       json: async () => ({ error: 'Invalid email or password.' }),
     })
     await expect(loginUser('a@b.com', 'wrong')).rejects.toThrow('Invalid email or password.')
+  })
+})
+
+describe('verifyMfaChallenge', () => {
+  it('posts the mfaToken and code to /api/auth/mfa/challenge', async () => {
+    ;(fetch as jest.Mock).mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ user: mockUser }),
+    })
+    const result = await verifyMfaChallenge('challenge-token', { code: '123456' })
+    expect(fetch).toHaveBeenCalledWith('/api/auth/mfa/challenge', expect.objectContaining({
+      method: 'POST',
+      body: JSON.stringify({ mfaToken: 'challenge-token', code: '123456' }),
+    }))
+    expect(result).toEqual(mockUser)
+  })
+
+  it('posts a recoveryCode when given one instead', async () => {
+    ;(fetch as jest.Mock).mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ user: mockUser }),
+    })
+    await verifyMfaChallenge('challenge-token', { recoveryCode: 'ABCDE-12345' })
+    expect(fetch).toHaveBeenCalledWith('/api/auth/mfa/challenge', expect.objectContaining({
+      body: JSON.stringify({ mfaToken: 'challenge-token', recoveryCode: 'ABCDE-12345' }),
+    }))
+  })
+
+  it('throws when response is not ok', async () => {
+    ;(fetch as jest.Mock).mockResolvedValueOnce({
+      ok: false,
+      json: async () => ({ error: 'Invalid code.' }),
+    })
+    await expect(verifyMfaChallenge('challenge-token', { code: '000000' })).rejects.toThrow('Invalid code.')
   })
 })
 
@@ -86,5 +129,29 @@ describe('registerUser', () => {
       json: async () => ({ error: 'Email already exists.' }),
     })
     await expect(registerUser('Jane', 'jane@example.com', 'password123')).rejects.toThrow('Email already exists.')
+  })
+})
+
+describe('fetchCurrentUser', () => {
+  it('returns the user when the session is valid', async () => {
+    ;(fetch as jest.Mock).mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ user: mockUser }),
+    })
+    const result = await fetchCurrentUser()
+    expect(fetch).toHaveBeenCalledWith('/api/auth/me')
+    expect(result).toEqual(mockUser)
+  })
+
+  it('returns null (not an error) when the session is missing/expired/revoked', async () => {
+    ;(fetch as jest.Mock).mockResolvedValueOnce({ ok: false })
+    const result = await fetchCurrentUser()
+    expect(result).toBeNull()
+  })
+
+  it('returns "unknown" on a network error, distinct from a confirmed logged-out state', async () => {
+    ;(fetch as jest.Mock).mockRejectedValueOnce(new Error('network down'))
+    const result = await fetchCurrentUser()
+    expect(result).toBe('unknown')
   })
 })

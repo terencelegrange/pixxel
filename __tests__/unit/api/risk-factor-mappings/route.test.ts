@@ -6,14 +6,19 @@ jest.mock('@/lib/db', () => ({
   resetPool: jest.fn(),
 }))
 jest.mock('@/lib/audit', () => ({ writeAudit: jest.fn().mockResolvedValue(undefined) }))
+jest.mock('@/lib/require-user', () => ({
+  requireUser: jest.fn().mockReturnValue({ ok: true, user: { id: 'u1', name: 'Admin', email: 'admin@example.com', role: 'Admin' } }),
+}))
 
 import { getDb } from '@/lib/db'
+import { requireUser } from '@/lib/require-user'
 import { GET, PUT } from '@/app/api/risk-factor-mappings/route'
 
 const mockExecute = jest.fn()
 beforeEach(() => {
   jest.clearAllMocks()
   ;(getDb as jest.Mock).mockReturnValue({ execute: mockExecute })
+  ;(requireUser as jest.Mock).mockResolvedValue({ ok: true, user: { id: 'u1', name: 'Admin', email: 'admin@example.com', role: 'Admin' } })
 })
 
 describe('GET /api/risk-factor-mappings', () => {
@@ -36,24 +41,28 @@ describe('PUT /api/risk-factor-mappings', () => {
   })
 
   it('returns 400 when category missing', async () => {
-    const res = await PUT(makeReq({ riskFactorIds: [], userId: 'u1', userName: 'Admin' }))
+    const res = await PUT(makeReq({ riskFactorIds: [] }))
     expect(res.status).toBe(400)
   })
 
   it('returns 400 when riskFactorIds is not an array', async () => {
-    const res = await PUT(makeReq({ category: 'Application', riskFactorIds: 'rf-1', userId: 'u1', userName: 'Admin' }))
+    const res = await PUT(makeReq({ category: 'Application', riskFactorIds: 'rf-1' }))
     expect(res.status).toBe(400)
   })
 
-  it('returns 401 when caller identity missing', async () => {
+  it('returns 403 when caller lacks a permitted role', async () => {
+    ;(requireUser as jest.Mock).mockResolvedValueOnce({
+      ok: false,
+      response: new Response(JSON.stringify({ error: 'Forbidden' }), { status: 403 }),
+    })
     const res = await PUT(makeReq({ category: 'Application', riskFactorIds: [] }))
-    expect(res.status).toBe(401)
+    expect(res.status).toBe(403)
   })
 
   it('returns 200 and replaces the mapping', async () => {
     mockExecute.mockResolvedValueOnce([[{ risk_factor_id: 'rf-old' }]]) // SELECT before
     mockExecute.mockResolvedValue([{}])                                 // DELETE + INSERTs
-    const res = await PUT(makeReq({ category: 'Application', riskFactorIds: ['rf-1', 'rf-2'], userId: 'u1', userName: 'Admin' }))
+    const res = await PUT(makeReq({ category: 'Application', riskFactorIds: ['rf-1', 'rf-2'] }))
     expect(res.status).toBe(200)
   })
 })

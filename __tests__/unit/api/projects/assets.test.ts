@@ -1,4 +1,9 @@
-import { NextRequest } from 'next/server'
+﻿import { NextRequest } from 'next/server'
+
+jest.mock('@/lib/require-user', () => ({
+  requireUser: jest.fn().mockReturnValue({ ok: true, user: { id: 'u1', name: 'Test User', email: 'test@example.com', role: 'Admin' } }),
+}))
+
 
 jest.mock('@/lib/db', () => ({
   setupDatabase: jest.fn().mockResolvedValue(undefined),
@@ -10,7 +15,7 @@ import { getDb } from '@/lib/db'
 import { GET, POST } from '@/app/api/projects/[id]/assets/route'
 
 const mockExecute = jest.fn()
-const params = { params: { id: 'proj-1' } }
+const params = { params: Promise.resolve({ id: 'proj-1' }) }
 
 beforeEach(() => {
   jest.clearAllMocks()

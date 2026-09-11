@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
+import logger from "@/lib/logger";
 import { randomUUID } from "crypto";
 import mysql from "mysql2/promise";
 import { getDb, setupDatabase } from "@/lib/db";
 import { writeAudit } from "@/lib/audit";
+import { requireUser } from "@/lib/require-user";
 
 const VALID_TYPES = ["feature", "fix", "improvement", "breaking"] as const;
 type ChangelogType = typeof VALID_TYPES[number];
@@ -25,7 +27,9 @@ function rowToEntry(row: mysql.RowDataPacket) {
 }
 
 // GET /api/changelog
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const auth = await requireUser(req);
+  if (!auth.ok) return auth.response;
   try {
     await setupDatabase();
     const db = getDb();
@@ -34,17 +38,20 @@ export async function GET() {
     );
     return NextResponse.json({ entries: rows.map(rowToEntry) });
   } catch (err) {
-    console.error("[GET /api/changelog]", err);
+    logger.error({ err, route: "GET /api/changelog" }, "request failed");
     return NextResponse.json({ error: "Failed to load changelog." }, { status: 500 });
   }
 }
 
 // POST /api/changelog
 export async function POST(req: NextRequest) {
+  const auth = await requireUser(req, ["Admin", "Member"]);
+  if (!auth.ok) return auth.response;
+  const { user } = auth;
   try {
     await setupDatabase();
     const body = await req.json();
-    const { version, title, description, type, releasedAt, userId, userName } = body;
+    const { version, title, description, type, releasedAt } = body;
 
     if (!version?.trim()) return NextResponse.json({ error: "Version is required." }, { status: 400 });
     if (!title?.trim())   return NextResponse.json({ error: "Title is required." }, { status: 400 });
@@ -52,7 +59,6 @@ export async function POST(req: NextRequest) {
     if (type && !VALID_TYPES.includes(type as ChangelogType)) {
       return NextResponse.json({ error: "type must be one of: feature, fix, improvement, breaking." }, { status: 400 });
     }
-    if (!userId || !userName) return NextResponse.json({ error: "Authenticated user is required." }, { status: 401 });
 
     const db = getDb();
     const id = randomUUID();
@@ -67,18 +73,18 @@ export async function POST(req: NextRequest) {
     await db.execute(
       `INSERT INTO changelog (id, version, title, description, type, released_at, created_by_id, created_by_name)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [id, values.version, values.title, values.description, values.type, values.releasedAt, userId, userName]
+      [id, values.version, values.title, values.description, values.type, values.releasedAt, user.id, user.name]
     );
 
     await writeAudit({
       tableName: "changelog", recordId: id, action: "CREATE",
-      performedById: userId, performedByName: userName,
+      performedById: user.id, performedByName: user.name,
       oldValues: null, newValues: values,
     });
 
     return NextResponse.json({ id }, { status: 201 });
   } catch (err) {
-    console.error("[POST /api/changelog]", err);
+    logger.error({ err, route: "POST /api/changelog" }, "request failed");
     return NextResponse.json({ error: "Failed to create changelog entry." }, { status: 500 });
   }
 }

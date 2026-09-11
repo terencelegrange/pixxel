@@ -129,7 +129,7 @@ function ClassificationModal({
 // Page
 // ---------------------------------------------------------------------------
 export default function InvestmentClassificationsPage() {
-  const { user } = useAuth();
+  const { user, canWrite } = useAuth();
   const [classifications, setClassifications] = useState<InvestmentClassification[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
@@ -208,9 +208,11 @@ export default function InvestmentClassificationsPage() {
             Configure the investment labels and colours used on the roadmap.
           </p>
         </div>
-        <Button onClick={() => { setEditing(null); setModalOpen(true); }}>
-          <Plus className="h-4 w-4" /> Add Classification
-        </Button>
+        {canWrite && (
+          <Button onClick={() => { setEditing(null); setModalOpen(true); }}>
+            <Plus className="h-4 w-4" /> Add Classification
+          </Button>
+        )}
       </div>
 
       <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden dark:border-slate-700 dark:bg-slate-900">
@@ -228,9 +230,11 @@ export default function InvestmentClassificationsPage() {
           <div className="flex flex-col items-center justify-center gap-3 py-20 text-slate-400 dark:text-slate-500">
             <MapPin className="h-10 w-10 text-slate-300 dark:text-slate-600" />
             <p className="text-sm font-medium">No classifications yet</p>
-            <Button size="sm" onClick={() => { setEditing(null); setModalOpen(true); }}>
-              <Plus className="h-4 w-4" /> Add Classification
-            </Button>
+            {canWrite && (
+              <Button size="sm" onClick={() => { setEditing(null); setModalOpen(true); }}>
+                <Plus className="h-4 w-4" /> Add Classification
+              </Button>
+            )}
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -261,20 +265,24 @@ export default function InvestmentClassificationsPage() {
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center justify-end gap-2">
-                        <button
-                          onClick={() => { setEditing(c); setModalOpen(true); }}
-                          className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-300 transition-colors"
-                          aria-label={`Edit ${c.name}`}
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </button>
-                        <button
-                          onClick={() => { setDeleteTarget(c); setDeleteError(null); }}
-                          className="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/40 dark:hover:text-red-400 transition-colors"
-                          aria-label={`Delete ${c.name}`}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
+                        {canWrite && (
+                          <>
+                            <button
+                              onClick={() => { setEditing(c); setModalOpen(true); }}
+                              className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-300 transition-colors"
+                              aria-label={`Edit ${c.name}`}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </button>
+                            <button
+                              onClick={() => { setDeleteTarget(c); setDeleteError(null); }}
+                              className="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/40 dark:hover:text-red-400 transition-colors"
+                              aria-label={`Delete ${c.name}`}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </>
+                        )}
                       </div>
                     </td>
                   </tr>

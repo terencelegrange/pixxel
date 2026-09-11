@@ -1,8 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
+import logger from "@/lib/logger";
 import bcrypt from "bcryptjs";
 import mysql from "mysql2/promise";
 import { getDb, setupDatabase } from "@/lib/db";
+import { rateLimit } from "@/lib/rate-limit";
+import { signJwt } from "@/lib/jwt";
+import { signMfaChallengeToken } from "@/lib/mfa";
+import { validate } from "@/lib/validate";
+import { LoginSchema } from "@/lib/schemas";
 import { User } from "@/types";
+import { isSecureRequest } from "@/lib/cookie-secure";
 
 interface DbUserRow {
   id: string;
@@ -11,26 +18,25 @@ interface DbUserRow {
   password: string;
   role: string;
   created_at: Date;
+  token_version: number;
+  mfa_enabled: number | boolean;
 }
 
 export async function POST(req: NextRequest) {
+  const limit = rateLimit(req, { limit: 10, windowMs: 15 * 60 * 1000 });
+  if (!limit.ok) return limit.response;
+
   try {
     await setupDatabase();
 
-    const body = await req.json();
-    const { email, password } = body as { email?: string; password?: string };
-
-    if (!email || !password) {
-      return NextResponse.json(
-        { error: "Email and password are required." },
-        { status: 400 }
-      );
-    }
+    const v = await validate(req, LoginSchema);
+    if (!v.ok) return v.response;
+    const { email, password } = v.data;
 
     const db = getDb();
     const [rows] = await db.execute<mysql.RowDataPacket[]>(
-      "SELECT id, name, email, password, role, created_at FROM users WHERE email = ? LIMIT 1",
-      [email.toLowerCase().trim()]
+      "SELECT id, name, email, password, role, created_at, token_version, mfa_enabled FROM users WHERE email = ? LIMIT 1",
+      [email]
     );
 
     const row = rows[0] as DbUserRow | undefined;
@@ -62,9 +68,24 @@ export async function POST(req: NextRequest) {
         : String(row.created_at),
     };
 
-    return NextResponse.json({ user }, { status: 200 });
+    if (row.mfa_enabled) {
+      const mfaToken = signMfaChallengeToken(user.id);
+      return NextResponse.json({ mfaRequired: true, mfaToken }, { status: 200 });
+    }
+
+    const token = signJwt({ sub: user.id, name: user.name, email: user.email, role: user.role, tokenVersion: row.token_version });
+
+    const res = NextResponse.json({ user, token }, { status: 200 });
+    res.cookies.set("authToken", token, {
+      httpOnly: true,
+      secure: isSecureRequest(req),
+      sameSite: "lax",
+      maxAge: 7 * 24 * 3600,
+      path: "/",
+    });
+    return res;
   } catch (err) {
-    console.error("[/api/auth/login]", err);
+    logger.error({ err, route: "/api/auth/login" }, "request failed");
     return NextResponse.json(
       { error: "An unexpected error occurred. Please try again." },
       { status: 500 }

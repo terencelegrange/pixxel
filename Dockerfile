@@ -1,18 +1,27 @@
 # syntax=docker/dockerfile:1
 
 # ─── Stage 1: Install dependencies ────────────────────────────────────────────
-FROM node:20-alpine AS deps
+FROM node:22-alpine AS deps
 
 # libc6-compat is needed for some native modules on Alpine
 RUN apk add --no-cache libc6-compat
 
 WORKDIR /app
 
+# Defaults to the public registry so this Dockerfile still builds anywhere;
+# Jenkins passes --build-arg NPM_REGISTRY=http://192.168.100.223:4873 to
+# route through the local Verdaccio mirror on that network instead.
+ARG NPM_REGISTRY=https://registry.npmjs.org/
+
 COPY package.json package-lock.json* ./
-RUN npm ci
+# Longer timeout/retry tolerance than npm's defaults (5min timeout, 2 retries)
+# — the arm64 leg of a multi-arch buildx build runs under QEMU emulation,
+# which is CPU-throttled enough that ordinary registry fetches occasionally
+# exceed npm's default fetch-timeout even though the network itself is fine.
+RUN npm ci --registry=${NPM_REGISTRY} --fetch-timeout=600000 --fetch-retries=8 --fetch-retry-maxtimeout=120000
 
 # ─── Stage 2: Build the application ───────────────────────────────────────────
-FROM node:20-alpine AS builder
+FROM node:22-alpine AS builder
 
 WORKDIR /app
 
@@ -25,7 +34,7 @@ ENV NEXT_TELEMETRY_DISABLED=1
 RUN npm run build
 
 # ─── Stage 3: Production runtime ──────────────────────────────────────────────
-FROM node:20-alpine AS runner
+FROM node:22-alpine AS runner
 
 WORKDIR /app
 
@@ -39,13 +48,37 @@ RUN addgroup --system --gid 1001 nodejs && \
 # Copy static assets
 COPY --from=builder /app/public ./public
 
+# CLAUDE.md and openapi.yaml are read from disk at request time by
+# app/(dashboard)/docs/page.tsx (process.cwd()/CLAUDE.md and
+# process.cwd()/openapi.yaml) — not bundled automatically by Next's
+# standalone output tracing, same reasoning as the migration SQL files
+# below. Without this, the /docs page silently falls back to "Documentation
+# is not available in this environment." in production.
+COPY --from=builder --chown=nextjs:nodejs /app/CLAUDE.md ./CLAUDE.md
+COPY --from=builder --chown=nextjs:nodejs /app/openapi.yaml ./openapi.yaml
+
 # Copy the standalone server bundle (enabled via output: 'standalone' in next.config.js)
 # This includes only the minimal server files — no full node_modules needed
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static    ./.next/static
 
+# Migration SQL files — read from disk at boot, not bundled automatically by
+# Next's standalone output tracing. MySQL migrations (drizzle/migrations) are
+# applied via drizzle-orm's migrate(); SQLite migrations (drizzle/migrations-sqlite)
+# are applied by a custom runner in lib/db-sqlite.ts (runSqliteSetup), not drizzle-orm's migrator.
+COPY --from=builder --chown=nextjs:nodejs /app/drizzle/migrations ./drizzle/migrations
+COPY --from=builder --chown=nextjs:nodejs /app/drizzle/migrations-sqlite ./drizzle/migrations-sqlite
+
 # Allow the app to write config/state files to /app at runtime
 RUN chown nextjs:nodejs /app
+
+# Pre-create the SQLite trial-mode data directory with correct ownership.
+# Without this, a fresh named volume mounted at /app/data (e.g.
+# `-v pixxel-data:/app/data`) is initialized by Docker as root:root, and the
+# non-root nextjs user below gets EACCES trying to create pixxel.db in it.
+# Creating the directory here first means Docker copies ITS ownership into
+# the new volume when the mount is first attached.
+RUN mkdir -p /app/data && chown nextjs:nodejs /app/data
 
 USER nextjs
 
@@ -54,11 +87,20 @@ EXPOSE 3000
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
-# Database connection — override these at runtime via -e or docker-compose env_file
-# ENV DB_HOST=
-# ENV DB_PORT=3306
-# ENV DB_USER=
-# ENV DB_PASSWORD=
-# ENV DB_NAME=
+# Database connection — override these at runtime via -e or docker-compose env_file.
+#
+# MySQL / MariaDB:
+#   ENV DB_TYPE=mysql
+#   ENV DB_HOST=
+#   ENV DB_PORT=3306
+#   ENV DB_USER=
+#   ENV DB_PASSWORD=
+#   ENV DB_NAME=
+#
+# SQLite (trial mode) — single file, no separate database container needed.
+# Mount a volume at /app/data to persist it across container restarts:
+#   docker run -v pixxel-data:/app/data -e DB_TYPE=sqlite -e DB_FILE=data/pixxel.db ...
+#   ENV DB_TYPE=sqlite
+#   ENV DB_FILE=data/pixxel.db
 
 CMD ["node", "server.js"]

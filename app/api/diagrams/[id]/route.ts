@@ -1,16 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
+import logger from "@/lib/logger";
 import mysql from "mysql2/promise";
 import { getDb, setupDatabase } from "@/lib/db";
 import { writeAudit } from "@/lib/audit";
+import { requireUser } from "@/lib/require-user";
 
 const toISO = (v: unknown) =>
   v instanceof Date ? v.toISOString() : v ? String(v) : null;
 
 // GET /api/diagrams/[id] — fetch diagram metadata + latest version content
-export async function GET(
-  _req: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function GET(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
+  const auth = await requireUser(req);
+  if (!auth.ok) return auth.response;
   try {
     await setupDatabase();
     const db = getDb();
@@ -42,21 +44,21 @@ export async function GET(
       },
     });
   } catch (err) {
-    console.error("[GET /api/diagrams/:id]", err);
+    logger.error({ err, route: "GET /api/diagrams/:id" }, "request failed");
     return NextResponse.json({ error: "Failed to load diagram." }, { status: 500 });
   }
 }
 
 // PUT /api/diagrams/[id] — update metadata only (name, description)
-export async function PUT(
-  req: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function PUT(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
+  const auth = await requireUser(req, ["Admin", "Member"]);
+  if (!auth.ok) return auth.response;
+  const { user } = auth;
   try {
     await setupDatabase();
-    const { name, description, projectId, diagramTypeId, userId, userName } = await req.json();
+    const { name, description, projectId, diagramTypeId } = await req.json();
     if (!name?.trim()) return NextResponse.json({ error: "Name is required." }, { status: 400 });
-    if (!userId || !userName) return NextResponse.json({ error: "Authenticated user is required." }, { status: 401 });
 
     const db = getDb();
     const [rows] = await db.execute<mysql.RowDataPacket[]>(
@@ -72,27 +74,26 @@ export async function PUT(
 
     await writeAudit({
       tableName: "diagrams", recordId: params.id, action: "UPDATE",
-      performedById: userId, performedByName: userName,
+      performedById: user.id, performedByName: user.name,
       oldValues: { name: current.name, description: current.description, projectId: current.project_id, diagramTypeId: current.diagram_type_id },
       newValues: { name: name.trim(), description: description?.trim() || null, projectId: projectId || null, diagramTypeId: diagramTypeId || null },
     });
 
     return NextResponse.json({ success: true });
   } catch (err) {
-    console.error("[PUT /api/diagrams/:id]", err);
+    logger.error({ err, route: "PUT /api/diagrams/:id" }, "request failed");
     return NextResponse.json({ error: "Failed to update diagram." }, { status: 500 });
   }
 }
 
 // DELETE /api/diagrams/[id]
-export async function DELETE(
-  req: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function DELETE(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
+  const auth = await requireUser(req, ["Admin", "Member"]);
+  if (!auth.ok) return auth.response;
+  const { user } = auth;
   try {
     await setupDatabase();
-    const { userId, userName } = await req.json() as { userId?: string; userName?: string };
-    if (!userId || !userName) return NextResponse.json({ error: "Authenticated user is required." }, { status: 401 });
 
     const db = getDb();
     const [rows] = await db.execute<mysql.RowDataPacket[]>(
@@ -101,19 +102,20 @@ export async function DELETE(
     const current = rows[0];
     if (!current) return NextResponse.json({ error: "Diagram not found." }, { status: 404 });
 
+    await db.execute("UPDATE assets SET hero_diagram_id = NULL WHERE hero_diagram_id = ?", [params.id]);
     await db.execute("DELETE FROM diagram_assets WHERE diagram_id = ?", [params.id]);
     await db.execute("DELETE FROM diagram_versions WHERE diagram_id = ?", [params.id]);
     await db.execute("DELETE FROM diagrams WHERE id = ?", [params.id]);
 
     await writeAudit({
       tableName: "diagrams", recordId: params.id, action: "DELETE",
-      performedById: userId, performedByName: userName,
+      performedById: user.id, performedByName: user.name,
       oldValues: { name: current.name, description: current.description }, newValues: null,
     });
 
     return NextResponse.json({ success: true });
   } catch (err) {
-    console.error("[DELETE /api/diagrams/:id]", err);
+    logger.error({ err, route: "DELETE /api/diagrams/:id" }, "request failed");
     return NextResponse.json({ error: "Failed to delete diagram." }, { status: 500 });
   }
 }

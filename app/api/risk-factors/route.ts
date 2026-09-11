@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { randomUUID } from "crypto";
 import mysql from "mysql2/promise";
-import { getDb, setupDatabase } from "@/lib/db";
+import { getDb, getDbDialect, setupDatabase } from "@/lib/db";
 import { writeAudit } from "@/lib/audit";
+import { requireUser } from "@/lib/require-user";
+import logger from "@/lib/logger";
 
 const VALID_KINDS = ["Attribute", "Characteristic"] as const;
 const VALID_LEVELS = ["Low", "Medium", "High", "Critical"] as const;
@@ -28,30 +30,53 @@ function rowToRiskFactor(row: mysql.RowDataPacket) {
 }
 
 // GET /api/risk-factors
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const auth = await requireUser(req);
+  if (!auth.ok) return auth.response;
   try {
     await setupDatabase();
     const db = getDb();
-    const [rows] = await db.execute<mysql.RowDataPacket[]>(`
-      SELECT rf.*, GROUP_CONCAT(rfc.category ORDER BY rfc.category) AS categories
+    // MySQL/MariaDB rejects a correlated reference (rf.id) from inside a
+    // derived table in the FROM clause — "Unknown column 'rf.id' in
+    // 'WHERE'" — since a derived table is materialized independently of
+    // the outer query. SQLite has no such restriction, and its GROUP_CONCAT
+    // has no ORDER BY clause of its own, so the derived-table wrapper is
+    // needed there to get a deterministic category order. Branch per
+    // dialect, same as app/api/assets/route.ts and app/api/feature-tiers/route.ts.
+    const dialect = getDbDialect();
+    const query = dialect === "sqlite" ? `
+      SELECT rf.*,
+        (SELECT GROUP_CONCAT(category, ',') FROM (
+          SELECT rfc.category AS category FROM risk_factor_categories rfc
+          WHERE rfc.risk_factor_id = rf.id ORDER BY rfc.category
+        )) AS categories
+      FROM risk_factors rf
+      ORDER BY rf.kind ASC, rf.name ASC
+    ` : `
+      SELECT rf.*,
+        GROUP_CONCAT(DISTINCT rfc.category ORDER BY rfc.category SEPARATOR ',') AS categories
       FROM risk_factors rf
       LEFT JOIN risk_factor_categories rfc ON rfc.risk_factor_id = rf.id
       GROUP BY rf.id
       ORDER BY rf.kind ASC, rf.name ASC
-    `);
+    `;
+    const [rows] = await db.execute<mysql.RowDataPacket[]>(query);
     return NextResponse.json({ riskFactors: rows.map(rowToRiskFactor) });
   } catch (err) {
-    console.error("[GET /api/risk-factors]", err);
+    logger.error({ err, route: "GET /api/risk-factors" }, "request failed");
     return NextResponse.json({ error: "Failed to load risk factors." }, { status: 500 });
   }
 }
 
 // POST /api/risk-factors
 export async function POST(req: NextRequest) {
+  const auth = await requireUser(req, ["Admin", "Member"]);
+  if (!auth.ok) return auth.response;
+  const { user } = auth;
   try {
     await setupDatabase();
     const body = await req.json();
-    const { name, description, kind, severity, likelihood, impact, categories, userId, userName } = body;
+    const { name, description, kind, severity, likelihood, impact, categories } = body;
 
     if (!name?.trim()) return NextResponse.json({ error: "Name is required." }, { status: 400 });
     if (!VALID_KINDS.includes(kind as Kind))
@@ -60,7 +85,6 @@ export async function POST(req: NextRequest) {
       if (!VALID_LEVELS.includes(value as Level))
         return NextResponse.json({ error: `${field} must be one of: Low, Medium, High, Critical.` }, { status: 400 });
     }
-    if (!userId || !userName) return NextResponse.json({ error: "Authenticated user is required." }, { status: 401 });
 
     const db = getDb();
     const id = randomUUID();
@@ -77,7 +101,7 @@ export async function POST(req: NextRequest) {
       `INSERT INTO risk_factors
          (id, name, description, kind, severity, likelihood, impact, created_by_id, created_by_name)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [id, values.name, values.description, values.kind, values.severity, values.likelihood, values.impact, userId, userName]
+      [id, values.name, values.description, values.kind, values.severity, values.likelihood, values.impact, user.id, user.name]
     );
 
     const categoryList: string[] = Array.isArray(categories) ? categories : [];
@@ -90,13 +114,13 @@ export async function POST(req: NextRequest) {
 
     await writeAudit({
       tableName: "risk_factors", recordId: id, action: "CREATE",
-      performedById: userId, performedByName: userName,
+      performedById: user.id, performedByName: user.name,
       oldValues: null, newValues: { ...values, categories: categoryList },
     });
 
     return NextResponse.json({ id }, { status: 201 });
   } catch (err) {
-    console.error("[POST /api/risk-factors]", err);
+    logger.error({ err, route: "POST /api/risk-factors" }, "request failed");
     return NextResponse.json({ error: "Failed to create risk factor." }, { status: 500 });
   }
 }

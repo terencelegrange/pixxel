@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
+import logger from "@/lib/logger";
 import { randomUUID } from "crypto";
 import mysql from "mysql2/promise";
 import { getDb, setupDatabase } from "@/lib/db";
 import { writeAudit } from "@/lib/audit";
 import { AssetComplexity } from "@/types";
+import { requireUser } from "@/lib/require-user";
 
 function rowToComplexity(row: mysql.RowDataPacket): AssetComplexity {
   const toISO = (v: unknown) => v instanceof Date ? v.toISOString() : v ? String(v) : null;
@@ -20,7 +22,9 @@ function rowToComplexity(row: mysql.RowDataPacket): AssetComplexity {
 }
 
 // GET /api/asset-complexity
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const auth = await requireUser(req);
+  if (!auth.ok) return auth.response;
   try {
     await setupDatabase();
     const db = getDb();
@@ -29,19 +33,21 @@ export async function GET() {
     );
     return NextResponse.json({ complexities: rows.map(rowToComplexity) });
   } catch (err) {
-    console.error("[GET /api/asset-complexity]", err);
+    logger.error({ err, route: "GET /api/asset-complexity" }, "request failed");
     return NextResponse.json({ error: "Failed to load complexities." }, { status: 500 });
   }
 }
 
 // POST /api/asset-complexity
 export async function POST(req: NextRequest) {
+  const auth = await requireUser(req, ["Admin", "Member"]);
+  if (!auth.ok) return auth.response;
+  const { user } = auth;
   try {
     await setupDatabase();
-    const { name, description, sortOrder, userId, userName } = await req.json();
+    const { name, description, sortOrder } = await req.json();
 
     if (!name?.trim()) return NextResponse.json({ error: "Name is required." }, { status: 400 });
-    if (!userId || !userName) return NextResponse.json({ error: "Authenticated user is required." }, { status: 401 });
 
     const db = getDb();
     const id = randomUUID();
@@ -57,7 +63,7 @@ export async function POST(req: NextRequest) {
       await db.execute(
         `INSERT INTO asset_complexities (id, name, description, sort_order, created_by_id, created_by_name)
          VALUES (?, ?, ?, ?, ?, ?)`,
-        [id, values.name, values.description, values.sortOrder, userId, userName]
+        [id, values.name, values.description, values.sortOrder, user.id, user.name]
       );
     } catch (e: unknown) {
       if ((e as { code?: string }).code === "ER_DUP_ENTRY") {
@@ -68,13 +74,13 @@ export async function POST(req: NextRequest) {
 
     await writeAudit({
       tableName: "asset_complexities", recordId: id, action: "CREATE",
-      performedById: userId, performedByName: userName,
+      performedById: user.id, performedByName: user.name,
       oldValues: null, newValues: values,
     });
 
     return NextResponse.json({ id }, { status: 201 });
   } catch (err) {
-    console.error("[POST /api/asset-complexity]", err);
+    logger.error({ err, route: "POST /api/asset-complexity" }, "request failed");
     return NextResponse.json({ error: "Failed to create complexity." }, { status: 500 });
   }
 }

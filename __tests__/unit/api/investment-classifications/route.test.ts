@@ -1,4 +1,4 @@
-import { NextRequest } from 'next/server'
+﻿import { NextRequest, NextResponse } from 'next/server'
 
 jest.mock('@/lib/db', () => ({
   setupDatabase: jest.fn().mockResolvedValue(undefined),
@@ -6,8 +6,12 @@ jest.mock('@/lib/db', () => ({
   resetPool: jest.fn(),
 }))
 jest.mock('@/lib/audit', () => ({ writeAudit: jest.fn().mockResolvedValue(undefined) }))
+jest.mock('@/lib/require-user', () => ({
+  requireUser: jest.fn().mockReturnValue({ ok: true, user: { id: 'u1', name: 'Test User', email: 'test@example.com', role: 'Admin' } }),
+}))
 
 import { getDb } from '@/lib/db'
+import { requireUser } from '@/lib/require-user'
 import { GET, POST } from '@/app/api/investment-classifications/route'
 
 const mockExecute = jest.fn()
@@ -19,7 +23,7 @@ beforeEach(() => {
 describe('GET /api/investment-classifications', () => {
   it('returns classifications list', async () => {
     mockExecute.mockResolvedValueOnce([[{ id: 'c1', name: 'Invest', color: '#22c55e', sort_order: 1, created_by_id: 'u1', created_by_name: 'Admin', created_at: new Date(), updated_at: new Date() }]])
-    const res = await GET()
+    const res = await GET(new NextRequest('http://localhost/'))
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.classifications).toHaveLength(1)
@@ -44,7 +48,8 @@ describe('POST /api/investment-classifications', () => {
     expect(res.status).toBe(400)
   })
 
-  it('returns 401 when userId is missing', async () => {
+  it('returns 401 when not authenticated', async () => {
+    ;(requireUser as jest.Mock).mockReturnValueOnce({ ok: false, response: new NextResponse(null, { status: 401 }) })
     const res = await POST(makeReq({ name: 'Invest', color: '#22c55e' }))
     expect(res.status).toBe(401)
   })

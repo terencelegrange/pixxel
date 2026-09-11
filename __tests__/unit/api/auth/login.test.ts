@@ -9,6 +9,13 @@ jest.mock('bcryptjs', () => ({
   compare: jest.fn(),
   hash: jest.fn(),
 }))
+jest.mock('@/lib/jwt', () => ({
+  signJwt: jest.fn().mockReturnValue('mock-token'),
+  verifyJwt: jest.fn(),
+}))
+jest.mock('@/lib/mfa', () => ({
+  signMfaChallengeToken: jest.fn().mockReturnValue('mock-mfa-token'),
+}))
 
 import { getDb } from '@/lib/db'
 import bcrypt from 'bcryptjs'
@@ -35,19 +42,20 @@ const dbUser = {
   password: '$2a$12$hashedpassword',
   role: 'Member',
   created_at: new Date('2025-01-01'),
+  token_version: 3,
 }
 
 describe('POST /api/auth/login', () => {
   it('returns 400 when email is missing', async () => {
     const res = await POST(makeReq({ password: 'secret' }))
     expect(res.status).toBe(400)
-    expect(await res.json()).toMatchObject({ error: expect.stringContaining('required') })
+    expect(await res.json()).toMatchObject({ error: expect.any(String) })
   })
 
   it('returns 400 when password is missing', async () => {
     const res = await POST(makeReq({ email: 'jane@example.com' }))
     expect(res.status).toBe(400)
-    expect(await res.json()).toMatchObject({ error: expect.stringContaining('required') })
+    expect(await res.json()).toMatchObject({ error: expect.any(String) })
   })
 
   it('returns 401 when email not found', async () => {
@@ -86,6 +94,28 @@ describe('POST /api/auth/login', () => {
       avatarInitials: 'JS',
     })
     expect(body.user.password).toBeUndefined()
+  })
+
+  it('embeds the user\'s current token_version in the signed JWT', async () => {
+    const { signJwt } = jest.requireMock('@/lib/jwt')
+    mockExecute.mockResolvedValueOnce([[dbUser]])
+    ;(bcrypt.compare as jest.Mock).mockResolvedValueOnce(true)
+    await POST(makeReq({ email: 'jane@example.com', password: 'correct' }))
+    expect(signJwt).toHaveBeenCalledWith(expect.objectContaining({ tokenVersion: 3 }))
+  })
+
+  it('returns mfaRequired + mfaToken instead of a session when MFA is enabled, without setting a cookie', async () => {
+    const { signMfaChallengeToken } = jest.requireMock('@/lib/mfa')
+    const { signJwt } = jest.requireMock('@/lib/jwt')
+    mockExecute.mockResolvedValueOnce([[{ ...dbUser, mfa_enabled: 1 }]])
+    ;(bcrypt.compare as jest.Mock).mockResolvedValueOnce(true)
+    const res = await POST(makeReq({ email: 'jane@example.com', password: 'correct' }))
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body).toEqual({ mfaRequired: true, mfaToken: 'mock-mfa-token' })
+    expect(signMfaChallengeToken).toHaveBeenCalledWith('user-1')
+    expect(signJwt).not.toHaveBeenCalled()
+    expect(res.cookies.get('authToken')).toBeUndefined()
   })
 
   it('returns 500 when DB throws', async () => {

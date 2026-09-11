@@ -1,7 +1,11 @@
-// __tests__/integration/api/assets.test.ts
+﻿// __tests__/integration/api/assets.test.ts
 import { NextRequest } from 'next/server'
 import { config } from 'dotenv'
 import { randomUUID } from 'crypto'
+
+jest.mock('@/lib/require-user', () => ({
+  requireUser: jest.fn().mockReturnValue({ ok: true, user: { id: 'u1', name: 'Test User', email: 'test@example.com', role: 'Admin' } }),
+}))
 
 config({ path: '.env.test' })
 
@@ -47,7 +51,7 @@ describe('Asset CRUD (integration)', () => {
 
   it('GET /api/assets returns the created asset with department name', async () => {
     const { GET } = await import('@/app/api/assets/route')
-    const res = await GET()
+    const res = await GET(new NextRequest('http://localhost/'))
     const body = await res.json()
     const found = body.assets.find((a: any) => a.id === createdAssetId)
     expect(found).toBeDefined()
@@ -58,7 +62,7 @@ describe('Asset CRUD (integration)', () => {
     const { DELETE } = await import('@/app/api/assets/[id]/route')
     const res = await DELETE(
       makeReq('DELETE', { userId: 'system', userName: 'System' }),
-      { params: { id: createdAssetId } }
+      { params: Promise.resolve({ id: createdAssetId }) }
     )
     expect(res.status).toBe(200)
     createdAssetId = ''

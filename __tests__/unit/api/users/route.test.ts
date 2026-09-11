@@ -1,14 +1,18 @@
-import { NextRequest } from 'next/server'
+﻿import { NextRequest } from 'next/server'
 
 jest.mock('@/lib/db', () => ({
   setupDatabase: jest.fn().mockResolvedValue(undefined),
   getDb: jest.fn(),
+  getDbDialect: jest.fn().mockReturnValue('mysql'),
   resetPool: jest.fn(),
 }))
 jest.mock('@/lib/audit', () => ({ writeAudit: jest.fn().mockResolvedValue(undefined) }))
+jest.mock('@/lib/require-user', () => ({
+  requireUser: jest.fn().mockReturnValue({ ok: true, user: { id: 'u1', name: 'Test User', email: 'test@example.com', role: 'Admin' } }),
+}))
 jest.mock('bcryptjs', () => ({ hash: jest.fn().mockResolvedValue('$hashed') }))
 
-import { getDb } from '@/lib/db'
+import { getDb, getDbDialect } from '@/lib/db'
 import { GET, POST } from '@/app/api/users/route'
 
 const mockExecute = jest.fn()
@@ -22,7 +26,7 @@ const dbUsers = [{ id: 'u1', name: 'Jane', email: 'jane@example.com', role: 'Adm
 describe('GET /api/users', () => {
   it('returns users list', async () => {
     mockExecute.mockResolvedValueOnce([dbUsers])
-    const res = await GET()
+    const res = await GET(new NextRequest('http://localhost/'))
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.users).toHaveLength(1)
@@ -31,7 +35,7 @@ describe('GET /api/users', () => {
 
   it('returns 500 when DB throws', async () => {
     mockExecute.mockRejectedValueOnce(new Error('fail'))
-    const res = await GET()
+    const res = await GET(new NextRequest('http://localhost/'))
     expect(res.status).toBe(500)
   })
 })
@@ -64,5 +68,16 @@ describe('POST /api/users', () => {
     mockExecute.mockResolvedValueOnce([{}])   // INSERT
     const res = await POST(makeReq({ name: 'New User', email: 'new@b.com', password: 'password1', role: 'Member', userId: 'u1', userName: 'Admin' }))
     expect(res.status).toBe(201)
+  })
+
+  it('uses CURRENT_TIMESTAMP instead of NOW() for sqlite dialect', async () => {
+    ;(getDbDialect as jest.Mock).mockReturnValue('sqlite')
+    mockExecute.mockResolvedValueOnce([[]])   // no existing
+    mockExecute.mockResolvedValueOnce([{}])   // INSERT
+    const res = await POST(makeReq({ name: 'Jane', email: 'jane@example.com', password: 'password123', role: 'Member' }))
+    expect(res.status).toBe(201)
+    const insertCall = mockExecute.mock.calls.find(([sql]) => sql.includes('INSERT INTO users'))
+    expect(insertCall[0]).toContain('CURRENT_TIMESTAMP, CURRENT_TIMESTAMP')
+    expect(insertCall[0]).not.toContain('NOW()')
   })
 })

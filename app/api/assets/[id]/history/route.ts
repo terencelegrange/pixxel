@@ -1,13 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
+import logger from "@/lib/logger";
 import mysql from "mysql2/promise";
 import { getDb, setupDatabase } from "@/lib/db";
 import { AuditLog } from "@/types";
+import { requireUser } from "@/lib/require-user";
 
 // GET /api/assets/[id]/history — audit log entries for a specific asset
-export async function GET(
-  _req: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function GET(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
+  const auth = await requireUser(req);
+  if (!auth.ok) return auth.response;
   try {
     await setupDatabase();
     const db = getDb();
@@ -34,7 +36,7 @@ export async function GET(
 
     return NextResponse.json({ history: entries });
   } catch (err) {
-    console.error("[GET /api/assets/:id/history]", err);
+    logger.error({ err, route: "GET /api/assets/:id/history" }, "request failed");
     return NextResponse.json({ error: "Failed to load audit history." }, { status: 500 });
   }
 }

@@ -1,50 +1,80 @@
 import { NextRequest, NextResponse } from "next/server";
+import logger from "@/lib/logger";
 import mysql from "mysql2/promise";
-import { getDb, setupDatabase } from "@/lib/db";
+import { getDb, setupDatabase, withTransaction, getDbDialect } from "@/lib/db";
+import { insertIgnoreSql } from "@/lib/sql-compat";
 import { writeAudit } from "@/lib/audit";
 import { Asset, AssetCategory, AssetType, LifecycleStatus } from "@/types";
+import { requireUser } from "@/lib/require-user";
 
 const VALID_TYPES: AssetType[] = ["SaaS", "On-Premise", "Hybrid", "Cloud", "Open Source", "Other"];
 const VALID_STATUSES: LifecycleStatus[] = ["Proposed", "Approved", "In Development", "Production", "Sunset", "Retired"];
 
 // GET /api/assets/[id] — fetch a single asset with aggregated departments
-export async function GET(
-  _req: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function GET(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
+  const auth = await requireUser(req);
+  if (!auth.ok) return auth.response;
   try {
     await setupDatabase();
     const db = getDb();
-    const [rows] = await db.execute<mysql.RowDataPacket[]>(
-      `SELECT
-         a.*,
-         GROUP_CONCAT(DISTINCT ad.department_id ORDER BY d.name SEPARATOR ',')  AS department_ids,
-         GROUP_CONCAT(DISTINCT d.name           ORDER BY d.name SEPARATOR '|')  AS department_names,
-         GROUP_CONCAT(DISTINCT aa.user_id       ORDER BY aa.user_name SEPARATOR ',') AS architect_ids,
-         GROUP_CONCAT(DISTINCT aa.user_name     ORDER BY aa.user_name SEPARATOR '|') AS architect_names,
-         GROUP_CONCAT(DISTINCT ac.business_capability_id ORDER BY bc.name SEPARATOR ',') AS capability_ids,
-         GROUP_CONCAT(DISTINCT bc.name                   ORDER BY bc.name SEPARATOR '|') AS capability_names,
-         v.name AS vendor_name,
-         dom.name AS domain_name,
-         s.name AS strategy_name,
-         c.name AS complexity_name,
-         t.name AS tier_name
-       FROM assets a
-       LEFT JOIN asset_departments ad  ON ad.asset_id = a.id
-       LEFT JOIN departments d         ON d.id = ad.department_id
-       LEFT JOIN asset_architects aa   ON aa.asset_id = a.id
-       LEFT JOIN asset_capabilities ac    ON ac.asset_id = a.id
-       LEFT JOIN business_capabilities bc ON bc.id = ac.business_capability_id
-       LEFT JOIN vendors v             ON v.id = a.vendor_id
-       LEFT JOIN domains dom           ON dom.id = a.domain_id
-       LEFT JOIN asset_strategies s    ON s.id = a.strategy_id
-       LEFT JOIN asset_complexities c  ON c.id = a.complexity_id
-       LEFT JOIN tiers t               ON t.id = a.tier_id
-       WHERE a.id = ?
-       GROUP BY a.id
-       LIMIT 1`,
-      [params.id]
-    );
+    const dialect = getDbDialect();
+    const query = dialect === "sqlite" ? `
+      SELECT
+        a.*,
+        (SELECT GROUP_CONCAT(department_id, ',') FROM (SELECT ad.department_id AS department_id FROM asset_departments ad JOIN departments d ON d.id = ad.department_id WHERE ad.asset_id = a.id ORDER BY d.name)) AS department_ids,
+        (SELECT GROUP_CONCAT(name, '|') FROM (SELECT d.name AS name FROM asset_departments ad JOIN departments d ON d.id = ad.department_id WHERE ad.asset_id = a.id ORDER BY d.name)) AS department_names,
+        (SELECT GROUP_CONCAT(user_id, ',') FROM (SELECT aa.user_id AS user_id FROM asset_architects aa WHERE aa.asset_id = a.id ORDER BY aa.user_name)) AS architect_ids,
+        (SELECT GROUP_CONCAT(user_name, '|') FROM (SELECT aa.user_name AS user_name FROM asset_architects aa WHERE aa.asset_id = a.id ORDER BY aa.user_name)) AS architect_names,
+        (SELECT GROUP_CONCAT(business_capability_id, ',') FROM (SELECT ac.business_capability_id AS business_capability_id FROM asset_capabilities ac JOIN business_capabilities bc ON bc.id = ac.business_capability_id WHERE ac.asset_id = a.id ORDER BY bc.name)) AS capability_ids,
+        (SELECT GROUP_CONCAT(name, '|') FROM (SELECT bc.name AS name FROM asset_capabilities ac JOIN business_capabilities bc ON bc.id = ac.business_capability_id WHERE ac.asset_id = a.id ORDER BY bc.name)) AS capability_names,
+        v.name AS vendor_name,
+        dom.name AS domain_name,
+        s.name AS strategy_name,
+        c.name AS complexity_name,
+        t.name AS tier_name,
+        hd.name AS hero_diagram_name
+      FROM assets a
+      LEFT JOIN vendors v             ON v.id = a.vendor_id
+      LEFT JOIN domains dom           ON dom.id = a.domain_id
+      LEFT JOIN asset_strategies s    ON s.id = a.strategy_id
+      LEFT JOIN asset_complexities c  ON c.id = a.complexity_id
+      LEFT JOIN tiers t               ON t.id = a.tier_id
+      LEFT JOIN diagrams hd           ON hd.id = a.hero_diagram_id
+      WHERE a.id = ?
+      LIMIT 1
+    ` : `
+      SELECT
+        a.*,
+        GROUP_CONCAT(DISTINCT ad.department_id ORDER BY d.name SEPARATOR ',')  AS department_ids,
+        GROUP_CONCAT(DISTINCT d.name           ORDER BY d.name SEPARATOR '|')  AS department_names,
+        GROUP_CONCAT(DISTINCT aa.user_id       ORDER BY aa.user_name SEPARATOR ',') AS architect_ids,
+        GROUP_CONCAT(DISTINCT aa.user_name     ORDER BY aa.user_name SEPARATOR '|') AS architect_names,
+        GROUP_CONCAT(DISTINCT ac.business_capability_id ORDER BY bc.name SEPARATOR ',') AS capability_ids,
+        GROUP_CONCAT(DISTINCT bc.name                   ORDER BY bc.name SEPARATOR '|') AS capability_names,
+        v.name AS vendor_name,
+        dom.name AS domain_name,
+        s.name AS strategy_name,
+        c.name AS complexity_name,
+        t.name AS tier_name,
+        hd.name AS hero_diagram_name
+      FROM assets a
+      LEFT JOIN asset_departments ad  ON ad.asset_id = a.id
+      LEFT JOIN departments d         ON d.id = ad.department_id
+      LEFT JOIN asset_architects aa   ON aa.asset_id = a.id
+      LEFT JOIN asset_capabilities ac    ON ac.asset_id = a.id
+      LEFT JOIN business_capabilities bc ON bc.id = ac.business_capability_id
+      LEFT JOIN vendors v             ON v.id = a.vendor_id
+      LEFT JOIN domains dom           ON dom.id = a.domain_id
+      LEFT JOIN asset_strategies s    ON s.id = a.strategy_id
+      LEFT JOIN asset_complexities c  ON c.id = a.complexity_id
+      LEFT JOIN tiers t               ON t.id = a.tier_id
+      LEFT JOIN diagrams hd           ON hd.id = a.hero_diagram_id
+      WHERE a.id = ?
+      GROUP BY a.id
+      LIMIT 1
+    `;
+    const [rows] = await db.execute<mysql.RowDataPacket[]>(query, [params.id]);
     if (!rows[0]) return NextResponse.json({ error: "Asset not found." }, { status: 404 });
 
     const row = rows[0];
@@ -56,6 +86,8 @@ export async function GET(
       shortCode: row.short_code ?? null, description: row.description ?? null,
       type: row.type as AssetType, category: (row.category ?? "Application") as AssetCategory,
       icon: row.icon ?? null,
+      heroDiagramId: row.hero_diagram_id ?? null,
+      heroDiagramName: row.hero_diagram_name ?? null,
       lifecycleStatus: row.lifecycle_status as LifecycleStatus,
       departmentIds:   row.department_ids   ? String(row.department_ids).split(",").filter(Boolean)   : [],
       departmentNames: row.department_names ? String(row.department_names).split("|").filter(Boolean) : [],
@@ -79,8 +111,6 @@ export async function GET(
       goLiveDate: toDate(row.go_live_date), retirementDate: toDate(row.retirement_date),
       appUrl: row.app_url ?? null,
       docUrl: row.doc_url ?? null,
-      contractEndDate: toDate(row.contract_end_date),
-      contractAmount: row.contract_amount != null ? Number(row.contract_amount) : null,
       notes: row.notes ?? null,
       createdById: row.created_by_id, createdByName: row.created_by_name,
       createdAt: toISO(row.created_at)!, updatedAt: toISO(row.updated_at)!,
@@ -88,16 +118,17 @@ export async function GET(
 
     return NextResponse.json({ asset });
   } catch (err) {
-    console.error("[GET /api/assets/:id]", err);
+    logger.error({ err, route: "GET /api/assets/:id" }, "request failed");
     return NextResponse.json({ error: "Failed to load asset." }, { status: 500 });
   }
 }
 
 // PUT /api/assets/[id] — update an asset
-export async function PUT(
-  req: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function PUT(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
+  const auth = await requireUser(req, ["Admin", "Member"]);
+  if (!auth.ok) return auth.response;
+  const { user } = auth;
   try {
     await setupDatabase();
     const body = await req.json();
@@ -105,8 +136,8 @@ export async function PUT(
       name, shortCode, description, type, category, icon, lifecycleStatus,
       departmentIds, architectIds, capabilityIds, tierId, strategyId, complexityId, domainId, vendorId, businessOwner, technicalOwner,
       slaAvailability, slaRto, slaRpo,
-      goLiveDate, retirementDate, appUrl, docUrl, contractEndDate, contractAmount, notes,
-      userId, userName,
+      goLiveDate, retirementDate, appUrl, docUrl, notes,
+      heroDiagramId,
     } = body;
 
     if (!name?.trim()) return NextResponse.json({ error: "Asset name is required." }, { status: 400 });
@@ -114,7 +145,6 @@ export async function PUT(
       return NextResponse.json({ error: "At least one department is required." }, { status: 400 });
     if (!VALID_TYPES.includes(type)) return NextResponse.json({ error: "Invalid asset type." }, { status: 400 });
     if (!VALID_STATUSES.includes(lifecycleStatus)) return NextResponse.json({ error: "Invalid lifecycle status." }, { status: 400 });
-    if (!userId || !userName) return NextResponse.json({ error: "Authenticated user is required." }, { status: 401 });
 
     const db = getDb();
 
@@ -140,6 +170,7 @@ export async function PUT(
       type,
       category: category || "Application",
       icon: icon || "Server",
+      heroDiagramId: heroDiagramId || null,
       lifecycleStatus,
       departmentIds: departmentIds as string[],
       architectIds: Array.isArray(architectIds) ? architectIds as string[] : [],
@@ -158,62 +189,64 @@ export async function PUT(
       retirementDate: retirementDate || null,
       appUrl: appUrl?.trim() || null,
       docUrl: docUrl?.trim() || null,
-      contractEndDate: contractEndDate || null,
-      contractAmount: contractAmount != null && contractAmount !== "" ? Number(contractAmount) : null,
       notes: notes?.trim() || null,
     };
 
-    await db.execute(
-      `UPDATE assets SET
-         name=?, short_code=?, description=?, type=?, category=?, icon=?, tier_id=?, strategy_id=?, complexity_id=?, domain_id=?, vendor_id=?,
-         lifecycle_status=?, business_owner=?, technical_owner=?,
-         sla_availability=?, sla_rto=?, sla_rpo=?,
-         go_live_date=?, retirement_date=?, app_url=?, doc_url=?, contract_end_date=?, contract_amount=?, notes=?
-       WHERE id=?`,
-      [values.name, values.shortCode, values.description, values.type, values.category,
-       values.icon, values.tierId, values.strategyId, values.complexityId, values.domainId, values.vendorId, values.lifecycleStatus,
-       values.businessOwner, values.technicalOwner,
-       values.slaAvailability, values.slaRto, values.slaRpo,
-       values.goLiveDate, values.retirementDate, values.appUrl, values.docUrl, values.contractEndDate, values.contractAmount,
-       values.notes, params.id]
-    );
+    await withTransaction(async (tx) => {
+      const dialect = getDbDialect();
+      await tx.execute(
+        `UPDATE assets SET
+           name=?, short_code=?, description=?, type=?, category=?, icon=?, hero_diagram_id=?, tier_id=?, strategy_id=?, complexity_id=?, domain_id=?, vendor_id=?,
+           lifecycle_status=?, business_owner=?, technical_owner=?,
+           sla_availability=?, sla_rto=?, sla_rpo=?,
+           go_live_date=?, retirement_date=?, app_url=?, doc_url=?, notes=?
+         WHERE id=?`,
+        [values.name, values.shortCode, values.description, values.type, values.category,
+         values.icon, values.heroDiagramId, values.tierId, values.strategyId, values.complexityId, values.domainId, values.vendorId, values.lifecycleStatus,
+         values.businessOwner, values.technicalOwner,
+         values.slaAvailability, values.slaRto, values.slaRpo,
+         values.goLiveDate, values.retirementDate, values.appUrl, values.docUrl,
+         values.notes, params.id]
+      );
 
-    // Replace department junction rows
-    await db.execute("DELETE FROM asset_departments WHERE asset_id = ?", [params.id]);
-    for (const deptId of values.departmentIds) {
-      await db.execute(
-        "INSERT IGNORE INTO asset_departments (asset_id, department_id) VALUES (?, ?)",
-        [params.id, deptId]
-      );
-    }
-    // Replace architect junction rows
-    await db.execute("DELETE FROM asset_architects WHERE asset_id = ?", [params.id]);
-    for (const uid of values.architectIds) {
-      const [uRows] = await db.execute<mysql.RowDataPacket[]>(
-        "SELECT name FROM users WHERE id = ? LIMIT 1", [uid]
-      );
-      if (uRows[0]) {
-        await db.execute(
-          "INSERT IGNORE INTO asset_architects (asset_id, user_id, user_name) VALUES (?, ?, ?)",
-          [params.id, uid, uRows[0].name]
+      // Replace department junction rows
+      await tx.execute("DELETE FROM asset_departments WHERE asset_id = ?", [params.id]);
+      for (const deptId of values.departmentIds) {
+        await tx.execute(
+          insertIgnoreSql("asset_departments", ["asset_id", "department_id"], dialect),
+          [params.id, deptId]
         );
       }
-    }
-    // Replace capability junction rows
-    await db.execute("DELETE FROM asset_capabilities WHERE asset_id = ?", [params.id]);
-    for (const capId of values.capabilityIds) {
-      await db.execute(
-        "INSERT IGNORE INTO asset_capabilities (asset_id, business_capability_id) VALUES (?, ?)",
-        [params.id, capId]
-      );
-    }
+      // Replace architect junction rows
+      await tx.execute("DELETE FROM asset_architects WHERE asset_id = ?", [params.id]);
+      for (const uid of values.architectIds) {
+        const [uRows] = await tx.execute<mysql.RowDataPacket[]>(
+          "SELECT name FROM users WHERE id = ? LIMIT 1", [uid]
+        );
+        if (uRows[0]) {
+          await tx.execute(
+            insertIgnoreSql("asset_architects", ["asset_id", "user_id", "user_name"], dialect),
+            [params.id, uid, uRows[0].name]
+          );
+        }
+      }
+      // Replace capability junction rows
+      await tx.execute("DELETE FROM asset_capabilities WHERE asset_id = ?", [params.id]);
+      for (const capId of values.capabilityIds) {
+        await tx.execute(
+          insertIgnoreSql("asset_capabilities", ["asset_id", "business_capability_id"], dialect),
+          [params.id, capId]
+        );
+      }
+    });
 
     await writeAudit({
       tableName: "assets", recordId: params.id, action: "UPDATE",
-      performedById: userId, performedByName: userName,
+      performedById: user.id, performedByName: user.name,
       oldValues: {
         name: current.name, shortCode: current.short_code, description: current.description,
         type: current.type, category: current.category, icon: current.icon,
+        heroDiagramId: current.hero_diagram_id ?? null,
         lifecycleStatus: current.lifecycle_status, departmentIds: oldDeptIds,
         architectIds: oldArchIds, capabilityIds: oldCapIds,
         tierId: current.tier_id,
@@ -225,7 +258,6 @@ export async function PUT(
         slaRto: current.sla_rto, slaRpo: current.sla_rpo,
         goLiveDate: toDate(current.go_live_date), retirementDate: toDate(current.retirement_date),
         appUrl: current.app_url, docUrl: current.doc_url,
-        contractEndDate: toDate(current.contract_end_date), contractAmount: current.contract_amount,
         notes: current.notes,
       },
       newValues: values,
@@ -233,20 +265,19 @@ export async function PUT(
 
     return NextResponse.json({ success: true });
   } catch (err) {
-    console.error("[PUT /api/assets/:id]", err);
+    logger.error({ err, route: "PUT /api/assets/:id" }, "request failed");
     return NextResponse.json({ error: "Failed to update asset." }, { status: 500 });
   }
 }
 
 // DELETE /api/assets/[id] — delete an asset and its department links
-export async function DELETE(
-  req: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function DELETE(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
+  const auth = await requireUser(req, ["Admin", "Member"]);
+  if (!auth.ok) return auth.response;
+  const { user } = auth;
   try {
     await setupDatabase();
-    const { userId, userName } = await req.json() as { userId?: string; userName?: string };
-    if (!userId || !userName) return NextResponse.json({ error: "Authenticated user is required." }, { status: 401 });
 
     const db = getDb();
 
@@ -256,21 +287,23 @@ export async function DELETE(
     const current = rows[0];
     if (!current) return NextResponse.json({ error: "Asset not found." }, { status: 404 });
 
-    await db.execute("DELETE FROM asset_departments WHERE asset_id = ?", [params.id]);
-    await db.execute("DELETE FROM asset_architects WHERE asset_id = ?", [params.id]);
-    await db.execute("DELETE FROM asset_capabilities WHERE asset_id = ?", [params.id]);
-    await db.execute("DELETE FROM assets WHERE id = ?", [params.id]);
+    await withTransaction(async (tx) => {
+      await tx.execute("DELETE FROM asset_departments WHERE asset_id = ?", [params.id]);
+      await tx.execute("DELETE FROM asset_architects WHERE asset_id = ?", [params.id]);
+      await tx.execute("DELETE FROM asset_capabilities WHERE asset_id = ?", [params.id]);
+      await tx.execute("DELETE FROM assets WHERE id = ?", [params.id]);
+    });
 
     await writeAudit({
       tableName: "assets", recordId: params.id, action: "DELETE",
-      performedById: userId, performedByName: userName,
+      performedById: user.id, performedByName: user.name,
       oldValues: { name: current.name, type: current.type, lifecycleStatus: current.lifecycle_status },
       newValues: null,
     });
 
     return NextResponse.json({ success: true });
   } catch (err) {
-    console.error("[DELETE /api/assets/:id]", err);
+    logger.error({ err, route: "DELETE /api/assets/:id" }, "request failed");
     return NextResponse.json({ error: "Failed to delete asset." }, { status: 500 });
   }
 }

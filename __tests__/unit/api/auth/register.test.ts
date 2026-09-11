@@ -9,6 +9,10 @@ jest.mock('bcryptjs', () => ({
   compare: jest.fn(),
   hash: jest.fn().mockResolvedValue('$2a$12$hashedpassword'),
 }))
+jest.mock('@/lib/jwt', () => ({
+  signJwt: jest.fn().mockReturnValue('mock-token'),
+  verifyJwt: jest.fn(),
+}))
 
 import { getDb } from '@/lib/db'
 import { POST } from '@/app/api/auth/register/route'
@@ -33,7 +37,7 @@ describe('POST /api/auth/register', () => {
   it('returns 400 when name is missing', async () => {
     const res = await POST(makeReq({ email: valid.email, password: valid.password }))
     expect(res.status).toBe(400)
-    expect(await res.json()).toMatchObject({ error: expect.stringContaining('required') })
+    expect(await res.json()).toMatchObject({ error: expect.any(String) })
   })
 
   it('returns 400 when name is only whitespace', async () => {

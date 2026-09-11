@@ -16,6 +16,10 @@ import {
   clearStoredUser,
   loginUser,
   registerUser,
+  logoutUser,
+  verifyMfaChallenge,
+  fetchCurrentUser,
+  LoginResult,
 } from "@/lib/auth";
 
 // ---------------------------------------------------------------------------
@@ -25,7 +29,10 @@ interface AuthContextValue {
   user: User | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (email: string, password: string) => Promise<void>;
+  /** False for the read-only "Viewer" role; true for Member/Admin. */
+  canWrite: boolean;
+  login: (email: string, password: string) => Promise<LoginResult>;
+  completeMfaLogin: (mfaToken: string, credential: { code: string } | { recoveryCode: string }) => Promise<void>;
   register: (name: string, email: string, password: string) => Promise<void>;
   logout: () => void;
   updateUser: (patch: Partial<User>) => void;
@@ -44,15 +51,41 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
 
-  // Rehydrate from localStorage on mount
+  // Rehydrate from localStorage on mount, then verify the session against
+  // the server — a stored user alone doesn't mean the session is still
+  // valid (the authToken cookie may have expired, or token_version may
+  // have been bumped by a role change or MFA disable elsewhere).
   useEffect(() => {
     const stored = getStoredUser();
     if (stored) setUser(stored);
-    setIsLoading(false);
+
+    fetchCurrentUser().then((result) => {
+      if (result === "unknown") {
+        // Network error: keep whatever was in localStorage rather than
+        // logging the user out over a transient connectivity issue.
+      } else if (result === null) {
+        clearStoredUser();
+        setUser(null);
+      } else {
+        storeUser(result);
+        setUser(result);
+      }
+      setIsLoading(false);
+    });
   }, []);
 
-  const login = useCallback(async (email: string, password: string) => {
-    const loggedIn = await loginUser(email, password);
+  const login = useCallback(async (email: string, password: string): Promise<LoginResult> => {
+    const result = await loginUser(email, password);
+    if (result.status === "ok") {
+      storeUser(result.user);
+      setUser(result.user);
+      router.push("/dashboard");
+    }
+    return result;
+  }, [router]);
+
+  const completeMfaLogin = useCallback(async (mfaToken: string, credential: { code: string } | { recoveryCode: string }) => {
+    const loggedIn = await verifyMfaChallenge(mfaToken, credential);
     storeUser(loggedIn);
     setUser(loggedIn);
     router.push("/dashboard");
@@ -71,6 +104,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = useCallback(() => {
     clearStoredUser();
     setUser(null);
+    // Clear the server-side HttpOnly cookie so the JWT is invalidated.
+    logoutUser();
     router.push("/login");
   }, [router]);
 
@@ -89,7 +124,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         user,
         isAuthenticated: !!user,
         isLoading,
+        canWrite: user?.role !== "Viewer",
         login,
+        completeMfaLogin,
         register,
         logout,
         updateUser,

@@ -1,4 +1,4 @@
-import { NextRequest } from 'next/server'
+﻿import { NextRequest, NextResponse } from 'next/server'
 
 jest.mock('@/lib/db', () => ({
   setupDatabase: jest.fn().mockResolvedValue(undefined),
@@ -6,8 +6,12 @@ jest.mock('@/lib/db', () => ({
   resetPool: jest.fn(),
 }))
 jest.mock('@/lib/audit', () => ({ writeAudit: jest.fn().mockResolvedValue(undefined) }))
+jest.mock('@/lib/require-user', () => ({
+  requireUser: jest.fn().mockReturnValue({ ok: true, user: { id: 'u1', name: 'Test User', email: 'test@example.com', role: 'Admin' } }),
+}))
 
 import { getDb } from '@/lib/db'
+import { requireUser } from '@/lib/require-user'
 import { PUT, DELETE } from '@/app/api/roles/[id]/route'
 
 const mockExecute = jest.fn()
@@ -16,7 +20,7 @@ beforeEach(() => {
   ;(getDb as jest.Mock).mockReturnValue({ execute: mockExecute })
 })
 
-const params = { params: { id: 'role-1' } }
+const params = { params: Promise.resolve({ id: 'role-1' }) }
 const dbRole = { id: 'role-1', name: 'Editor', description: null, permission_level: 'member' }
 
 function makeReq(method: string, body: object) {
@@ -28,7 +32,8 @@ function makeReq(method: string, body: object) {
 }
 
 describe('DELETE /api/roles/[id]', () => {
-  it('returns 401 when caller identity missing', async () => {
+  it('returns 401 when not authenticated', async () => {
+    ;(requireUser as jest.Mock).mockReturnValueOnce({ ok: false, response: new NextResponse(null, { status: 401 }) })
     const res = await DELETE(makeReq('DELETE', {}), params)
     expect(res.status).toBe(401)
   })

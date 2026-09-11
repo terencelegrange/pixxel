@@ -3,6 +3,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        NPM_REGISTRY: http://192.168.100.223:4873
     env_file: .env.production
     ports:
       - "3030:3000"

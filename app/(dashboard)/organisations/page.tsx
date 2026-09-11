@@ -55,7 +55,7 @@ function StatusBadge({ status }: { status: DeptStatus }) {
 // Page
 // ---------------------------------------------------------------------------
 export default function OrganisationsPage() {
-  const { user } = useAuth();
+  const { user, canWrite } = useAuth();
 
   const [departments, setDepartments] = useState<Department[]>([]);
   const [isLoadingData, setIsLoadingData] = useState(true);
@@ -207,10 +207,12 @@ export default function OrganisationsPage() {
             Configure the organisational departments that own applications.
           </p>
         </div>
-        <Button onClick={openCreate} size="md">
-          <Plus className="h-4 w-4" />
-          Add Department
-        </Button>
+        {canWrite && (
+          <Button onClick={openCreate} size="md">
+            <Plus className="h-4 w-4" />
+            Add Department
+          </Button>
+        )}
       </div>
 
       {/* Table card */}
@@ -230,10 +232,12 @@ export default function OrganisationsPage() {
             <Building2 className="h-10 w-10 text-slate-300 dark:text-slate-600" />
             <p className="text-sm font-medium">No departments yet</p>
             <p className="text-xs text-slate-400">Add your first department to get started.</p>
-            <Button size="sm" onClick={openCreate}>
-              <Plus className="h-4 w-4" />
-              Add Department
-            </Button>
+            {canWrite && (
+              <Button size="sm" onClick={openCreate}>
+                <Plus className="h-4 w-4" />
+                Add Department
+              </Button>
+            )}
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -288,20 +292,24 @@ export default function OrganisationsPage() {
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center justify-end gap-2">
-                        <button
-                          onClick={() => openEdit(dept)}
-                          className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-300 transition-colors"
-                          aria-label={`Edit ${dept.name}`}
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </button>
-                        <button
-                          onClick={() => openDelete(dept)}
-                          className="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/40 dark:hover:text-red-400 transition-colors"
-                          aria-label={`Delete ${dept.name}`}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
+                        {canWrite && (
+                          <>
+                            <button
+                              onClick={() => openEdit(dept)}
+                              className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-300 transition-colors"
+                              aria-label={`Edit ${dept.name}`}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </button>
+                            <button
+                              onClick={() => openDelete(dept)}
+                              className="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/40 dark:hover:text-red-400 transition-colors"
+                              aria-label={`Delete ${dept.name}`}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </>
+                        )}
                       </div>
                     </td>
                   </tr>

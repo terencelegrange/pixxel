@@ -151,7 +151,7 @@ function DiagramModal({
 // Page
 // ---------------------------------------------------------------------------
 export default function DiagramsPage() {
-  const { user } = useAuth();
+  const { user, canWrite } = useAuth();
   const router = useRouter();
 
   const [diagrams, setDiagrams] = useState<Diagram[]>([]);
@@ -301,10 +301,12 @@ export default function DiagramsPage() {
             Create and manage interactive architecture diagrams with asset references.
           </p>
         </div>
-        <Button onClick={() => setCreateOpen(true)}>
-          <Plus className="h-4 w-4" />
-          New Diagram
-        </Button>
+        {canWrite && (
+          <Button onClick={() => setCreateOpen(true)}>
+            <Plus className="h-4 w-4" />
+            New Diagram
+          </Button>
+        )}
       </div>
 
       {/* Filter bar */}
@@ -392,7 +394,7 @@ export default function DiagramsPage() {
                 ? "No diagrams match your filters."
                 : "No diagrams yet. Create your first one."}
             </p>
-            {!search && !hasActiveFilters && (
+            {!search && !hasActiveFilters && canWrite && (
               <Button size="sm" onClick={() => setCreateOpen(true)}>
                 <Plus className="h-4 w-4" /> New Diagram
               </Button>
@@ -473,20 +475,24 @@ export default function DiagramsPage() {
                     </td>
                     <td className="px-5 py-4 text-right">
                       <div className="flex items-center justify-end gap-1">
-                        <button
-                          onClick={() => setEditTarget(d)}
-                          className="rounded p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"
-                          title="Edit"
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </button>
-                        <button
-                          onClick={() => { setDeleteTarget(d); setDeleteError(""); }}
-                          className="rounded p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-500 transition-colors"
-                          title="Delete"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
+                        {canWrite && (
+                          <>
+                            <button
+                              onClick={() => setEditTarget(d)}
+                              className="rounded p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"
+                              title="Edit"
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </button>
+                            <button
+                              onClick={() => { setDeleteTarget(d); setDeleteError(""); }}
+                              className="rounded p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-500 transition-colors"
+                              title="Delete"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </>
+                        )}
                       </div>
                     </td>
                   </tr>

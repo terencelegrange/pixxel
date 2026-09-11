@@ -1,7 +1,11 @@
-// __tests__/integration/api/vendors.test.ts
+﻿// __tests__/integration/api/vendors.test.ts
 import { NextRequest } from 'next/server'
 import { config } from 'dotenv'
 import { randomUUID } from 'crypto'
+
+jest.mock('@/lib/require-user', () => ({
+  requireUser: jest.fn().mockReturnValue({ ok: true, user: { id: 'u1', name: 'Test User', email: 'test@example.com', role: 'Admin' } }),
+}))
 
 config({ path: '.env.test' })
 
@@ -51,7 +55,7 @@ describe('Vendor delete nulls asset vendor_id (integration)', () => {
     const { DELETE } = await import('@/app/api/vendors/[id]/route')
     const res = await DELETE(
       makeReq('DELETE', { userId: 'system', userName: 'System' }),
-      { params: { id: vendorId } }
+      { params: Promise.resolve({ id: vendorId }) }
     )
     expect(res.status).toBe(200)
     const [rows] = await getDb().execute<any[]>('SELECT vendor_id FROM assets WHERE id = ?', [assetId])

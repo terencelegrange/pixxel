@@ -10,7 +10,7 @@ pipeline {
 
     triggers {
         GenericTrigger(
-            token: 'gxkhsonsjafbmlbcqrauryeomwjksgsb'
+            tokenCredentialId: 'PIXXEL_WEBHOOK_TOKEN'
         )
     }
 
@@ -18,6 +18,17 @@ pipeline {
         stage('Checkout') {
             steps {
                 checkout scm
+            }
+        }
+
+        stage('Verify') {
+            steps {
+                sh """
+                    npm ci
+                    npx tsc --noEmit
+                    npm run lint
+                    npm run test:coverage
+                """
             }
         }
 

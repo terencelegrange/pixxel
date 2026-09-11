@@ -1,15 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
+import logger from "@/lib/logger";
 import mysql from "mysql2/promise";
 import { getDb, setupDatabase } from "@/lib/db";
+import { requireUser } from "@/lib/require-user";
 
 const VALID_STATUSES = ["New", "Acknowledged", "Under Review", "Will Fix", "Will Not Implement", "Completed"] as const;
 type SupportStatus = typeof VALID_STATUSES[number];
 
 // PATCH /api/support/[id] — update status
-export async function PATCH(
-  req: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function PATCH(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
+  const auth = await requireUser(req, "Admin");
+  if (!auth.ok) return auth.response;
   try {
     await setupDatabase();
     const { status } = await req.json() as { status?: string };
@@ -28,7 +30,7 @@ export async function PATCH(
 
     return NextResponse.json({ success: true });
   } catch (err) {
-    console.error("[PATCH /api/support/:id]", err);
+    logger.error({ err, route: "PATCH /api/support/:id" }, "request failed");
     return NextResponse.json({ error: "Failed to update status." }, { status: 500 });
   }
 }

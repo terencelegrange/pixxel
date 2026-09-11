@@ -1,17 +1,24 @@
-import { NextRequest } from 'next/server'
+﻿import { NextRequest, NextResponse } from 'next/server'
+
+const mockExecute = jest.fn()
 
 jest.mock('@/lib/db', () => ({
   setupDatabase: jest.fn().mockResolvedValue(undefined),
   getDb: jest.fn(),
   resetPool: jest.fn(),
+  withTransaction: jest.fn((cb: (tx: { execute: jest.Mock }) => unknown) => cb({ execute: mockExecute })),
+  getDbDialect: jest.fn().mockReturnValue('mysql'),
 }))
 jest.mock('@/lib/audit', () => ({ writeAudit: jest.fn().mockResolvedValue(undefined) }))
+jest.mock('@/lib/require-user', () => ({
+  requireUser: jest.fn().mockReturnValue({ ok: true, user: { id: 'u1', name: 'Test User', email: 'test@example.com', role: 'Admin' } }),
+}))
 
-import { getDb } from '@/lib/db'
+import { getDb, getDbDialect } from '@/lib/db'
+import { requireUser } from '@/lib/require-user'
 import { GET, PUT, DELETE } from '@/app/api/assets/[id]/route'
 
-const mockExecute = jest.fn()
-const params = { params: { id: 'asset-1' } }
+const params = { params: Promise.resolve({ id: 'asset-1' }) }
 
 beforeEach(() => {
   jest.clearAllMocks()
@@ -35,7 +42,7 @@ const dbAsset = {
   business_owner: null, technical_owner: null,
   sla_availability: null, sla_rto: null, sla_rpo: null,
   go_live_date: null, retirement_date: null, app_url: null, doc_url: null,
-  contract_end_date: null, contract_amount: null, notes: null,
+  notes: null,
   created_by_id: 'u1', created_by_name: 'Admin',
   created_at: new Date(), updated_at: new Date(),
 }
@@ -49,7 +56,7 @@ const dbAssetRaw = {
   business_owner: null, technical_owner: null,
   sla_availability: null, sla_rto: null, sla_rpo: null,
   go_live_date: null, retirement_date: null, app_url: null, doc_url: null,
-  contract_end_date: null, contract_amount: null, notes: null,
+  notes: null,
   created_by_id: 'u1', created_by_name: 'Admin',
   created_at: new Date(), updated_at: new Date(),
 }
@@ -88,6 +95,17 @@ describe('GET /api/assets/[id]', () => {
     mockExecute.mockRejectedValueOnce(new Error('db error'))
     const res = await GET(new NextRequest('http://localhost/'), params)
     expect(res.status).toBe(500)
+  })
+
+  it('uses correlated-subquery GROUP_CONCAT (no DISTINCT/SEPARATOR) for sqlite dialect', async () => {
+    ;(getDbDialect as jest.Mock).mockReturnValue('sqlite')
+    mockExecute.mockResolvedValueOnce([[]])
+    const res = await GET(new NextRequest('http://localhost/'), params)
+    expect(res.status).toBe(404)
+    const sql = mockExecute.mock.calls[0][0] as string
+    expect(sql).not.toMatch(/SEPARATOR/)
+    expect(sql).not.toMatch(/DISTINCT/)
+    expect(sql).toMatch(/GROUP_CONCAT\(department_id, ','\)/)
   })
 })
 
@@ -133,9 +151,9 @@ describe('PUT /api/assets/[id]', () => {
     expect(res.status).toBe(400)
   })
 
-  it('returns 401 when userId is missing', async () => {
-    const { userId, ...rest } = valid
-    const res = await PUT(makeReq(rest), params)
+  it('returns 401 when not authenticated', async () => {
+    ;(requireUser as jest.Mock).mockReturnValueOnce({ ok: false, response: new NextResponse(null, { status: 401 }) })
+    const res = await PUT(makeReq(valid), params)
     expect(res.status).toBe(401)
   })
 
@@ -162,6 +180,15 @@ describe('PUT /api/assets/[id]', () => {
     const res = await PUT(makeReq(valid), params)
     expect(res.status).toBe(500)
   })
+
+  it('uses INSERT OR IGNORE for junction rows when dialect is sqlite', async () => {
+    ;(getDbDialect as jest.Mock).mockReturnValue('sqlite')
+    setupFoundMocks()
+    const res = await PUT(makeReq(valid), params)
+    expect(res.status).toBe(200)
+    const junctionCall = mockExecute.mock.calls.find(([sql]) => sql.includes('asset_departments') && sql.startsWith('INSERT'))
+    expect(junctionCall?.[0]).toBe('INSERT OR IGNORE INTO asset_departments (`asset_id`, `department_id`) VALUES (?, ?)')
+  })
 })
 
 describe('DELETE /api/assets/[id]', () => {
@@ -171,8 +198,9 @@ describe('DELETE /api/assets/[id]', () => {
     body: JSON.stringify(body),
   })
 
-  it('returns 401 when userId is missing', async () => {
-    const res = await DELETE(makeReq({}), params)
+  it('returns 401 when not authenticated', async () => {
+    ;(requireUser as jest.Mock).mockReturnValueOnce({ ok: false, response: new NextResponse(null, { status: 401 }) })
+    const res = await DELETE(makeReq({ userId: 'u1', userName: 'Admin' }), params)
     expect(res.status).toBe(401)
   })
 

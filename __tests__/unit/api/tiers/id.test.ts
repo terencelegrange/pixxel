@@ -1,4 +1,4 @@
-import { NextRequest } from 'next/server'
+﻿import { NextRequest } from 'next/server'
 
 jest.mock('@/lib/db', () => ({
   setupDatabase: jest.fn().mockResolvedValue(undefined),
@@ -6,12 +6,15 @@ jest.mock('@/lib/db', () => ({
   resetPool: jest.fn(),
 }))
 jest.mock('@/lib/audit', () => ({ writeAudit: jest.fn().mockResolvedValue(undefined) }))
+jest.mock('@/lib/require-user', () => ({
+  requireUser: jest.fn().mockReturnValue({ ok: true, user: { id: 'u1', name: 'Test User', email: 'test@example.com', role: 'Admin' } }),
+}))
 
 import { getDb } from '@/lib/db'
 import { PUT, DELETE } from '@/app/api/tiers/[id]/route'
 
 const mockExecute = jest.fn()
-const params = { params: { id: 'tier-1' } }
+const params = { params: Promise.resolve({ id: 'tier-1' }) }
 const dbTier = { id: 'tier-1', name: 'Tier 1', description: null, sla_availability: '99.9%', support_hours: '24x7', response_time: '15 minutes', resolution_time: '4 hours' }
 
 beforeEach(() => {

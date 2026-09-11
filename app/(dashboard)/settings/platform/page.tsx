@@ -221,7 +221,6 @@ export default function PlatformSettingsPage() {
       body: JSON.stringify({
         ...form,
         sortOrder: form.sortOrder.trim() === "" ? null : Number(form.sortOrder),
-        userId: user.id, userName: user.name,
       }),
     });
     const data = await res.json();
@@ -237,8 +236,6 @@ export default function PlatformSettingsPage() {
     try {
       const res = await fetch(`/api/feature-tiers/${deleteTarget.id}`, {
         method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: user.id, userName: user.name }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Delete failed.");

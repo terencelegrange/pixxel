@@ -2,19 +2,24 @@ import { NextRequest, NextResponse } from "next/server";
 import mysql from "mysql2/promise";
 import { getDb, setupDatabase } from "@/lib/db";
 import { writeAudit } from "@/lib/audit";
+import { requireUser } from "@/lib/require-user";
+import logger from "@/lib/logger";
 
 // PUT /api/feature-tiers/[id]
 export async function PUT(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  props: { params: Promise<{ id: string }> }
 ) {
+  const auth = await requireUser(req, ["Admin", "Member"]);
+  if (!auth.ok) return auth.response;
+  const { user } = auth;
   try {
+    const params = await props.params;
     await setupDatabase();
     const body = await req.json();
-    const { name, description, sortOrder, isDefault, features, userId, userName } = body;
+    const { name, description, sortOrder, isDefault, features } = body;
 
     if (!name?.trim()) return NextResponse.json({ error: "Name is required." }, { status: 400 });
-    if (!userId || !userName) return NextResponse.json({ error: "Authenticated user is required." }, { status: 401 });
 
     const db = getDb();
     const [rows] = await db.execute<mysql.RowDataPacket[]>(
@@ -47,7 +52,7 @@ export async function PUT(
 
     await writeAudit({
       tableName: "feature_tiers", recordId: params.id, action: "UPDATE",
-      performedById: userId, performedByName: userName,
+      performedById: user.id, performedByName: user.name,
       oldValues: {
         name: current.name, description: current.description,
         sortOrder: current.sort_order, isDefault: !!current.is_default,
@@ -57,7 +62,7 @@ export async function PUT(
 
     return NextResponse.json({ success: true });
   } catch (err) {
-    console.error("[PUT /api/feature-tiers/:id]", err);
+    logger.error({ err, route: "PUT /api/feature-tiers/:id" }, "request failed");
     return NextResponse.json({ error: "Failed to update feature tier." }, { status: 500 });
   }
 }
@@ -65,13 +70,14 @@ export async function PUT(
 // DELETE /api/feature-tiers/[id]
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  props: { params: Promise<{ id: string }> }
 ) {
+  const auth = await requireUser(req, ["Admin", "Member"]);
+  if (!auth.ok) return auth.response;
+  const { user } = auth;
   try {
+    const params = await props.params;
     await setupDatabase();
-    const { userId, userName } = await req.json() as { userId?: string; userName?: string };
-    if (!userId || !userName) return NextResponse.json({ error: "Authenticated user is required." }, { status: 401 });
-
     const db = getDb();
     const [rows] = await db.execute<mysql.RowDataPacket[]>(
       "SELECT * FROM feature_tiers WHERE id = ? LIMIT 1", [params.id]
@@ -99,14 +105,14 @@ export async function DELETE(
 
     await writeAudit({
       tableName: "feature_tiers", recordId: params.id, action: "DELETE",
-      performedById: userId, performedByName: userName,
+      performedById: user.id, performedByName: user.name,
       oldValues: { name: current.name },
       newValues: null,
     });
 
     return NextResponse.json({ success: true });
   } catch (err) {
-    console.error("[DELETE /api/feature-tiers/:id]", err);
+    logger.error({ err, route: "DELETE /api/feature-tiers/:id" }, "request failed");
     return NextResponse.json({ error: "Failed to delete feature tier." }, { status: 500 });
   }
 }

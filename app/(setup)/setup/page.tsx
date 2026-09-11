@@ -7,11 +7,13 @@ import { useRouter } from "next/navigation";
 // Types
 // ---------------------------------------------------------------------------
 interface DbForm {
+  dialect: "mysql" | "sqlite";
   host: string;
   port: string;
   user: string;
   password: string;
   name: string;
+  sqliteFile: string;
 }
 
 interface AppForm {
@@ -28,17 +30,23 @@ interface AdminForm {
 
 type Step = 1 | 2 | 3 | 4 | 5;
 
-// Fixed IDs — must match the seed rows created in lib/db.ts runSetup(), since this
-// step runs before setupDatabase() has ever executed and can't query them dynamically.
-const TIER_OPTIONS = [
-  { id: "ftier000-0000-0000-0000-000000000001", name: "Basic",
-    description: "Asset register and asset strategy reporting." },
-  { id: "ftier000-0000-0000-0000-000000000002", name: "Advanced",
-    description: "Adds diagramming, dependency mapping, projects, and richer reporting." },
-  { id: "ftier000-0000-0000-0000-000000000003", name: "Enterprise",
-    description: "Full platform, including the security assessment and quadrant report." },
-];
-const DEFAULT_TIER_ID = TIER_OPTIONS[0].id;
+const FEATURE_TIERS = [
+  {
+    id: "ftier000-0000-0000-0000-000000000001",
+    name: "Basic",
+    description: "Asset register and asset strategy reporting for smaller teams.",
+  },
+  {
+    id: "ftier000-0000-0000-0000-000000000002",
+    name: "Advanced",
+    description: "Adds architecture diagramming, dependency mapping, projects, and richer reporting.",
+  },
+  {
+    id: "ftier000-0000-0000-0000-000000000003",
+    name: "Enterprise",
+    description: "Full platform, including security attribute/characteristic assessment and the security quadrant report.",
+  },
+] as const;
 
 // ---------------------------------------------------------------------------
 // Step indicator
@@ -192,12 +200,14 @@ function StepDatabase({
 
   function validate() {
     const e: typeof errors = {};
-    if (!form.host.trim()) e.host = "Host is required.";
-    if (!form.user.trim()) e.user = "Username is required.";
-    if (!form.name.trim()) e.name = "Database name is required.";
-    const port = Number(form.port);
-    if (form.port && (isNaN(port) || port < 1 || port > 65535))
-      e.port = "Port must be between 1 and 65535.";
+    if (form.dialect === "mysql") {
+      if (!form.host.trim()) e.host = "Host is required.";
+      if (!form.user.trim()) e.user = "Username is required.";
+      if (!form.name.trim()) e.name = "Database name is required.";
+      const port = Number(form.port);
+      if (form.port && (isNaN(port) || port < 1 || port > 65535))
+        e.port = "Port must be between 1 and 65535.";
+    }
     setErrors(e);
     return Object.keys(e).length === 0;
   }
@@ -211,11 +221,13 @@ function StepDatabase({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          dialect: form.dialect,
           host: form.host.trim(),
           port: Number(form.port) || 3306,
           user: form.user.trim(),
           password: form.password,
           name: form.name.trim(),
+          file: form.sqliteFile.trim(),
         }),
       });
       const data = await res.json();
@@ -244,59 +256,75 @@ function StepDatabase({
         connect to this database and create all required tables automatically.
       </p>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <div className="sm:col-span-2">
-          <Field
-            label="Host"
-            id="db-host"
-            value={form.host}
-            onChange={(v) => { onChange({ host: v }); setTestState("idle"); }}
-            placeholder="localhost"
-            error={errors.host}
-          />
-        </div>
-        <Field
-          label="Port"
-          id="db-port"
-          value={form.port}
-          onChange={(v) => { onChange({ port: v }); setTestState("idle"); }}
-          placeholder="3306"
-          error={errors.port}
-        />
+      <div className="mb-6 grid grid-cols-2 gap-3">
+        <button
+          type="button"
+          onClick={() => { onChange({ dialect: "mysql" }); setTestState("idle"); }}
+          className={`rounded-lg border-2 px-4 py-3 text-left text-sm font-medium transition-colors ${
+            form.dialect === "mysql" ? "border-brand-600 bg-brand-50 text-brand-900" : "border-slate-200 text-slate-600 hover:border-slate-300"
+          }`}
+        >
+          MySQL / MariaDB
+          <span className="mt-1 block text-xs font-normal text-slate-400">Connect to an existing database server.</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => { onChange({ dialect: "sqlite" }); setTestState("idle"); }}
+          className={`rounded-lg border-2 px-4 py-3 text-left text-sm font-medium transition-colors ${
+            form.dialect === "sqlite" ? "border-brand-600 bg-brand-50 text-brand-900" : "border-slate-200 text-slate-600 hover:border-slate-300"
+          }`}
+        >
+          SQLite (Trial Mode)
+          <span className="mt-1 block text-xs font-normal text-slate-400">Single file, no separate database container needed.</span>
+        </button>
       </div>
 
-      <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+      {form.dialect === "sqlite" ? (
         <Field
-          label="Username"
-          id="db-user"
-          value={form.user}
-          onChange={(v) => { onChange({ user: v }); setTestState("idle"); }}
-          placeholder="root"
-          error={errors.user}
+          label="Database File Path"
+          id="sqlite-file"
+          value={form.sqliteFile}
+          onChange={(v) => { onChange({ sqliteFile: v }); setTestState("idle"); }}
+          placeholder="data/pixxel.db"
+          hint="Stored inside the container. Mount a volume at this path to persist data across restarts."
         />
-        <Field
-          label="Password"
-          id="db-password"
-          type={showPassword ? "text" : "password"}
-          value={form.password}
-          onChange={(v) => { onChange({ password: v }); setTestState("idle"); }}
-          placeholder="Leave blank if none"
-          showToggle
-          onToggle={() => setShowPassword((s) => !s)}
-        />
-      </div>
-
-      <div className="mt-4">
-        <Field
-          label="Database Name"
-          id="db-name"
-          value={form.name}
-          onChange={(v) => { onChange({ name: v }); setTestState("idle"); }}
-          placeholder="saas_app"
-          hint="Will be created if it does not exist."
-          error={errors.name}
-        />
-      </div>
+      ) : (
+        <>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <div className="sm:col-span-2">
+              <Field
+                label="Host" id="db-host" value={form.host}
+                onChange={(v) => { onChange({ host: v }); setTestState("idle"); }}
+                placeholder="localhost" error={errors.host}
+              />
+            </div>
+            <Field
+              label="Port" id="db-port" value={form.port}
+              onChange={(v) => { onChange({ port: v }); setTestState("idle"); }}
+              placeholder="3306" error={errors.port}
+            />
+          </div>
+          <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <Field
+              label="Username" id="db-user" value={form.user}
+              onChange={(v) => { onChange({ user: v }); setTestState("idle"); }}
+              placeholder="root" error={errors.user}
+            />
+            <Field
+              label="Password" id="db-password" type={showPassword ? "text" : "password"} value={form.password}
+              onChange={(v) => { onChange({ password: v }); setTestState("idle"); }}
+              placeholder="Leave blank if none" showToggle onToggle={() => setShowPassword((s) => !s)}
+            />
+          </div>
+          <div className="mt-4">
+            <Field
+              label="Database Name" id="db-name" value={form.name}
+              onChange={(v) => { onChange({ name: v }); setTestState("idle"); }}
+              placeholder="saas_app" hint="Will be created if it does not exist." error={errors.name}
+            />
+          </div>
+        </>
+      )}
 
       {/* Test connection feedback */}
       {testState === "ok" && (
@@ -520,7 +548,7 @@ function StepAdmin({
 // ---------------------------------------------------------------------------
 // Step 4 — Feature tier
 // ---------------------------------------------------------------------------
-function StepTier({
+function StepFeatureTier({
   tierId,
   onChange,
   onBack,
@@ -535,32 +563,24 @@ function StepTier({
     <div>
       <h2 className="mb-1 text-lg font-semibold text-slate-900">Feature Tier</h2>
       <p className="mb-6 text-sm text-slate-500">
-        Choose which set of features to start with. You can change this anytime later
-        from Settings → Platform, and fully customise or add new tiers there too.
+        Choose which feature set is enabled for this install. This can be
+        changed anytime from Settings → Platform.
       </p>
 
       <div className="flex flex-col gap-3">
-        {TIER_OPTIONS.map((tier) => {
-          const isSelected = tier.id === tierId;
-          return (
-            <button
-              key={tier.id}
-              type="button"
-              onClick={() => onChange(tier.id)}
-              className={`flex flex-col items-start gap-1 rounded-lg border px-4 py-3 text-left transition-colors ${
-                isSelected ? "border-brand-500 bg-brand-50" : "border-slate-200 bg-white hover:border-brand-300"
-              }`}
-            >
-              <div className="flex w-full items-center justify-between">
-                <span className="text-sm font-semibold text-slate-800">{tier.name}</span>
-                {isSelected && (
-                  <span className="rounded-full bg-brand-600 px-2 py-0.5 text-xs font-medium text-white">Selected</span>
-                )}
-              </div>
-              <span className="text-xs text-slate-500">{tier.description}</span>
-            </button>
-          );
-        })}
+        {FEATURE_TIERS.map((tier) => (
+          <button
+            key={tier.id}
+            type="button"
+            onClick={() => onChange(tier.id)}
+            className={`rounded-lg border-2 px-4 py-3 text-left text-sm font-medium transition-colors ${
+              tierId === tier.id ? "border-brand-600 bg-brand-50 text-brand-900" : "border-slate-200 text-slate-600 hover:border-slate-300"
+            }`}
+          >
+            {tier.name}
+            <span className="mt-1 block text-xs font-normal text-slate-400">{tier.description}</span>
+          </button>
+        ))}
       </div>
 
       <div className="mt-6 flex justify-between">
@@ -613,11 +633,13 @@ function StepReview({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           db: {
+            dialect: db.dialect,
             host: db.host.trim(),
             port: Number(db.port) || 3306,
             user: db.user.trim(),
             password: db.password,
             name: db.name.trim(),
+            file: db.sqliteFile.trim(),
           },
           appName: app.appName.trim(),
           orgName: app.orgName.trim(),
@@ -666,10 +688,20 @@ function StepReview({
           Database
         </p>
         <div className="divide-y divide-slate-100">
-          <Row label="Host" value={`${db.host}:${db.port || 3306}`} />
-          <Row label="Username" value={db.user} />
-          <Row label="Password" value="••••••••" />
-          <Row label="Database" value={db.name} />
+          {db.dialect === "sqlite" ? (
+            <>
+              <Row label="Type" value="SQLite (Trial Mode)" />
+              <Row label="File" value={db.sqliteFile} />
+            </>
+          ) : (
+            <>
+              <Row label="Type" value="MySQL / MariaDB" />
+              <Row label="Host" value={`${db.host}:${db.port || 3306}`} />
+              <Row label="Username" value={db.user} />
+              <Row label="Password" value="••••••••" />
+              <Row label="Database" value={db.name} />
+            </>
+          )}
         </div>
       </div>
 
@@ -702,7 +734,7 @@ function StepReview({
           Feature Tier
         </p>
         <div className="divide-y divide-slate-100">
-          <Row label="Tier" value={TIER_OPTIONS.find((t) => t.id === tierId)?.name ?? "Basic"} />
+          <Row label="Tier" value={FEATURE_TIERS.find((t) => t.id === tierId)?.name ?? ""} />
         </div>
       </div>
 
@@ -749,11 +781,13 @@ export default function SetupPage() {
   const [step, setStep] = useState<Step>(1);
 
   const [db, setDb] = useState<DbForm>({
+    dialect: "mysql",
     host: "localhost",
     port: "3306",
     user: "root",
     password: "",
     name: "saas_app",
+    sqliteFile: "data/pixxel.db",
   });
   const [app, setApp] = useState<AppForm>({ appName: "", orgName: "" });
   const [admin, setAdmin] = useState<AdminForm>({
@@ -762,7 +796,7 @@ export default function SetupPage() {
     password: "",
     confirmPassword: "",
   });
-  const [tierId, setTierId] = useState<string>(DEFAULT_TIER_ID);
+  const [tierId, setTierId] = useState<string>(FEATURE_TIERS[0].id);
 
   // Redirect away if setup is already complete
   useEffect(() => {
@@ -811,7 +845,7 @@ export default function SetupPage() {
         />
       )}
       {step === 4 && (
-        <StepTier
+        <StepFeatureTier
           tierId={tierId}
           onChange={setTierId}
           onBack={() => setStep(3)}

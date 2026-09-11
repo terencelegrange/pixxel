@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
+import logger from "@/lib/logger";
 import { randomUUID } from "crypto";
 import mysql from "mysql2/promise";
 import { getDb, setupDatabase } from "@/lib/db";
 import { writeAudit } from "@/lib/audit";
 import { RoadmapDomainGroup, RoadmapAsset, AssetRoadmapPhase } from "@/types";
+import { requireUser } from "@/lib/require-user";
 
 function isValidQuarter(q: string): boolean {
   return /^\d{4}-Q[1-4]$/.test(q);
@@ -11,6 +13,8 @@ function isValidQuarter(q: string): boolean {
 
 // GET /api/roadmap/phases?from=YYYY-Qn&to=YYYY-Qn
 export async function GET(req: NextRequest) {
+  const auth = await requireUser(req);
+  if (!auth.ok) return auth.response;
   try {
     await setupDatabase();
     const { searchParams } = new URL(req.url);
@@ -87,17 +91,20 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({ groups: Array.from(groupMap.values()) });
   } catch (err) {
-    console.error("[GET /api/roadmap/phases]", err);
+    logger.error({ err, route: "GET /api/roadmap/phases" }, "request failed");
     return NextResponse.json({ error: "Failed to load roadmap phases." }, { status: 500 });
   }
 }
 
 // POST /api/roadmap/phases
 export async function POST(req: NextRequest) {
+  const auth = await requireUser(req, ["Admin", "Member"]);
+  if (!auth.ok) return auth.response;
+  const { user } = auth;
   try {
     await setupDatabase();
     const body = await req.json();
-    const { assetId, classificationId, startQuarter, endQuarter, notes, userId, userName } = body;
+    const { assetId, classificationId, startQuarter, endQuarter, notes } = body;
 
     if (!assetId)          return NextResponse.json({ error: "assetId is required." }, { status: 400 });
     if (!classificationId) return NextResponse.json({ error: "classificationId is required." }, { status: 400 });
@@ -107,8 +114,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "endQuarter must be in YYYY-Qn format." }, { status: 400 });
     if (endQuarter < startQuarter)
       return NextResponse.json({ error: "endQuarter must be >= startQuarter." }, { status: 400 });
-    if (!userId || !userName)
-      return NextResponse.json({ error: "Authenticated user is required." }, { status: 401 });
 
     const db = getDb();
 
@@ -131,19 +136,19 @@ export async function POST(req: NextRequest) {
       `INSERT INTO asset_roadmap_phases
          (id, asset_id, classification_id, start_quarter, end_quarter, notes, created_by_id, created_by_name)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [id, assetId, classificationId, startQuarter, endQuarter, notes?.trim() || null, userId, userName]
+      [id, assetId, classificationId, startQuarter, endQuarter, notes?.trim() || null, user.id, user.name]
     );
 
     await writeAudit({
       tableName: "asset_roadmap_phases", recordId: id, action: "CREATE",
-      performedById: userId, performedByName: userName,
+      performedById: user.id, performedByName: user.name,
       oldValues: null,
       newValues: { assetId, classificationId, startQuarter, endQuarter, notes: notes?.trim() || null },
     });
 
     return NextResponse.json({ id }, { status: 201 });
   } catch (err) {
-    console.error("[POST /api/roadmap/phases]", err);
+    logger.error({ err, route: "POST /api/roadmap/phases" }, "request failed");
     return NextResponse.json({ error: "Failed to create roadmap phase." }, { status: 500 });
   }
 }

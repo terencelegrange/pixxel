@@ -151,7 +151,7 @@ function EntryModal({
 // Page
 // ---------------------------------------------------------------------------
 export default function ChangelogPage() {
-  const { user } = useAuth();
+  const { user, canWrite } = useAuth();
   const [entries, setEntries] = useState<ChangelogEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
@@ -224,9 +224,11 @@ export default function ChangelogPage() {
             Record and communicate what has changed in each release of this platform.
           </p>
         </div>
-        <Button onClick={() => { setEditing(null); setModalOpen(true); }}>
-          <Plus className="h-4 w-4" /> Add Entry
-        </Button>
+        {canWrite && (
+          <Button onClick={() => { setEditing(null); setModalOpen(true); }}>
+            <Plus className="h-4 w-4" /> Add Entry
+          </Button>
+        )}
       </div>
 
       <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden dark:border-slate-700 dark:bg-slate-900">
@@ -244,9 +246,11 @@ export default function ChangelogPage() {
           <div className="flex flex-col items-center justify-center gap-3 py-20 text-slate-400 dark:text-slate-500">
             <ScrollText className="h-10 w-10 text-slate-300 dark:text-slate-600" />
             <p className="text-sm font-medium">No changelog entries yet</p>
-            <Button size="sm" onClick={() => { setEditing(null); setModalOpen(true); }}>
-              <Plus className="h-4 w-4" /> Add Entry
-            </Button>
+            {canWrite && (
+              <Button size="sm" onClick={() => { setEditing(null); setModalOpen(true); }}>
+                <Plus className="h-4 w-4" /> Add Entry
+              </Button>
+            )}
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -289,20 +293,24 @@ export default function ChangelogPage() {
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center justify-end gap-2">
-                        <button
-                          onClick={() => { setEditing(entry); setModalOpen(true); }}
-                          className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-300 transition-colors"
-                          aria-label={`Edit ${entry.version}`}
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </button>
-                        <button
-                          onClick={() => { setDeleteTarget(entry); setDeleteError(null); }}
-                          className="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/40 dark:hover:text-red-400 transition-colors"
-                          aria-label={`Delete ${entry.version}`}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
+                        {canWrite && (
+                          <>
+                            <button
+                              onClick={() => { setEditing(entry); setModalOpen(true); }}
+                              className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-300 transition-colors"
+                              aria-label={`Edit ${entry.version}`}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </button>
+                            <button
+                              onClick={() => { setDeleteTarget(entry); setDeleteError(null); }}
+                              className="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/40 dark:hover:text-red-400 transition-colors"
+                              aria-label={`Delete ${entry.version}`}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </>
+                        )}
                       </div>
                     </td>
                   </tr>

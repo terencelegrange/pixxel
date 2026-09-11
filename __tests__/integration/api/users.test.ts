@@ -1,10 +1,15 @@
-// __tests__/integration/api/users.test.ts
+﻿// __tests__/integration/api/users.test.ts
 import { NextRequest } from 'next/server'
 import { config } from 'dotenv'
+
+jest.mock('@/lib/require-user', () => ({
+  requireUser: jest.fn().mockReturnValue({ ok: true, user: { id: 'u1', name: 'Test User', email: 'test@example.com', role: 'Admin' } }),
+}))
 
 config({ path: '.env.test' })
 
 import { resetPool, setupDatabase, getDb } from '@/lib/db'
+import { requireUser } from '@/lib/require-user'
 
 beforeAll(async () => { resetPool(); await setupDatabase() })
 afterAll(() => resetPool())
@@ -35,10 +40,11 @@ describe('User CRUD (integration)', () => {
   })
 
   it('blocks self-delete via DELETE /api/users/[id]', async () => {
+    ;(requireUser as jest.Mock).mockReturnValueOnce({ ok: true, user: { id: createdUserId, name: 'Test User', email: 'test@example.com', role: 'Admin' } })
     const { DELETE } = await import('@/app/api/users/[id]/route')
     const res = await DELETE(
       makeReq('DELETE', { userId: createdUserId, userName: 'Test User' }),
-      { params: { id: createdUserId } }
+      { params: Promise.resolve({ id: createdUserId }) }
     )
     expect(res.status).toBe(400)
   })
@@ -47,7 +53,7 @@ describe('User CRUD (integration)', () => {
     const { PUT } = await import('@/app/api/users/[id]/route')
     const res = await PUT(
       makeReq('PUT', { name: 'Updated Name', role: 'Viewer', userId: 'system', userName: 'System' }),
-      { params: { id: createdUserId } }
+      { params: Promise.resolve({ id: createdUserId }) }
     )
     expect(res.status).toBe(200)
     const [rows] = await getDb().execute<any[]>('SELECT name, role FROM users WHERE id = ?', [createdUserId])
@@ -59,7 +65,7 @@ describe('User CRUD (integration)', () => {
     const { DELETE } = await import('@/app/api/users/[id]/route')
     const res = await DELETE(
       makeReq('DELETE', { userId: 'system', userName: 'System' }),
-      { params: { id: createdUserId } }
+      { params: Promise.resolve({ id: createdUserId }) }
     )
     expect(res.status).toBe(200)
     createdUserId = ''

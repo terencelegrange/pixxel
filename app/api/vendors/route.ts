@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
+import logger from "@/lib/logger";
 import { randomUUID } from "crypto";
 import mysql from "mysql2/promise";
 import { getDb, setupDatabase } from "@/lib/db";
 import { writeAudit } from "@/lib/audit";
 import { Vendor } from "@/types";
+import { requireUser } from "@/lib/require-user";
 
 function rowToVendor(row: mysql.RowDataPacket): Vendor {
   const toISO = (v: unknown) => v instanceof Date ? v.toISOString() : v ? String(v) : null;
@@ -31,7 +33,9 @@ function rowToVendor(row: mysql.RowDataPacket): Vendor {
 }
 
 // GET /api/vendors
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const auth = await requireUser(req);
+  if (!auth.ok) return auth.response;
   try {
     await setupDatabase();
     const db = getDb();
@@ -40,13 +44,16 @@ export async function GET() {
     );
     return NextResponse.json({ vendors: rows.map(rowToVendor) });
   } catch (err) {
-    console.error("[GET /api/vendors]", err);
+    logger.error({ err, route: "GET /api/vendors" }, "request failed");
     return NextResponse.json({ error: "Failed to load vendors." }, { status: 500 });
   }
 }
 
 // POST /api/vendors
 export async function POST(req: NextRequest) {
+  const auth = await requireUser(req, ["Admin", "Member"]);
+  if (!auth.ok) return auth.response;
+  const { user } = auth;
   try {
     await setupDatabase();
     const body = await req.json();
@@ -54,11 +61,10 @@ export async function POST(req: NextRequest) {
       name, website, email, phone,
       addressLine1, addressLine2, city, stateProvince, country, postalCode,
       primaryContactName, primaryContactRole, primaryContactEmail, primaryContactPhone,
-      notes, userId, userName,
+      notes,
     } = body;
 
     if (!name?.trim()) return NextResponse.json({ error: "Vendor name is required." }, { status: 400 });
-    if (!userId || !userName) return NextResponse.json({ error: "Authenticated user is required." }, { status: 401 });
 
     const db = getDb();
     const id = randomUUID();
@@ -93,18 +99,18 @@ export async function POST(req: NextRequest) {
        values.country, values.postalCode,
        values.primaryContactName, values.primaryContactRole,
        values.primaryContactEmail, values.primaryContactPhone,
-       values.notes, userId, userName]
+       values.notes, user.id, user.name]
     );
 
     await writeAudit({
       tableName: "vendors", recordId: id, action: "CREATE",
-      performedById: userId, performedByName: userName,
+      performedById: user.id, performedByName: user.name,
       oldValues: null, newValues: values,
     });
 
     return NextResponse.json({ id }, { status: 201 });
   } catch (err) {
-    console.error("[POST /api/vendors]", err);
+    logger.error({ err, route: "POST /api/vendors" }, "request failed");
     return NextResponse.json({ error: "Failed to create vendor." }, { status: 500 });
   }
 }

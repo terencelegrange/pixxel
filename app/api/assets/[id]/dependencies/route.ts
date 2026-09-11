@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
+import logger from "@/lib/logger";
 import mysql from "mysql2/promise";
 import { getDb, setupDatabase } from "@/lib/db";
 import { AssetDependency, DependencyConnectionType, DependencyDirection } from "@/types";
+import { requireUser } from "@/lib/require-user";
 
 const toISO = (v: unknown) => v instanceof Date ? v.toISOString() : String(v);
 
@@ -47,10 +49,10 @@ const JOIN_SQL = (whereClause: string) => `
   ORDER BY sa.name ASC, ta.name ASC
 `;
 
-export async function GET(
-  _req: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function GET(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
+  const auth = await requireUser(req);
+  if (!auth.ok) return auth.response;
   try {
     await setupDatabase();
     const db = getDb();
@@ -71,7 +73,7 @@ export async function GET(
       upstream:   [...upstreamRows,   ...bidiFromDownstream].map(mapRow),
     });
   } catch (err) {
-    console.error("[GET /api/assets/:id/dependencies]", err);
+    logger.error({ err, route: "GET /api/assets/:id/dependencies" }, "request failed");
     return NextResponse.json({ error: "Failed to load dependencies." }, { status: 500 });
   }
 }

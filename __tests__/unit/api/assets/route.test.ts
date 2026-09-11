@@ -1,16 +1,23 @@
-import { NextRequest } from 'next/server'
+﻿import { NextRequest, NextResponse } from 'next/server'
+
+const mockExecute = jest.fn()
 
 jest.mock('@/lib/db', () => ({
   setupDatabase: jest.fn().mockResolvedValue(undefined),
   getDb: jest.fn(),
   resetPool: jest.fn(),
+  withTransaction: jest.fn((cb: (tx: { execute: jest.Mock }) => unknown) => cb({ execute: mockExecute })),
+  getDbDialect: jest.fn().mockReturnValue('mysql'),
 }))
 jest.mock('@/lib/audit', () => ({ writeAudit: jest.fn().mockResolvedValue(undefined) }))
+jest.mock('@/lib/require-user', () => ({
+  requireUser: jest.fn().mockReturnValue({ ok: true, user: { id: 'u1', name: 'Test User', email: 'test@example.com', role: 'Admin' } }),
+}))
 
-import { getDb } from '@/lib/db'
+import { getDb, getDbDialect } from '@/lib/db'
+import { requireUser } from '@/lib/require-user'
 import { GET, POST } from '@/app/api/assets/route'
 
-const mockExecute = jest.fn()
 beforeEach(() => {
   jest.clearAllMocks()
   ;(getDb as jest.Mock).mockReturnValue({ execute: mockExecute })
@@ -32,7 +39,7 @@ const dbAssetRow = {
   vendor: null,
   sla_availability: null, sla_rto: null, sla_rpo: null,
   go_live_date: null, retirement_date: null, app_url: null, doc_url: null,
-  contract_end_date: null, contract_amount: null, notes: null,
+  notes: null,
   created_by_id: 'u1', created_by_name: 'Admin',
   created_at: new Date(), updated_at: new Date(),
 }
@@ -40,7 +47,7 @@ const dbAssetRow = {
 describe('GET /api/assets', () => {
   it('returns mapped asset list', async () => {
     mockExecute.mockResolvedValueOnce([[dbAssetRow]])
-    const res = await GET()
+    const res = await GET(new NextRequest('http://localhost/'))
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.assets).toHaveLength(1)
@@ -50,7 +57,7 @@ describe('GET /api/assets', () => {
 
   it('returns empty list when no assets', async () => {
     mockExecute.mockResolvedValueOnce([[]])
-    const res = await GET()
+    const res = await GET(new NextRequest('http://localhost/'))
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.assets).toHaveLength(0)
@@ -67,7 +74,7 @@ describe('GET /api/assets', () => {
       capability_names: 'Hosting',
     }
     mockExecute.mockResolvedValueOnce([[row]])
-    const res = await GET()
+    const res = await GET(new NextRequest('http://localhost/'))
     const body = await res.json()
     const asset = body.assets[0]
     expect(asset.departmentIds).toEqual(['d1', 'd2'])
@@ -80,8 +87,19 @@ describe('GET /api/assets', () => {
 
   it('returns 500 when DB throws', async () => {
     mockExecute.mockRejectedValueOnce(new Error('db error'))
-    const res = await GET()
+    const res = await GET(new NextRequest('http://localhost/'))
     expect(res.status).toBe(500)
+  })
+
+  it('uses correlated-subquery GROUP_CONCAT (no DISTINCT/SEPARATOR) for sqlite dialect', async () => {
+    ;(getDbDialect as jest.Mock).mockReturnValue('sqlite')
+    mockExecute.mockResolvedValueOnce([[]])
+    const res = await GET(new NextRequest('http://localhost/api/assets'))
+    expect(res.status).toBe(200)
+    const sql = mockExecute.mock.calls[0][0] as string
+    expect(sql).not.toMatch(/SEPARATOR/)
+    expect(sql).not.toMatch(/DISTINCT/)
+    expect(sql).toMatch(/GROUP_CONCAT\(department_id, ','\)/)
   })
 })
 
@@ -121,9 +139,9 @@ describe('POST /api/assets', () => {
     expect(res.status).toBe(400)
   })
 
-  it('returns 401 when userId is missing', async () => {
-    const { userId, ...rest } = valid
-    const res = await POST(makeReq(rest))
+  it('returns 401 when not authenticated', async () => {
+    ;(requireUser as jest.Mock).mockReturnValueOnce({ ok: false, response: new NextResponse(null, { status: 401 }) })
+    const res = await POST(makeReq(valid))
     expect(res.status).toBe(401)
   })
 
@@ -157,5 +175,14 @@ describe('POST /api/assets', () => {
     mockExecute.mockRejectedValueOnce(new Error('db error'))
     const res = await POST(makeReq(valid))
     expect(res.status).toBe(500)
+  })
+
+  it('uses INSERT OR IGNORE for junction rows when dialect is sqlite', async () => {
+    ;(getDbDialect as jest.Mock).mockReturnValue('sqlite')
+    mockExecute.mockResolvedValue([{}])
+    const res = await POST(makeReq(valid))
+    expect(res.status).toBe(201)
+    const junctionCall = mockExecute.mock.calls.find(([sql]) => sql.includes('asset_departments'))
+    expect(junctionCall?.[0]).toBe('INSERT OR IGNORE INTO asset_departments (`asset_id`, `department_id`) VALUES (?, ?)')
   })
 })

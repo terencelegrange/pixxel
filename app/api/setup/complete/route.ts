@@ -3,7 +3,8 @@ import bcrypt from "bcryptjs";
 import { randomUUID } from "crypto";
 import fs from "fs";
 import path from "path";
-import { isSetupComplete, writeSiteConfig } from "@/lib/setup";
+import { isSetupComplete, writeSiteConfig, type DbConfig } from "@/lib/setup";
+import { upsertSql } from "@/lib/sql-compat";
 
 export async function POST(req: Request) {
   // Guard: prevent re-running setup
@@ -16,14 +17,37 @@ export async function POST(req: Request) {
 
   const body = await req.json();
   const { db, appName, orgName, admin, tierId } = body;
-  const DEFAULT_TIER_ID = "ftier000-0000-0000-0000-000000000001"; // Basic — see lib/db.ts seed
 
   // Validate
-  if (!db?.host || !db?.user || !db?.name) {
+  if (!db?.dialect) {
     return NextResponse.json(
       { error: "Missing database configuration." },
       { status: 400 }
     );
+  }
+  if (db.dialect === "mysql" && (!db.host || !db.user || !db.name)) {
+    return NextResponse.json(
+      { error: "Missing database configuration." },
+      { status: 400 }
+    );
+  }
+  if (db.dialect === "sqlite" && !db.file?.trim()) {
+    return NextResponse.json(
+      { error: "A SQLite file path is required." },
+      { status: 400 }
+    );
+  }
+  if (db.dialect === "sqlite") {
+    const file = db.file.trim();
+    const resolved = path.resolve(process.cwd(), file);
+    const cwd = process.cwd();
+    const outsideProject = resolved !== cwd && !resolved.startsWith(cwd + path.sep);
+    if (path.isAbsolute(file) || outsideProject) {
+      return NextResponse.json(
+        { error: "Database file path must be a relative path within the project directory." },
+        { status: 400 }
+      );
+    }
   }
   if (!appName?.trim() || !orgName?.trim()) {
     return NextResponse.json(
@@ -38,13 +62,17 @@ export async function POST(req: Request) {
     );
   }
 
-  const dbConfig = {
-    host: db.host.trim(),
-    port: Number(db.port) || 3306,
-    user: db.user.trim(),
-    password: db.password ?? "",
-    name: db.name.trim(),
-  };
+  const dbConfig: DbConfig =
+    db.dialect === "sqlite"
+      ? { dialect: "sqlite", file: db.file.trim() }
+      : {
+          dialect: "mysql",
+          host: db.host.trim(),
+          port: Number(db.port) || 3306,
+          user: db.user.trim(),
+          password: db.password ?? "",
+          name: db.name.trim(),
+        };
 
   // 1. Write site.config.json (setupComplete: false for now so the DB
   //    pool can read credentials but setup isn't marked done yet)
@@ -56,14 +84,20 @@ export async function POST(req: Request) {
   });
 
   // 2. Write .env.local so credentials survive server restarts
-  const envContent = [
-    `DB_HOST=${dbConfig.host}`,
-    `DB_PORT=${dbConfig.port}`,
-    `DB_USER=${dbConfig.user}`,
-    `DB_PASSWORD=${dbConfig.password}`,
-    `DB_NAME=${dbConfig.name}`,
-    "",
-  ].join("\n");
+  const envContent = (
+    dbConfig.dialect === "sqlite"
+      ? [`DB_TYPE=sqlite`, `DB_FILE=${dbConfig.file}`]
+      : [
+          `DB_TYPE=mysql`,
+          `DB_HOST=${dbConfig.host}`,
+          `DB_PORT=${dbConfig.port}`,
+          `DB_USER=${dbConfig.user}`,
+          `DB_PASSWORD=${dbConfig.password}`,
+          `DB_NAME=${dbConfig.name}`,
+        ]
+  )
+    .concat("")
+    .join("\n");
 
   fs.writeFileSync(
     path.join(process.cwd(), ".env.local"),
@@ -75,7 +109,7 @@ export async function POST(req: Request) {
     // 3. Bootstrap the schema using the credentials just written to site.config.json.
     //    Reset any existing pool so it is recreated with the new credentials
     //    rather than the stale env vars that were loaded when the server started.
-    const { setupDatabase, getDb, resetPool } = await import("@/lib/db");
+    const { setupDatabase, getDb, resetPool, getDbDialect } = await import("@/lib/db");
     resetPool();
     await setupDatabase();
 
@@ -95,12 +129,13 @@ export async function POST(req: Request) {
       ]
     );
 
-    // 5. Record the chosen feature tier (setupDatabase() above already seeded the
-    //    three default tiers, so this row is guaranteed to exist by now)
-    await db_pool.execute(
-      "INSERT INTO app_settings (`key`, `value`) VALUES ('feature_tier_id', ?) ON DUPLICATE KEY UPDATE `value` = VALUES(`value`)",
-      [typeof tierId === "string" && tierId.trim() ? tierId : DEFAULT_TIER_ID]
-    );
+    // 5. Persist the chosen feature tier as the active tier
+    if (tierId) {
+      await db_pool.execute(
+        upsertSql("app_settings", ["key", "value"], "value", getDbDialect()),
+        ["feature_tier_id", tierId]
+      );
+    }
 
     // 6. Mark setup complete
     writeSiteConfig({

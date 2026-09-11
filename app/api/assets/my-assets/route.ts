@@ -1,42 +1,67 @@
 import { NextRequest, NextResponse } from "next/server";
+import logger from "@/lib/logger";
 import mysql from "mysql2/promise";
-import { getDb, setupDatabase } from "@/lib/db";
+import { getDb, setupDatabase, getDbDialect } from "@/lib/db";
 import { Asset, AssetCategory, AssetType, LifecycleStatus } from "@/types";
+import { requireUser } from "@/lib/require-user";
 
 // GET /api/assets/my-assets?userId=<id> — assets where user is an assigned architect
 export async function GET(req: NextRequest) {
+  const auth = await requireUser(req);
+  if (!auth.ok) return auth.response;
   try {
     await setupDatabase();
     const userId = req.nextUrl.searchParams.get("userId");
     if (!userId) return NextResponse.json({ error: "userId is required." }, { status: 400 });
 
     const db = getDb();
-    const [rows] = await db.execute<mysql.RowDataPacket[]>(
-      `SELECT
-         a.*,
-         GROUP_CONCAT(DISTINCT ad.department_id ORDER BY d.name SEPARATOR ',')  AS department_ids,
-         GROUP_CONCAT(DISTINCT d.name           ORDER BY d.name SEPARATOR '|')  AS department_names,
-         GROUP_CONCAT(DISTINCT aa.user_id       ORDER BY aa.user_name SEPARATOR ',') AS architect_ids,
-         GROUP_CONCAT(DISTINCT aa.user_name     ORDER BY aa.user_name SEPARATOR '|') AS architect_names,
-         v.name AS vendor_name,
-         dom.name AS domain_name,
-         s.name AS strategy_name,
-         c.name AS complexity_name,
-         t.name AS tier_name
-       FROM assets a
-       INNER JOIN asset_architects my_aa ON my_aa.asset_id = a.id AND my_aa.user_id = ?
-       LEFT JOIN asset_departments ad    ON ad.asset_id = a.id
-       LEFT JOIN departments d           ON d.id = ad.department_id
-       LEFT JOIN asset_architects aa     ON aa.asset_id = a.id
-       LEFT JOIN vendors v               ON v.id = a.vendor_id
-       LEFT JOIN domains dom             ON dom.id = a.domain_id
-       LEFT JOIN asset_strategies s      ON s.id = a.strategy_id
-       LEFT JOIN asset_complexities c    ON c.id = a.complexity_id
-       LEFT JOIN tiers t                 ON t.id = a.tier_id
-       GROUP BY a.id
-       ORDER BY a.name ASC`,
-      [userId]
-    );
+    const dialect = getDbDialect();
+    const query = dialect === "sqlite" ? `
+      SELECT
+        a.*,
+        (SELECT GROUP_CONCAT(department_id, ',') FROM (SELECT ad.department_id AS department_id FROM asset_departments ad JOIN departments d ON d.id = ad.department_id WHERE ad.asset_id = a.id ORDER BY d.name)) AS department_ids,
+        (SELECT GROUP_CONCAT(name, '|') FROM (SELECT d.name AS name FROM asset_departments ad JOIN departments d ON d.id = ad.department_id WHERE ad.asset_id = a.id ORDER BY d.name)) AS department_names,
+        (SELECT GROUP_CONCAT(user_id, ',') FROM (SELECT aa.user_id AS user_id FROM asset_architects aa WHERE aa.asset_id = a.id ORDER BY aa.user_name)) AS architect_ids,
+        (SELECT GROUP_CONCAT(user_name, '|') FROM (SELECT aa.user_name AS user_name FROM asset_architects aa WHERE aa.asset_id = a.id ORDER BY aa.user_name)) AS architect_names,
+        v.name AS vendor_name,
+        dom.name AS domain_name,
+        s.name AS strategy_name,
+        c.name AS complexity_name,
+        t.name AS tier_name
+      FROM assets a
+      INNER JOIN asset_architects my_aa ON my_aa.asset_id = a.id AND my_aa.user_id = ?
+      LEFT JOIN vendors v               ON v.id = a.vendor_id
+      LEFT JOIN domains dom             ON dom.id = a.domain_id
+      LEFT JOIN asset_strategies s      ON s.id = a.strategy_id
+      LEFT JOIN asset_complexities c    ON c.id = a.complexity_id
+      LEFT JOIN tiers t                 ON t.id = a.tier_id
+      ORDER BY a.name ASC
+    ` : `
+      SELECT
+        a.*,
+        GROUP_CONCAT(DISTINCT ad.department_id ORDER BY d.name SEPARATOR ',')  AS department_ids,
+        GROUP_CONCAT(DISTINCT d.name           ORDER BY d.name SEPARATOR '|')  AS department_names,
+        GROUP_CONCAT(DISTINCT aa.user_id       ORDER BY aa.user_name SEPARATOR ',') AS architect_ids,
+        GROUP_CONCAT(DISTINCT aa.user_name     ORDER BY aa.user_name SEPARATOR '|') AS architect_names,
+        v.name AS vendor_name,
+        dom.name AS domain_name,
+        s.name AS strategy_name,
+        c.name AS complexity_name,
+        t.name AS tier_name
+      FROM assets a
+      INNER JOIN asset_architects my_aa ON my_aa.asset_id = a.id AND my_aa.user_id = ?
+      LEFT JOIN asset_departments ad    ON ad.asset_id = a.id
+      LEFT JOIN departments d           ON d.id = ad.department_id
+      LEFT JOIN asset_architects aa     ON aa.asset_id = a.id
+      LEFT JOIN vendors v               ON v.id = a.vendor_id
+      LEFT JOIN domains dom             ON dom.id = a.domain_id
+      LEFT JOIN asset_strategies s      ON s.id = a.strategy_id
+      LEFT JOIN asset_complexities c    ON c.id = a.complexity_id
+      LEFT JOIN tiers t                 ON t.id = a.tier_id
+      GROUP BY a.id
+      ORDER BY a.name ASC
+    `;
+    const [rows] = await db.execute<mysql.RowDataPacket[]>(query, [userId]);
 
     const toISO = (v: unknown) => v instanceof Date ? v.toISOString() : v ? String(v) : null;
     const toDate = (v: unknown) => !v ? null : (v instanceof Date ? v.toISOString() : String(v)).split("T")[0];
@@ -46,6 +71,8 @@ export async function GET(req: NextRequest) {
       shortCode: row.short_code ?? null, description: row.description ?? null,
       type: row.type as AssetType, category: (row.category ?? "Application") as AssetCategory,
       icon: row.icon ?? null,
+      heroDiagramId: row.hero_diagram_id ?? null,
+      heroDiagramName: null,
       lifecycleStatus: row.lifecycle_status as LifecycleStatus,
       departmentIds:   row.department_ids   ? String(row.department_ids).split(",").filter(Boolean)   : [],
       departmentNames: row.department_names ? String(row.department_names).split("|").filter(Boolean) : [],
@@ -63,8 +90,6 @@ export async function GET(req: NextRequest) {
       slaRto: row.sla_rto ?? null, slaRpo: row.sla_rpo ?? null,
       goLiveDate: toDate(row.go_live_date), retirementDate: toDate(row.retirement_date),
       appUrl: row.app_url ?? null, docUrl: row.doc_url ?? null,
-      contractEndDate: toDate(row.contract_end_date),
-      contractAmount: row.contract_amount != null ? Number(row.contract_amount) : null,
       notes: row.notes ?? null,
       createdById: row.created_by_id, createdByName: row.created_by_name,
       createdAt: toISO(row.created_at)!, updatedAt: toISO(row.updated_at)!,
@@ -72,7 +97,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({ assets });
   } catch (err) {
-    console.error("[GET /api/assets/my-assets]", err);
+    logger.error({ err, route: "GET /api/assets/my-assets" }, "request failed");
     return NextResponse.json({ error: "Failed to load assets." }, { status: 500 });
   }
 }

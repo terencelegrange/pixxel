@@ -1,12 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
+import logger from "@/lib/logger";
 import mysql from "mysql2/promise";
 import { getDb, setupDatabase } from "@/lib/db";
+import { requireUser } from "@/lib/require-user";
 
 // GET /api/projects/[id]/assets — list assets linked to project
-export async function GET(
-  _req: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function GET(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
+  const auth = await requireUser(req);
+  if (!auth.ok) return auth.response;
   try {
     await setupDatabase();
     const db = getDb();
@@ -41,16 +43,16 @@ export async function GET(
 
     return NextResponse.json({ assets });
   } catch (err) {
-    console.error("[GET /api/projects/:id/assets]", err);
+    logger.error({ err, route: "GET /api/projects/:id/assets" }, "request failed");
     return NextResponse.json({ error: "Failed to load project assets." }, { status: 500 });
   }
 }
 
 // POST /api/projects/[id]/assets — link an asset
-export async function POST(
-  req: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function POST(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
+  const auth = await requireUser(req, ["Admin", "Member"]);
+  if (!auth.ok) return auth.response;
   try {
     await setupDatabase();
     const body = await req.json();
@@ -86,7 +88,7 @@ export async function POST(
 
     return NextResponse.json({ success: true }, { status: 201 });
   } catch (err) {
-    console.error("[POST /api/projects/:id/assets]", err);
+    logger.error({ err, route: "POST /api/projects/:id/assets" }, "request failed");
     return NextResponse.json({ error: "Failed to link asset." }, { status: 500 });
   }
 }

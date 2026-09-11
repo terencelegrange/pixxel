@@ -1,30 +1,28 @@
 import { NextRequest, NextResponse } from "next/server";
+import logger from "@/lib/logger";
 import mysql from "mysql2/promise";
 import { getDb, setupDatabase } from "@/lib/db";
 import { writeAudit } from "@/lib/audit";
+import { requireUser } from "@/lib/require-user";
 
 // PUT /api/organisations/[id] — update a department
-export async function PUT(
-  req: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function PUT(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
+  const auth = await requireUser(req, ["Admin", "Member"]);
+  if (!auth.ok) return auth.response;
+  const { user } = auth;
   try {
     await setupDatabase();
 
     const body = await req.json();
-    const { name, description, status, userId, userName } = body as {
+    const { name, description, status } = body as {
       name?: string;
       description?: string;
       status?: string;
-      userId?: string;
-      userName?: string;
     };
 
     if (!name?.trim()) {
       return NextResponse.json({ error: "Department name is required." }, { status: 400 });
-    }
-    if (!userId || !userName) {
-      return NextResponse.json({ error: "Authenticated user is required." }, { status: 401 });
     }
 
     const db = getDb();
@@ -61,35 +59,27 @@ export async function PUT(
       tableName: "departments",
       recordId: params.id,
       action: "UPDATE",
-      performedById: userId,
-      performedByName: userName,
+      performedById: user.id,
+      performedByName: user.name,
       oldValues: { name: current.name, description: current.description ?? null, status: current.status },
       newValues: { name: trimmedName, description: trimmedDesc, status: resolvedStatus },
     });
 
     return NextResponse.json({ success: true });
   } catch (err) {
-    console.error("[PUT /api/organisations/:id]", err);
+    logger.error({ err, route: "PUT /api/organisations/:id" }, "request failed");
     return NextResponse.json({ error: "Failed to update department." }, { status: 500 });
   }
 }
 
 // DELETE /api/organisations/[id] — delete a department
-export async function DELETE(
-  req: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function DELETE(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
+  const auth = await requireUser(req, ["Admin", "Member"]);
+  if (!auth.ok) return auth.response;
+  const { user } = auth;
   try {
     await setupDatabase();
-
-    const { userId, userName } = await req.json() as {
-      userId?: string;
-      userName?: string;
-    };
-
-    if (!userId || !userName) {
-      return NextResponse.json({ error: "Authenticated user is required." }, { status: 401 });
-    }
 
     const db = getDb();
 
@@ -109,15 +99,15 @@ export async function DELETE(
       tableName: "departments",
       recordId: params.id,
       action: "DELETE",
-      performedById: userId,
-      performedByName: userName,
+      performedById: user.id,
+      performedByName: user.name,
       oldValues: { name: current.name, description: current.description ?? null },
       newValues: null,
     });
 
     return NextResponse.json({ success: true });
   } catch (err) {
-    console.error("[DELETE /api/organisations/:id]", err);
+    logger.error({ err, route: "DELETE /api/organisations/:id" }, "request failed");
     return NextResponse.json({ error: "Failed to delete department." }, { status: 500 });
   }
 }

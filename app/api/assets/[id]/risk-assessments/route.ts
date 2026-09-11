@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import mysql from "mysql2/promise";
 import { getDb, setupDatabase } from "@/lib/db";
+import { requireUser } from "@/lib/require-user";
+import logger from "@/lib/logger";
 
 function rowToAssessedRiskFactor(row: mysql.RowDataPacket) {
   const toISO = (v: unknown) => v instanceof Date ? v.toISOString() : v ? String(v) : null;
@@ -24,9 +26,12 @@ function rowToAssessedRiskFactor(row: mysql.RowDataPacket) {
 // joined with any existing assessment (defaults to "Not Met" when unassessed)
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  props: { params: Promise<{ id: string }> }
 ) {
+  const auth = await requireUser(req);
+  if (!auth.ok) return auth.response;
   try {
+    const params = await props.params;
     await setupDatabase();
     const db = getDb();
 
@@ -47,7 +52,7 @@ export async function GET(
 
     return NextResponse.json({ riskFactors: rows.map(rowToAssessedRiskFactor) });
   } catch (err) {
-    console.error("[GET /api/assets/:id/risk-assessments]", err);
+    logger.error({ err, route: "GET /api/assets/:id/risk-assessments" }, "request failed");
     return NextResponse.json({ error: "Failed to load risk assessments." }, { status: 500 });
   }
 }

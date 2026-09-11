@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -20,6 +20,7 @@ import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import AssetModal, { AssetFormState, AssetIcon } from "@/components/assets/AssetModal";
+import { AssetContractsList } from "@/components/contracts/AssetContractsList";
 import { Asset, AuditLog, AssetComplexity, AssetStrategy, AssetType, BusinessCapability, Department, Diagram, Domain, IndustrySector, LifecycleStatus, Tier, User, Vendor } from "@/types";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -100,7 +101,6 @@ const FIELD_LABELS: Record<string, string> = {
   technicalOwner: "Technical Owner", vendor: "Vendor", vendorId: "Vendor",
   slaAvailability: "Availability SLA", slaRto: "RTO", slaRpo: "RPO",
   goLiveDate: "Go Live Date", retirementDate: "Retirement Date",
-  contractEndDate: "Contract End Date", contractAmount: "Contract Amount",
   appUrl: "Application URL", docUrl: "Documentation URL", notes: "Notes",
 };
 
@@ -206,13 +206,89 @@ function AuditRow({ entry }: { entry: AuditLog }) {
 const DEP_NODE_TYPES: NodeTypes = { dependencyNode: DependencyNode };
 const DEP_EDGE_TYPES: EdgeTypes = { dependencyEdge: DependencyEdge };
 
+// ── Dependency mini-map builder — a pure, module-level function (not a
+// per-render closure) so it has a stable reference for useCallback below,
+// without needing to be listed as a dependency.
+function computeDepMiniMap(
+  downstream: AssetDependency[],
+  upstream: AssetDependency[],
+  currentId: string,
+  currentAsset: { name: string; icon: string | null; shortCode: string | null; lifecycleStatus: string; domainName: string | null }
+): { nodes: Node<DependencyNodeData>[]; edges: Edge<DependencyEdgeData>[] } {
+  const miniNodes: Node<DependencyNodeData>[] = [];
+  const miniEdges: Edge<DependencyEdgeData>[] = [];
+  const seenIds = new Set<string>();
+  const upstreamX = -240;
+  const centerX = 0;
+  const downstreamX = 240;
+
+  miniNodes.push({
+    id: currentId,
+    type: "dependencyNode",
+    position: { x: centerX - 95, y: 0 },
+    data: {
+      name: currentAsset.name,
+      shortCode: currentAsset.shortCode,
+      icon: currentAsset.icon,
+      domain: currentAsset.domainName ?? null,
+      lifecycleStatus: currentAsset.lifecycleStatus,
+      isCenter: true,
+    },
+  });
+  seenIds.add(currentId);
+
+  const downstreamUniq = downstream.filter((d) => {
+    const otherId = d.sourceAssetId === currentId ? d.targetAssetId : d.sourceAssetId;
+    return !seenIds.has(otherId);
+  });
+  downstreamUniq.forEach((d, i) => {
+    const otherId = d.sourceAssetId === currentId ? d.targetAssetId : d.sourceAssetId;
+    const otherName = d.sourceAssetId === currentId ? d.targetAssetName : d.sourceAssetName;
+    const otherIcon = d.sourceAssetId === currentId ? d.targetAssetIcon : d.sourceAssetIcon;
+    const otherDomain = d.sourceAssetId === currentId ? d.targetAssetDomain : d.sourceAssetDomain;
+    seenIds.add(otherId);
+    miniNodes.push({
+      id: otherId, type: "dependencyNode",
+      position: { x: downstreamX - 95, y: i * 80 - ((downstreamUniq.length - 1) * 80) / 2 },
+      data: { name: otherName, shortCode: null, icon: otherIcon, domain: otherDomain, lifecycleStatus: null },
+    });
+    miniEdges.push({
+      id: `down-${d.id}`, source: currentId, target: otherId, type: "dependencyEdge",
+      data: { type: d.type, direction: d.direction, notes: d.notes, dependencyId: d.id },
+    });
+  });
+
+  const upstreamUniq = upstream.filter((d) => {
+    const otherId = d.targetAssetId === currentId ? d.sourceAssetId : d.targetAssetId;
+    return !seenIds.has(otherId);
+  });
+  upstreamUniq.forEach((d, i) => {
+    const otherId = d.targetAssetId === currentId ? d.sourceAssetId : d.targetAssetId;
+    const otherName = d.targetAssetId === currentId ? d.sourceAssetName : d.targetAssetName;
+    const otherIcon = d.targetAssetId === currentId ? d.sourceAssetIcon : d.targetAssetIcon;
+    const otherDomain = d.targetAssetId === currentId ? d.sourceAssetDomain : d.targetAssetDomain;
+    seenIds.add(otherId);
+    miniNodes.push({
+      id: otherId, type: "dependencyNode",
+      position: { x: upstreamX - 95, y: i * 80 - ((upstreamUniq.length - 1) * 80) / 2 },
+      data: { name: otherName, shortCode: null, icon: otherIcon, domain: otherDomain, lifecycleStatus: null },
+    });
+    miniEdges.push({
+      id: `up-${d.id}`, source: otherId, target: currentId, type: "dependencyEdge",
+      data: { type: d.type, direction: d.direction, notes: d.notes, dependencyId: d.id },
+    });
+  });
+
+  return { nodes: miniNodes, edges: miniEdges };
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Page
 // ─────────────────────────────────────────────────────────────────────────────
 export default function AssetDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, canWrite } = useAuth();
 
   const [asset, setAsset] = useState<Asset | null>(null);
   const [departments, setDepartments] = useState<Department[]>([]);
@@ -230,6 +306,7 @@ export default function AssetDetailPage() {
     startDate: string | null; endDate: string | null;
     dependencyType: string; notes: string | null;
   }[]>([]);
+  const [diagrams, setDiagrams] = useState<Diagram[]>([]);
   const [assetDiagrams, setAssetDiagrams] = useState<Pick<Diagram, "id" | "name" | "latestVersion" | "assetCount" | "updatedAt">[]>([]);
   const [assetPlantUMLDiagrams, setAssetPlantUMLDiagrams] = useState<{
     id: string; name: string; updatedAt: string; latestVersion: number; matchedOn: string;
@@ -260,12 +337,26 @@ export default function AssetDetailPage() {
   const [pushResult, setPushResult] = useState<{ url: string; title: string } | null>(null);
   const [pushError, setPushError] = useState<string | null>(null);
 
+  // ── Dependency mini-map builder — stable identity via useCallback (the
+  // actual computation is the pure, module-level computeDepMiniMap above)
+  // so fetchAll (below) doesn't get a new function reference every render.
+  const buildDepMiniMap = useCallback((
+    downstream: AssetDependency[],
+    upstream: AssetDependency[],
+    currentId: string,
+    currentAsset: { name: string; icon: string | null; shortCode: string | null; lifecycleStatus: string; domainName: string | null }
+  ) => {
+    const { nodes, edges } = computeDepMiniMap(downstream, upstream, currentId, currentAsset);
+    setDepNodes(nodes);
+    setDepEdges(edges);
+  }, [setDepNodes, setDepEdges]);
+
   // ── Data loading ──────────────────────────────────────────────────────────
   const fetchAll = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     try {
-      const [assetRes, historyRes, deptsRes, strategiesRes, complexitiesRes, domainsRes, tiersRes, vendorsRes, usersRes, projectsRes, capsRes, sectorsRes, diagramsRes, plantumlDiagramsRes, depRes, allAssetsRes] = await Promise.all([
+      const [assetRes, historyRes, deptsRes, strategiesRes, complexitiesRes, domainsRes, tiersRes, vendorsRes, usersRes, projectsRes, capsRes, sectorsRes, diagramsRes, plantumlDiagramsRes, depRes, allAssetsRes, allDiagramsRes] = await Promise.all([
         fetch(`/api/assets/${id}`),
         fetch(`/api/assets/${id}/history`),
         fetch("/api/organisations"),
@@ -282,12 +373,13 @@ export default function AssetDetailPage() {
         fetch(`/api/assets/${id}/plantuml-diagrams`),
         fetch(`/api/assets/${id}/dependencies`),
         fetch("/api/assets"),
+        fetch("/api/diagrams"),
       ]);
       if (!assetRes.ok) {
         const d = await assetRes.json();
         throw new Error(d.error ?? "Asset not found.");
       }
-      const [assetData, historyData, deptsData, strategiesData, complexitiesData, domainsData, tiersData, vendorsData, usersData, projectsData, capsData, sectorsData, diagramsData, plantumlDiagramsData, depDataResult, allAssetsData] = await Promise.all([
+      const [assetData, historyData, deptsData, strategiesData, complexitiesData, domainsData, tiersData, vendorsData, usersData, projectsData, capsData, sectorsData, diagramsData, plantumlDiagramsData, depDataResult, allAssetsData, allDiagramsData] = await Promise.all([
         assetRes.json(),
         historyRes.json(),
         deptsRes.json(),
@@ -304,6 +396,7 @@ export default function AssetDetailPage() {
         plantumlDiagramsRes.json(),
         depRes.json(),
         allAssetsRes.json(),
+        allDiagramsRes.json(),
       ]);
       setAsset(assetData.asset);
       setHistory(historyData.history ?? []);
@@ -317,6 +410,7 @@ export default function AssetDetailPage() {
       setActiveProjects(projectsData.projects ?? []);
       setCapabilities(capsData.capabilities ?? []);
       setSectors(sectorsData.sectors ?? []);
+      setDiagrams(allDiagramsData.diagrams ?? []);
       setAssetDiagrams(diagramsData.diagrams ?? []);
       setAssetPlantUMLDiagrams(plantumlDiagramsData.diagrams ?? []);
       const downstream: AssetDependency[] = depDataResult.downstream ?? [];
@@ -329,84 +423,27 @@ export default function AssetDetailPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [id]);
+  }, [id, buildDepMiniMap]);
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
 
-  // ── Dependency mini-map builder ───────────────────────────────────────────
-  function buildDepMiniMap(
-    downstream: AssetDependency[],
-    upstream: AssetDependency[],
-    currentId: string,
-    currentAsset: { name: string; icon: string | null; shortCode: string | null; lifecycleStatus: string; domainName: string | null }
-  ) {
-    const miniNodes: Node<DependencyNodeData>[] = [];
-    const miniEdges: Edge<DependencyEdgeData>[] = [];
-    const seenIds = new Set<string>();
-    const upstreamX = -240;
-    const centerX = 0;
-    const downstreamX = 240;
-
-    miniNodes.push({
-      id: currentId,
-      type: "dependencyNode",
-      position: { x: centerX - 95, y: 0 },
-      data: {
-        name: currentAsset.name,
-        shortCode: currentAsset.shortCode,
-        icon: currentAsset.icon,
-        domain: currentAsset.domainName ?? null,
-        lifecycleStatus: currentAsset.lifecycleStatus,
-        isCenter: true,
-      },
-    });
-    seenIds.add(currentId);
-
-    const downstreamUniq = downstream.filter((d) => {
-      const otherId = d.sourceAssetId === currentId ? d.targetAssetId : d.sourceAssetId;
-      return !seenIds.has(otherId);
-    });
-    downstreamUniq.forEach((d, i) => {
-      const otherId = d.sourceAssetId === currentId ? d.targetAssetId : d.sourceAssetId;
-      const otherName = d.sourceAssetId === currentId ? d.targetAssetName : d.sourceAssetName;
-      const otherIcon = d.sourceAssetId === currentId ? d.targetAssetIcon : d.sourceAssetIcon;
-      const otherDomain = d.sourceAssetId === currentId ? d.targetAssetDomain : d.sourceAssetDomain;
-      seenIds.add(otherId);
-      miniNodes.push({
-        id: otherId, type: "dependencyNode",
-        position: { x: downstreamX - 95, y: i * 80 - ((downstreamUniq.length - 1) * 80) / 2 },
-        data: { name: otherName, shortCode: null, icon: otherIcon, domain: otherDomain, lifecycleStatus: null },
-      });
-      miniEdges.push({
-        id: `down-${d.id}`, source: currentId, target: otherId, type: "dependencyEdge",
-        data: { type: d.type, direction: d.direction, notes: d.notes, dependencyId: d.id },
-      });
-    });
-
-    const upstreamUniq = upstream.filter((d) => {
-      const otherId = d.targetAssetId === currentId ? d.sourceAssetId : d.targetAssetId;
-      return !seenIds.has(otherId);
-    });
-    upstreamUniq.forEach((d, i) => {
-      const otherId = d.targetAssetId === currentId ? d.sourceAssetId : d.targetAssetId;
-      const otherName = d.targetAssetId === currentId ? d.sourceAssetName : d.targetAssetName;
-      const otherIcon = d.targetAssetId === currentId ? d.sourceAssetIcon : d.targetAssetIcon;
-      const otherDomain = d.targetAssetId === currentId ? d.sourceAssetDomain : d.targetAssetDomain;
-      seenIds.add(otherId);
-      miniNodes.push({
-        id: otherId, type: "dependencyNode",
-        position: { x: upstreamX - 95, y: i * 80 - ((upstreamUniq.length - 1) * 80) / 2 },
-        data: { name: otherName, shortCode: null, icon: otherIcon, domain: otherDomain, lifecycleStatus: null },
-      });
-      miniEdges.push({
-        id: `up-${d.id}`, source: otherId, target: currentId, type: "dependencyEdge",
-        data: { type: d.type, direction: d.direction, notes: d.notes, dependencyId: d.id },
-      });
-    });
-
-    setDepNodes(miniNodes);
-    setDepEdges(miniEdges);
-  }
+  // ── Section diagrams: hero pinned first, then linked diagrams (deduped) ──
+  // Must run before any early return below — Hooks can't be called conditionally.
+  const sectionDiagrams = useMemo(() => {
+    if (!asset) return assetDiagrams;
+    const heroId = asset.heroDiagramId;
+    if (!heroId) return assetDiagrams;
+    const linkedIds = new Set(assetDiagrams.map((d) => d.id));
+    const heroInLinked = linkedIds.has(heroId);
+    const heroFromAll = !heroInLinked ? diagrams.find((d) => d.id === heroId) : null;
+    const nonHero = assetDiagrams.filter((d) => d.id !== heroId);
+    const heroEntry = heroInLinked
+      ? assetDiagrams.find((d) => d.id === heroId)!
+      : heroFromAll
+        ? { id: heroFromAll.id, name: heroFromAll.name, latestVersion: heroFromAll.latestVersion, assetCount: heroFromAll.assetCount, updatedAt: heroFromAll.updatedAt }
+        : null;
+    return heroEntry ? [heroEntry, ...nonHero] : assetDiagrams;
+  }, [asset, assetDiagrams, diagrams]);
 
   // ── Delete dependency ─────────────────────────────────────────────────────
   async function handleDeleteDep(depId: string) {
@@ -550,21 +587,25 @@ export default function AssetDetailPage() {
 
           {/* Actions */}
           <div className="flex gap-2 flex-wrap">
-            <Button variant="secondary" size="sm" onClick={() => {
-              setConfluencePageTitle(asset.name);
-              setConfluenceParentPageId("");
-              setPushResult(null);
-              setPushError(null);
-              setConfluenceOpen(true);
-            }}>
-              <CloudUpload className="h-4 w-4" /> Push to Confluence
-            </Button>
-            <Button variant="secondary" size="sm" onClick={() => setEditOpen(true)}>
-              <Pencil className="h-4 w-4" /> Edit
-            </Button>
-            <Button variant="danger" size="sm" onClick={() => { setDeleteOpen(true); setDeleteError(null); }}>
-              <Trash2 className="h-4 w-4" /> Delete
-            </Button>
+            {canWrite && (
+              <>
+                <Button variant="secondary" size="sm" onClick={() => {
+                  setConfluencePageTitle(asset.name);
+                  setConfluenceParentPageId("");
+                  setPushResult(null);
+                  setPushError(null);
+                  setConfluenceOpen(true);
+                }}>
+                  <CloudUpload className="h-4 w-4" /> Push to Confluence
+                </Button>
+                <Button variant="secondary" size="sm" onClick={() => setEditOpen(true)}>
+                  <Pencil className="h-4 w-4" /> Edit
+                </Button>
+                <Button variant="danger" size="sm" onClick={() => { setDeleteOpen(true); setDeleteError(null); }}>
+                  <Trash2 className="h-4 w-4" /> Delete
+                </Button>
+              </>
+            )}
           </div>
         </div>
 
@@ -618,14 +659,14 @@ export default function AssetDetailPage() {
           <Field label="RPO"               value={asset.slaRpo} />
           <Field label="Go live date"       value={fmtDate(asset.goLiveDate)} />
           <Field label="Retirement date"   value={fmtDate(asset.retirementDate)} />
-          <Field label="Contract end date" value={fmtDate(asset.contractEndDate)} />
-          <Field
-            label="Contract amount"
-            value={asset.contractAmount != null
-              ? new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(asset.contractAmount)
-              : null}
-          />
           {/* ↑ Add new SLA/date fields here in future */}
+        </Section>
+
+        {/* Contracts */}
+        <Section title="Contracts">
+          <div className="col-span-2">
+            <AssetContractsList assetId={asset.id} />
+          </div>
         </Section>
 
         {/* Links & Notes */}
@@ -704,41 +745,51 @@ export default function AssetDetailPage() {
       )}
 
       {/* ── Diagrams ───────────────────────────────────────────────────────── */}
-      {assetDiagrams.length > 0 && (
-        <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden dark:border-slate-700 dark:bg-slate-900">
-          <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50 px-5 py-3 dark:border-slate-800 dark:bg-slate-800/50">
+      {(sectionDiagrams.length > 0 || asset.heroDiagramId) && (
+        <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+          <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50 px-5 py-3">
             <div className="flex items-center gap-2">
               <GitBranch className="h-4 w-4 text-slate-400 dark:text-slate-500" />
               <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Architecture Diagrams</h2>
             </div>
-            <span className="rounded-full bg-brand-100 px-2 py-0.5 text-xs font-medium text-brand-700 dark:bg-brand-900/30 dark:text-brand-400">
-              {assetDiagrams.length} diagram{assetDiagrams.length !== 1 ? "s" : ""}
+            <span className="rounded-full bg-brand-100 px-2 py-0.5 text-xs font-medium text-brand-700">
+              {sectionDiagrams.length} diagram{sectionDiagrams.length !== 1 ? "s" : ""}
             </span>
           </div>
-          <div className="divide-y divide-slate-100 dark:divide-slate-800">
-            {assetDiagrams.map((d) => (
-              <div key={d.id} className="flex items-center gap-4 px-5 py-3 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-brand-50 dark:bg-brand-900/20">
-                  <GitBranch className="h-4 w-4 text-brand-500 dark:text-brand-400" />
+          <div className="divide-y divide-slate-100">
+            {sectionDiagrams.map((d) => {
+              const isHero = d.id === asset.heroDiagramId;
+              return (
+                <div key={d.id} className={`flex items-center gap-4 px-5 py-3 transition-colors ${isHero ? "bg-brand-50/40 hover:bg-brand-50" : "hover:bg-slate-50"}`}>
+                  <div className={`flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg ${isHero ? "bg-brand-100" : "bg-brand-50"}`}>
+                    <GitBranch className={`h-4 w-4 ${isHero ? "text-brand-600" : "text-brand-500"}`} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <Link
+                        href={`/diagrams/${d.id}`}
+                        className="text-sm font-medium text-slate-900 hover:text-brand-600 transition-colors"
+                      >
+                        {d.name}
+                      </Link>
+                      {isHero && (
+                        <span className="inline-flex items-center rounded-full bg-brand-100 px-2 py-0.5 text-[10px] font-semibold text-brand-700">
+                          Main
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <span className="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600 shrink-0">
+                    v{d.latestVersion}
+                  </span>
+                  <span className="text-xs text-slate-400 shrink-0 hidden sm:block">
+                    {new Date(d.updatedAt).toLocaleDateString("en-GB", {
+                      day: "2-digit", month: "short", year: "numeric",
+                    })}
+                  </span>
                 </div>
-                <div className="flex-1 min-w-0">
-                  <Link
-                    href={`/diagrams/${d.id}`}
-                    className="text-sm font-medium text-slate-900 dark:text-slate-100 hover:text-brand-600 dark:hover:text-brand-400 transition-colors"
-                  >
-                    {d.name}
-                  </Link>
-                </div>
-                <span className="inline-flex items-center rounded-full bg-slate-100 dark:bg-slate-800 px-2 py-0.5 text-xs font-medium text-slate-600 dark:text-slate-300 shrink-0">
-                  v{d.latestVersion}
-                </span>
-                <span className="text-xs text-slate-400 dark:text-slate-500 shrink-0 hidden sm:block">
-                  {new Date(d.updatedAt).toLocaleDateString("en-GB", {
-                    day: "2-digit", month: "short", year: "numeric",
-                  })}
-                </span>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
@@ -811,7 +862,7 @@ export default function AssetDetailPage() {
             <span className="rounded-full bg-slate-200 dark:bg-slate-700 px-2 py-0.5 text-xs font-medium text-slate-600 dark:text-slate-300">
               {depData.downstream.length + depData.upstream.length} connection{depData.downstream.length + depData.upstream.length !== 1 ? "s" : ""}
             </span>
-            {user && (
+            {canWrite && (
               <button
                 onClick={() => setDepAddOpen(true)}
                 className="flex items-center gap-1 rounded-lg bg-brand-600 px-2.5 py-1 text-xs font-medium text-white hover:bg-brand-700"
@@ -865,7 +916,7 @@ export default function AssetDetailPage() {
                     </span>
                     <span className="text-xs text-slate-300 dark:text-slate-600">{d.direction}</span>
                     {d.notes && <span className="text-xs text-slate-400 dark:text-slate-500 truncate max-w-[120px]" title={d.notes}>{d.notes}</span>}
-                    {user && (
+                    {canWrite && user && (
                       depDeleteId === d.id ? (
                         <div className="flex items-center gap-1">
                           <span className="text-xs text-slate-500 dark:text-slate-400">Delete?</span>
@@ -911,7 +962,7 @@ export default function AssetDetailPage() {
                     </span>
                     <span className="text-xs text-slate-300 dark:text-slate-600">{d.direction}</span>
                     {d.notes && <span className="text-xs text-slate-400 dark:text-slate-500 truncate max-w-[120px]" title={d.notes}>{d.notes}</span>}
-                    {user && (
+                    {canWrite && user && (
                       <button onClick={() => setEditingDep(d)} className="text-slate-300 hover:text-brand-500 dark:text-slate-600 dark:hover:text-brand-400">
                         <Pencil className="h-3.5 w-3.5" />
                       </button>
@@ -927,7 +978,7 @@ export default function AssetDetailPage() {
           <div className="flex flex-col items-center justify-center gap-2 py-10 text-slate-400 dark:text-slate-500">
             <Network className="h-8 w-8 text-slate-300 dark:text-slate-600" />
             <p className="text-sm">No dependencies recorded yet</p>
-            {user && (
+            {canWrite && (
               <button onClick={() => setDepAddOpen(true)} className="text-xs text-brand-600 hover:underline dark:text-brand-400">
                 Add first dependency
               </button>
@@ -936,7 +987,7 @@ export default function AssetDetailPage() {
         )}
       </div>
 
-      {user && (
+      {canWrite && user && (
         <AddDependencyModal
           open={depAddOpen}
           onClose={() => setDepAddOpen(false)}
@@ -949,7 +1000,7 @@ export default function AssetDetailPage() {
         />
       )}
 
-      {editingDep && user && (
+      {editingDep && canWrite && user && (
         <DependencyPanel
           dependency={editingDep}
           onClose={() => setEditingDep(null)}
@@ -1006,6 +1057,7 @@ export default function AssetDetailPage() {
         users={users}
         capabilities={capabilities}
         sectors={sectors}
+        diagrams={diagrams}
         onSave={handleSave}
       />
 
@@ -1092,6 +1144,23 @@ export default function AssetDetailPage() {
                     setIsPushing(true);
                     setPushError(null);
                     try {
+                      // Render main diagram as PNG (client-side, non-fatal)
+                      let diagramPng: string | null = null;
+                      if (asset.heroDiagramId) {
+                        try {
+                          const dRes = await fetch(`/api/diagrams/${asset.heroDiagramId}`);
+                          if (dRes.ok) {
+                            const dData = await dRes.json();
+                            const content: string = dData.diagram?.content ?? "";
+                            if (content) {
+                              const { exportDiagramPng } = await import("@/components/diagrams/exportDiagramPng");
+                              diagramPng = await exportDiagramPng(content);
+                            }
+                          }
+                        } catch {
+                          // non-fatal — push without image
+                        }
+                      }
                       const res = await fetch("/api/confluence/push", {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
@@ -1099,6 +1168,7 @@ export default function AssetDetailPage() {
                           assetId: id,
                           pageTitle: confluencePageTitle.trim(),
                           parentPageId: confluenceParentPageId.trim() || undefined,
+                          diagramPng,
                         }),
                       });
                       const data = await res.json();

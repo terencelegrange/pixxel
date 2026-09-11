@@ -22,6 +22,9 @@ build/
 # Setup config — contains DB credentials, never commit
 site.config.json
 
+# Auto-generated JWT signing secret (lib/jwt-secret.ts), never commit
+.jwt-secret
+
 # Misc
 .DS_Store
 *.pem
@@ -31,4 +34,16 @@ yarn-error.log*
 
 # Testing
 .env.test
-tsconfig.tsbuildinfo
+tsconfig*.tsbuildinfo
+coverage/
+
+# DB backup files — never commit these
+*.sql.bak
+database-setup/*.sql
+backups/
+
+# Local scripts — not for source control
+scripts/
+
+# SQLite trial-mode database files
+data/

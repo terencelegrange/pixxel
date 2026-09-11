@@ -1,6 +1,10 @@
-// __tests__/integration/api/roles.test.ts
+﻿// __tests__/integration/api/roles.test.ts
 import { NextRequest } from 'next/server'
 import { config } from 'dotenv'
+
+jest.mock('@/lib/require-user', () => ({
+  requireUser: jest.fn().mockReturnValue({ ok: true, user: { id: 'u1', name: 'Test User', email: 'test@example.com', role: 'Admin' } }),
+}))
 
 config({ path: '.env.test' })
 
@@ -37,7 +41,7 @@ describe('Role CRUD (integration)', () => {
     const { DELETE } = await import('@/app/api/roles/[id]/route')
     const res = await DELETE(
       makeReq('DELETE', { userId: 'system', userName: 'System' }),
-      { params: { id: createdRoleId } }
+      { params: Promise.resolve({ id: createdRoleId }) }
     )
     expect(res.status).toBe(200)
     createdRoleId = ''

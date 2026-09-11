@@ -201,7 +201,7 @@ type LayoutTab = "force" | "layered" | "domain";
 
 export default function DependenciesPage() {
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, canWrite } = useAuth();
 
   const [deps, setDeps] = useState<AssetDependency[]>([]);
   const [assetMeta, setAssetMeta] = useState<Map<string, AssetMeta>>(new Map());
@@ -358,7 +358,7 @@ export default function DependenciesPage() {
           ))}
         </div>
 
-        {user && (
+        {canWrite && (
           <button
             onClick={() => setAddOpen(true)}
             className="flex h-9 items-center gap-1.5 rounded-lg bg-brand-600 px-3 text-sm font-medium text-white hover:bg-brand-700"
@@ -385,7 +385,7 @@ export default function DependenciesPage() {
               <p className="text-sm font-medium text-slate-400 dark:text-slate-500">
                 {deps.length === 0 ? "No dependencies yet" : "No results match your filters"}
               </p>
-              {deps.length === 0 && user && (
+              {deps.length === 0 && canWrite && (
                 <button
                   onClick={() => setAddOpen(true)}
                   className="flex items-center gap-1.5 text-sm text-brand-600 hover:underline dark:text-brand-400"
@@ -430,7 +430,7 @@ export default function DependenciesPage() {
           )}
         </div>
 
-        {selectedDep && user && (
+        {selectedDep && user && canWrite && (
           <div className="w-80 flex-shrink-0">
             <DependencyPanel
               dependency={selectedDep}
@@ -444,7 +444,7 @@ export default function DependenciesPage() {
         )}
       </div>
 
-      {user && (
+      {canWrite && user && (
         <AddDependencyModal
           open={addOpen}
           onClose={() => setAddOpen(false)}

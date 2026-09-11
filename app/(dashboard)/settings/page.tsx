@@ -1,11 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import {
-  Settings, Bell, Lock, Globe, ShieldCheck, ShieldAlert, MessageSquare, ChevronRight,
-  Layers, GitBranch, Gauge, Building2, Network, Target, Package2, BarChart2, ScrollText,
-  MapPin, Users, ClipboardList, Blocks,
-} from "lucide-react";
+import { Settings, Bell, Lock, Globe, ShieldCheck, ShieldAlert, MessageSquare, ChevronRight, Layers, GitBranch, Gauge, Building2, Network, Target, Package2, BarChart2, ScrollText, MapPin, Users, ClipboardList, Activity, Blocks, KeyRound } from "lucide-react";
 import { useFeatureTier } from "@/context/FeatureTierContext";
 
 // ---------------------------------------------------------------------------
@@ -45,70 +41,6 @@ function SettingsTile({ href, icon: Icon, iconBg, title, description }: TileConf
 }
 
 // ---------------------------------------------------------------------------
-// Tile data — each section's tiles, optionally gated by featureKey (see
-// config/features.ts and context/FeatureTierContext.tsx)
-// ---------------------------------------------------------------------------
-const SECTIONS: { title: string; tiles: TileConfig[] }[] = [
-  {
-    title: "Administration",
-    tiles: [
-      { href: "/users", icon: Users, iconBg: "bg-violet-500", title: "Users",
-        description: "Manage user accounts, roles, and access levels." },
-      { href: "/audit", icon: ClipboardList, iconBg: "bg-slate-500", title: "Audit Log",
-        description: "Review a full history of changes made across the platform." },
-    ],
-  },
-  {
-    title: "Reference Data",
-    tiles: [
-      { href: "/organisations", icon: Building2, iconBg: "bg-blue-500", title: "Departments",
-        description: "Manage the business units and teams that own assets." },
-      { href: "/domains", icon: Network, iconBg: "bg-teal-500", title: "Domains",
-        description: "Classify assets by technology domain such as Application or Infrastructure." },
-      { href: "/asset-strategy", icon: Target, iconBg: "bg-orange-500", title: "Asset Strategy",
-        description: "Define strategic dispositions such as Adopt, Scale, Replace, or Retire." },
-      { href: "/vendors", icon: Package2, iconBg: "bg-cyan-600", title: "Vendors",
-        description: "Register the vendors and suppliers your assets depend on." },
-      { href: "/tiers", icon: BarChart2, iconBg: "bg-amber-500", title: "Tiers",
-        description: "Set criticality tiers to capture SLA expectations and support obligations." },
-    ],
-  },
-  {
-    title: "Configuration",
-    tiles: [
-      { href: "/settings/platform", icon: Blocks, iconBg: "bg-fuchsia-600", title: "Platform",
-        description: "Choose which feature set is enabled for this install, and manage feature tiers." },
-      { href: "/settings/roles", icon: ShieldCheck, iconBg: "bg-violet-500", title: "Roles",
-        description: "Define roles and permission levels for users." },
-      { href: "/settings/feedback", icon: MessageSquare, iconBg: "bg-sky-500", title: "Feedback",
-        description: "View and manage user feedback submissions." },
-      { href: "/settings/changelog", icon: ScrollText, iconBg: "bg-emerald-500", title: "Changelog",
-        description: "Record and publish what has changed in each platform release." },
-      { href: "/settings/investment-classifications", icon: MapPin, iconBg: "bg-rose-500", title: "Investment Classifications",
-        description: "Configure roadmap investment labels and their colours.", featureKey: "roadmap" },
-      { href: "/settings/industry-sectors", icon: Globe, iconBg: "bg-teal-500", title: "Industry Sectors",
-        description: "Manage industry sectors for business capability categorisation.", featureKey: "capability_coverage" },
-      { href: "/settings/business-capabilities", icon: Layers, iconBg: "bg-indigo-500", title: "Business Capabilities",
-        description: "Define and manage business capabilities by industry sector.", featureKey: "capability_coverage" },
-      { href: "/settings/diagram-types", icon: GitBranch, iconBg: "bg-brand-500", title: "Diagram Types",
-        description: "Configure diagram classification types (Domain, Program, Solution, Detailed).", featureKey: "diagrams" },
-      { href: "/settings/security-configuration", icon: ShieldAlert, iconBg: "bg-red-600", title: "Security Configuration",
-        description: "Configure risk attributes, characteristics, and how they map to asset categories.", featureKey: "security" },
-      { href: "/settings/asset-complexity", icon: Gauge, iconBg: "bg-rose-500", title: "Asset Complexity",
-        description: "Define complexity levels for classifying assets (e.g. Low, Medium, High, Critical).", featureKey: "complexity_cost" },
-      { icon: Settings, iconBg: "bg-slate-400", title: "General",
-        description: "Manage account name, timezone, and language." },
-      { icon: Bell, iconBg: "bg-amber-400", title: "Notifications",
-        description: "Configure email and in-app notification preferences." },
-      { icon: Lock, iconBg: "bg-slate-500", title: "Security",
-        description: "Update your password and manage 2FA settings." },
-      { href: "/settings/integrations", icon: Globe, iconBg: "bg-sky-500", title: "Integrations",
-        description: "Connect third-party services and manage API keys." },
-    ],
-  },
-];
-
-// ---------------------------------------------------------------------------
 // Page
 // ---------------------------------------------------------------------------
 export default function SettingsPage() {
@@ -123,20 +55,205 @@ export default function SettingsPage() {
         </p>
       </div>
 
-      {SECTIONS.map((section) => {
-        const tiles = section.tiles.filter((t) => !t.featureKey || hasFeature(t.featureKey));
-        if (tiles.length === 0) return null;
-        return (
-          <div key={section.title}>
-            <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-3">
-              {section.title}
-            </h2>
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {tiles.map((tile) => <SettingsTile key={tile.title} {...tile} />)}
-            </div>
-          </div>
-        );
-      })}
+      {/* Administration */}
+      <div>
+        <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-3">
+          Administration
+        </h2>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <SettingsTile
+            href="/users"
+            icon={Users}
+            iconBg="bg-violet-500"
+            title="Users"
+            description="Manage user accounts, roles, and access levels."
+          />
+          <SettingsTile
+            href="/audit"
+            icon={ClipboardList}
+            iconBg="bg-slate-500"
+            title="Audit Log"
+            description="Review a full history of changes made across the platform."
+          />
+        </div>
+      </div>
+
+      {/* Reference Data */}
+      <div>
+        <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-3">
+          Reference Data
+        </h2>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <SettingsTile
+            href="/organisations"
+            icon={Building2}
+            iconBg="bg-blue-500"
+            title="Departments"
+            description="Manage the business units and teams that own assets."
+          />
+          <SettingsTile
+            href="/domains"
+            icon={Network}
+            iconBg="bg-teal-500"
+            title="Domains"
+            description="Classify assets by technology domain such as Application or Infrastructure."
+          />
+          <SettingsTile
+            href="/asset-strategy"
+            icon={Target}
+            iconBg="bg-orange-500"
+            title="Asset Strategy"
+            description="Define strategic dispositions such as Adopt, Scale, Replace, or Retire."
+          />
+          <SettingsTile
+            href="/vendors"
+            icon={Package2}
+            iconBg="bg-cyan-600"
+            title="Vendors"
+            description="Register the vendors and suppliers your assets depend on."
+          />
+          <SettingsTile
+            href="/tiers"
+            icon={BarChart2}
+            iconBg="bg-amber-500"
+            title="Tiers"
+            description="Set criticality tiers to capture SLA expectations and support obligations."
+          />
+        </div>
+      </div>
+
+      {/* Configuration */}
+      <div>
+        <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-3">
+          Configuration
+        </h2>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <SettingsTile
+          href="/settings/platform"
+          icon={Blocks}
+          iconBg="bg-fuchsia-600"
+          title="Platform"
+          description="Choose which feature set is enabled for this install, and manage feature tiers."
+        />
+        <SettingsTile
+          href="/settings/roles"
+          icon={ShieldCheck}
+          iconBg="bg-violet-500"
+          title="Roles"
+          description="Define roles and permission levels for users."
+        />
+        <SettingsTile
+          href="/settings/api-keys"
+          icon={KeyRound}
+          iconBg="bg-lime-600"
+          title="API Keys"
+          description="Generate and manage keys for programmatic API access."
+        />
+        <SettingsTile
+          href="/settings/feedback"
+          icon={MessageSquare}
+          iconBg="bg-sky-500"
+          title="Feedback"
+          description="View and manage user feedback submissions."
+        />
+        <SettingsTile
+          href="/settings/changelog"
+          icon={ScrollText}
+          iconBg="bg-emerald-500"
+          title="Changelog"
+          description="Record and publish what has changed in each platform release."
+        />
+        {hasFeature("security") && (
+          <SettingsTile
+            href="/settings/security-configuration"
+            icon={ShieldAlert}
+            iconBg="bg-red-600"
+            title="Security Configuration"
+            description="Configure risk attributes, characteristics, and how they map to asset categories."
+          />
+        )}
+        {hasFeature("roadmap") && (
+          <SettingsTile
+            href="/settings/investment-classifications"
+            icon={MapPin}
+            iconBg="bg-rose-500"
+            title="Investment Classifications"
+            description="Configure roadmap investment labels and their colours."
+          />
+        )}
+        {hasFeature("capability_coverage") && (
+          <SettingsTile
+            href="/settings/industry-sectors"
+            icon={Globe}
+            iconBg="bg-teal-500"
+            title="Industry Sectors"
+            description="Manage industry sectors for business capability categorisation."
+          />
+        )}
+        {hasFeature("capability_coverage") && (
+          <SettingsTile
+            href="/settings/business-capabilities"
+            icon={Layers}
+            iconBg="bg-indigo-500"
+            title="Business Capabilities"
+            description="Define and manage business capabilities by industry sector."
+          />
+        )}
+        {hasFeature("diagrams") && (
+          <SettingsTile
+            href="/settings/diagram-types"
+            icon={GitBranch}
+            iconBg="bg-brand-500"
+            title="Diagram Types"
+            description="Configure diagram classification types (Domain, Program, Solution, Detailed)."
+          />
+        )}
+        {hasFeature("complexity_cost") && (
+          <SettingsTile
+            href="/settings/asset-complexity"
+            icon={Gauge}
+            iconBg="bg-rose-500"
+            title="Asset Complexity"
+            description="Define complexity levels for classifying assets (e.g. Low, Medium, High, Critical)."
+          />
+        )}
+        <SettingsTile
+          href="/settings/general"
+          icon={Settings}
+          iconBg="bg-slate-400"
+          title="General"
+          description="Manage account name, branding, timezone, and language."
+        />
+        <SettingsTile
+          href="/settings/notifications"
+          icon={Bell}
+          iconBg="bg-amber-400"
+          title="Notifications"
+          description="Choose what shows up in your notification bell."
+        />
+        <SettingsTile
+          href="/settings/security"
+          icon={Lock}
+          iconBg="bg-slate-500"
+          title="Security"
+          description="Update your password and manage 2FA settings."
+        />
+        <SettingsTile
+          href="/settings/integrations"
+          icon={Globe}
+          iconBg="bg-sky-500"
+          title="Integrations"
+          description="Connect third-party services such as Confluence."
+        />
+        <SettingsTile
+          href="/settings/observability"
+          icon={Activity}
+          iconBg="bg-cyan-500"
+          title="Observability"
+          description="Forward application logs to an external log collector."
+        />
+        </div>
+      </div>
     </div>
   );
 }

@@ -1,0 +1,254 @@
+/**
+ * lib/require-user.ts  —  SERVER ONLY
+ *
+ * Call at the top of every protected API route handler.
+ * Reads the HttpOnly authToken cookie, verifies the JWT (signature, expiry,
+ * and — for state-changing requests — same-origin), and returns the
+ * authenticated user or a ready-made error response.
+ *
+ * Also accepts an `Authorization: Bearer <api-key>` header as an alternative
+ * to the cookie (see lib/api-keys.ts) — resolves to the key's creating
+ * user's CURRENT role, looked up fresh on every request.
+ *
+ * Usage:
+ *   const auth = await requireUser(req);
+ *   if (!auth.ok) return auth.response;
+ *   const { user } = auth;  // { id, name, email, role }
+ *
+ * Role guard:
+ *   const auth = await requireUser(req, "Admin");
+ *   if (!auth.ok) return auth.response;  // returns 403 if role doesn't match
+ *
+ *   const auth = await requireUser(req, ["Admin", "Member"]);
+ *   if (!auth.ok) return auth.response;  // returns 403 unless role is one of these
+ */
+import { NextRequest, NextResponse } from "next/server";
+import mysql from "mysql2/promise";
+import { verifyJwt } from "@/lib/jwt";
+import { getDb } from "@/lib/db";
+import { isSecureRequest } from "@/lib/cookie-secure";
+import logger from "@/lib/logger";
+import { hashApiKey, looksLikeApiKey } from "@/lib/api-keys";
+
+export interface AuthUser {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+}
+
+type RequireUserResult =
+  | { ok: true; user: AuthUser }
+  | { ok: false; response: NextResponse };
+
+const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
+
+// CSRF defense-in-depth for the SameSite=Lax auth cookie: state-changing
+// requests must present an Origin/Referer matching this app's own origin.
+// Requests with neither header (non-browser clients) are allowed through —
+// SameSite=Lax already blocks the classic cross-site form-POST vector.
+//
+// The "expected" origin is built from the request's Host header (honoring
+// X-Forwarded-Host for reverse-proxy deployments), NOT req.nextUrl.origin.
+// In Next.js's standalone server output (this app's Docker build target),
+// req.nextUrl is constructed from the server's own listen address
+// (HOSTNAME/PORT env vars, e.g. http://0.0.0.0:3000) rather than the
+// incoming request's actual Host header — so a container run with a
+// remapped host port (`docker run -p 3088:3000 ...`, a normal deployment)
+// would see req.nextUrl.origin stay stuck at the internal port and reject
+// every state-changing request as cross-site, no matter what the browser
+// actually sent. The Host header always reflects what the client used.
+function isTrustedOrigin(req: NextRequest): boolean {
+  const host = req.headers.get("x-forwarded-host") ?? req.headers.get("host");
+  if (!host) return false;
+  const proto = isSecureRequest(req) ? "https" : "http";
+  const expected = `${proto}://${host}`;
+
+  const origin = req.headers.get("origin");
+  if (origin) return origin === expected;
+
+  const referer = req.headers.get("referer");
+  if (referer) {
+    try {
+      return new URL(referer).origin === expected;
+    } catch {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+export async function requireUser(req: NextRequest, requiredRole?: string | string[]): Promise<RequireUserResult> {
+  const start = Date.now();
+  const method = req.method;
+  const path = req.nextUrl.pathname;
+
+  // Central request-logging point (PIXXEL-2): every route that calls
+  // requireUser() gets one structured log line here, with no per-route
+  // logging code. "durationMs" is requireUser()'s own execution time (the
+  // token_version DB round-trip on success), not full end-to-end request
+  // latency — requireUser() returns before the route does its actual work,
+  // so it can't know the eventual response status/timing. Still useful for
+  // traffic/auth visibility (who's hitting what, auth pass/fail rates,
+  // DB-lookup latency) — a "real" per-route status/duration would need each
+  // route to report back, which the acceptance criteria explicitly avoided.
+  function logRequest(outcome: string, status: number, user?: AuthUser) {
+    logger.info(
+      { method, path, status, outcome, durationMs: Date.now() - start, userId: user?.id, role: user?.role },
+      "api_request"
+    );
+  }
+
+  // API key (bearer token) auth path — checked before the cookie/CSRF flow
+  // since a bearer token is not an ambient browser credential and can't be
+  // CSRF'd. Falls through to the cookie flow below when no Authorization
+  // header is present at all.
+  const authHeader = req.headers.get("authorization");
+  const bearerMatch = authHeader?.match(/^Bearer\s+(.+)$/i);
+  if (bearerMatch) {
+    const rawKey = bearerMatch[1].trim();
+    if (!looksLikeApiKey(rawKey)) {
+      logRequest("api_key_invalid", 401);
+      return {
+        ok: false,
+        response: NextResponse.json({ error: "Invalid API key." }, { status: 401 }),
+      };
+    }
+
+    const db = getDb();
+    const [keyRows] = await db.execute<mysql.RowDataPacket[]>(
+      "SELECT id, created_by_id, expires_at, revoked_at FROM api_keys WHERE key_hash = ? LIMIT 1",
+      [hashApiKey(rawKey)]
+    );
+    const keyRow = keyRows[0];
+    if (!keyRow) {
+      logRequest("api_key_invalid", 401);
+      return {
+        ok: false,
+        response: NextResponse.json({ error: "Invalid API key." }, { status: 401 }),
+      };
+    }
+    if (keyRow.revoked_at != null) {
+      logRequest("api_key_revoked", 401);
+      return {
+        ok: false,
+        response: NextResponse.json({ error: "This API key has been revoked." }, { status: 401 }),
+      };
+    }
+    if (keyRow.expires_at != null && new Date(keyRow.expires_at).getTime() < Date.now()) {
+      logRequest("api_key_expired", 401);
+      return {
+        ok: false,
+        response: NextResponse.json({ error: "This API key has expired." }, { status: 401 }),
+      };
+    }
+
+    // Fresh role lookup — mirrors the token_version fresh-lookup below, so a
+    // key always reflects its creator's CURRENT role, never a baked-in one.
+    const [userRows] = await db.execute<mysql.RowDataPacket[]>(
+      "SELECT id, name, email, role FROM users WHERE id = ? LIMIT 1", [keyRow.created_by_id]
+    );
+    const creator = userRows[0];
+    if (!creator) {
+      logRequest("api_key_invalid", 401);
+      return {
+        ok: false,
+        response: NextResponse.json({ error: "Invalid API key." }, { status: 401 }),
+      };
+    }
+
+    const user: AuthUser = { id: creator.id, name: creator.name, email: creator.email, role: creator.role };
+    const allowedRoles = Array.isArray(requiredRole) ? requiredRole : requiredRole ? [requiredRole] : null;
+    if (allowedRoles && !allowedRoles.includes(user.role)) {
+      logRequest("forbidden", 403, user);
+      return {
+        ok: false,
+        response: NextResponse.json({ error: "You do not have permission to perform this action." }, { status: 403 }),
+      };
+    }
+
+    // Fire-and-forget usage bump — must never fail the outer request.
+    db.execute(
+      "UPDATE api_keys SET last_used_at = CURRENT_TIMESTAMP, use_count = use_count + 1 WHERE id = ?",
+      [keyRow.id]
+    ).catch((err) => logger.error({ err, keyId: keyRow.id }, "api_key usage bump failed"));
+
+    logRequest("api_key_ok", 200, user);
+    return { ok: true, user };
+  }
+
+  if (!SAFE_METHODS.has(req.method) && !isTrustedOrigin(req)) {
+    logRequest("cross_site_blocked", 403);
+    return {
+      ok: false,
+      response: NextResponse.json(
+        { error: "Cross-site request blocked." },
+        { status: 403 }
+      ),
+    };
+  }
+
+  const token = req.cookies.get("authToken")?.value;
+
+  if (!token) {
+    logRequest("unauthenticated", 401);
+    return {
+      ok: false,
+      response: NextResponse.json(
+        { error: "Authentication required." },
+        { status: 401 }
+      ),
+    };
+  }
+
+  const payload = verifyJwt(token);
+  if (!payload) {
+    logRequest("session_expired", 401);
+    return {
+      ok: false,
+      response: NextResponse.json(
+        { error: "Session expired. Please log in again." },
+        { status: 401 }
+      ),
+    };
+  }
+
+  const db = getDb();
+  const [rows] = await db.execute<mysql.RowDataPacket[]>(
+    "SELECT token_version FROM users WHERE id = ? LIMIT 1", [payload.sub]
+  );
+  const currentVersion = rows[0]?.token_version;
+  if (currentVersion == null || currentVersion !== payload.tokenVersion) {
+    logRequest("session_expired", 401);
+    return {
+      ok: false,
+      response: NextResponse.json(
+        { error: "Session expired. Please log in again." },
+        { status: 401 }
+      ),
+    };
+  }
+
+  const user: AuthUser = {
+    id: payload.sub,
+    name: payload.name,
+    email: payload.email,
+    role: payload.role,
+  };
+
+  const allowedRoles = Array.isArray(requiredRole) ? requiredRole : requiredRole ? [requiredRole] : null;
+  if (allowedRoles && !allowedRoles.includes(user.role)) {
+    logRequest("forbidden", 403, user);
+    return {
+      ok: false,
+      response: NextResponse.json(
+        { error: "You do not have permission to perform this action." },
+        { status: 403 }
+      ),
+    };
+  }
+
+  logRequest("ok", 200, user);
+  return { ok: true, user };
+}

@@ -3,6 +3,8 @@ import { randomUUID } from "crypto";
 import mysql from "mysql2/promise";
 import { getDb, setupDatabase } from "@/lib/db";
 import { writeAudit } from "@/lib/audit";
+import { requireUser } from "@/lib/require-user";
+import logger from "@/lib/logger";
 
 const VALID_STATUSES = ["Met", "Not Met", "Partial"] as const;
 type Status = typeof VALID_STATUSES[number];
@@ -10,16 +12,19 @@ type Status = typeof VALID_STATUSES[number];
 // PUT /api/assets/[id]/risk-assessments/[riskFactorId] — upsert a single assessment
 export async function PUT(
   req: NextRequest,
-  { params }: { params: { id: string; riskFactorId: string } }
+  props: { params: Promise<{ id: string; riskFactorId: string }> }
 ) {
+  const auth = await requireUser(req, ["Admin", "Member"]);
+  if (!auth.ok) return auth.response;
+  const { user } = auth;
   try {
+    const params = await props.params;
     await setupDatabase();
     const body = await req.json();
-    const { status, notes, userId, userName } = body;
+    const { status, notes } = body;
 
     if (!VALID_STATUSES.includes(status as Status))
       return NextResponse.json({ error: "status must be one of: Met, Not Met, Partial." }, { status: 400 });
-    if (!userId || !userName) return NextResponse.json({ error: "Authenticated user is required." }, { status: 401 });
 
     const db = getDb();
     const [rows] = await db.execute<mysql.RowDataPacket[]>(
@@ -34,11 +39,11 @@ export async function PUT(
         `UPDATE asset_risk_assessments
          SET status = ?, notes = ?, assessed_by_id = ?, assessed_by_name = ?, assessed_at = CURRENT_TIMESTAMP
          WHERE asset_id = ? AND risk_factor_id = ?`,
-        [values.status, values.notes, userId, userName, params.id, params.riskFactorId]
+        [values.status, values.notes, user.id, user.name, params.id, params.riskFactorId]
       );
       await writeAudit({
         tableName: "asset_risk_assessments", recordId: current.id, action: "UPDATE",
-        performedById: userId, performedByName: userName,
+        performedById: user.id, performedByName: user.name,
         oldValues: { status: current.status, notes: current.notes },
         newValues: values,
       });
@@ -48,18 +53,18 @@ export async function PUT(
         `INSERT INTO asset_risk_assessments
            (id, asset_id, risk_factor_id, status, notes, assessed_by_id, assessed_by_name)
          VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        [id, params.id, params.riskFactorId, values.status, values.notes, userId, userName]
+        [id, params.id, params.riskFactorId, values.status, values.notes, user.id, user.name]
       );
       await writeAudit({
         tableName: "asset_risk_assessments", recordId: id, action: "CREATE",
-        performedById: userId, performedByName: userName,
+        performedById: user.id, performedByName: user.name,
         oldValues: null, newValues: values,
       });
     }
 
     return NextResponse.json({ success: true });
   } catch (err) {
-    console.error("[PUT /api/assets/:id/risk-assessments/:riskFactorId]", err);
+    logger.error({ err, route: "PUT /api/assets/:id/risk-assessments/:riskFactorId" }, "request failed");
     return NextResponse.json({ error: "Failed to save assessment." }, { status: 500 });
   }
 }

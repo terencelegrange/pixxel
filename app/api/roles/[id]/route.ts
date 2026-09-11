@@ -1,20 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
+import logger from "@/lib/logger";
 import mysql from "mysql2/promise";
 import { getDb, setupDatabase } from "@/lib/db";
 import { writeAudit } from "@/lib/audit";
+import { requireUser } from "@/lib/require-user";
 
 const VALID_PERMISSION_LEVELS = ["read-only", "member", "admin"] as const;
 type PermissionLevel = typeof VALID_PERMISSION_LEVELS[number];
 
 // PUT /api/roles/[id]
-export async function PUT(
-  req: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function PUT(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
+  const auth = await requireUser(req, "Admin");
+  if (!auth.ok) return auth.response;
+  const { user } = auth;
   try {
     await setupDatabase();
     const body = await req.json();
-    const { name, description, permissionLevel, userId, userName } = body;
+    const { name, description, permissionLevel } = body;
 
     if (!name?.trim()) return NextResponse.json({ error: "Role name is required." }, { status: 400 });
     if (!permissionLevel || !VALID_PERMISSION_LEVELS.includes(permissionLevel as PermissionLevel)) {
@@ -23,7 +26,6 @@ export async function PUT(
         { status: 400 }
       );
     }
-    if (!userId || !userName) return NextResponse.json({ error: "Authenticated user is required." }, { status: 401 });
 
     const db = getDb();
     const [rows] = await db.execute<mysql.RowDataPacket[]>(
@@ -45,7 +47,7 @@ export async function PUT(
 
     await writeAudit({
       tableName: "roles", recordId: params.id, action: "UPDATE",
-      performedById: userId, performedByName: userName,
+      performedById: user.id, performedByName: user.name,
       oldValues: {
         name:            current.name,
         description:     current.description,
@@ -56,20 +58,19 @@ export async function PUT(
 
     return NextResponse.json({ success: true });
   } catch (err) {
-    console.error("[PUT /api/roles/:id]", err);
+    logger.error({ err, route: "PUT /api/roles/:id" }, "request failed");
     return NextResponse.json({ error: "Failed to update role." }, { status: 500 });
   }
 }
 
 // DELETE /api/roles/[id]
-export async function DELETE(
-  req: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function DELETE(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
+  const auth = await requireUser(req, "Admin");
+  if (!auth.ok) return auth.response;
+  const { user } = auth;
   try {
     await setupDatabase();
-    const { userId, userName } = await req.json() as { userId?: string; userName?: string };
-    if (!userId || !userName) return NextResponse.json({ error: "Authenticated user is required." }, { status: 401 });
 
     const db = getDb();
     const [rows] = await db.execute<mysql.RowDataPacket[]>(
@@ -92,14 +93,14 @@ export async function DELETE(
 
     await writeAudit({
       tableName: "roles", recordId: params.id, action: "DELETE",
-      performedById: userId, performedByName: userName,
+      performedById: user.id, performedByName: user.name,
       oldValues: { name: current.name, permissionLevel: current.permission_level },
       newValues: null,
     });
 
     return NextResponse.json({ success: true });
   } catch (err) {
-    console.error("[DELETE /api/roles/:id]", err);
+    logger.error({ err, route: "DELETE /api/roles/:id" }, "request failed");
     return NextResponse.json({ error: "Failed to delete role." }, { status: 500 });
   }
 }

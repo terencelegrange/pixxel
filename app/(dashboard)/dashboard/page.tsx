@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { TrendingUp, Users, Building2, ArrowUpRight, Server, FolderKanban } from "lucide-react";
+import Link from "next/link";
+import { TrendingUp, Users, Building2, ArrowUpRight, Server, FolderKanban, AlertCircle } from "lucide-react";
 import {
   PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer,
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
@@ -45,20 +46,9 @@ function useChartTheme(isDark: boolean) {
     },
     legendText: isDark ? "#94a3b8" : "#475569",
     legendValue: isDark ? "#e2e8f0" : "#1e293b",
-    // Pie/donut slice border — matches the card background so segments blend
-    // into it instead of showing Recharts' default white outline in dark mode.
     cardBg: isDark ? "#0f172a" : "#ffffff",
   };
 }
-
-// ── Stat icon background — light colour needs a dark equivalent ───────────────
-const ICON_BG_DARK: Record<string, string> = {
-  "bg-violet-50":  "dark:bg-violet-900/30",
-  "bg-emerald-50": "dark:bg-emerald-900/30",
-  "bg-amber-50":   "dark:bg-amber-900/30",
-  "bg-blue-50":    "dark:bg-blue-900/30",
-  "bg-brand-50":   "dark:bg-brand-900/30",
-};
 
 export default function DashboardPage() {
   const { theme } = useTheme();
@@ -70,6 +60,7 @@ export default function DashboardPage() {
   const [assetsByLifecycle, setAssetsByLifecycle] = useState<LifecycleStat[]>([]);
   const [assetsByTier, setAssetsByTier]         = useState<TierStat[]>([]);
   const [assetsByStrategy, setAssetsByStrategy] = useState<StrategyStat[]>([]);
+  const [expiringContracts, setExpiringContracts] = useState<number | null>(null);
 
   useEffect(() => {
     fetch("/api/dashboard/stats")
@@ -80,6 +71,7 @@ export default function DashboardPage() {
         setAssetsByLifecycle(d.assetsByLifecycle ?? []);
         setAssetsByTier(d.assetsByTier ?? []);
         setAssetsByStrategy(d.assetsByStrategy ?? []);
+        setExpiringContracts(d.expiringContracts30d ?? 0);
       })
       .catch(() => {
         setPublishedDepts(0);
@@ -87,6 +79,7 @@ export default function DashboardPage() {
         setAssetsByLifecycle([]);
         setAssetsByTier([]);
         setAssetsByStrategy([]);
+        setExpiringContracts(0);
       });
   }, []);
 
@@ -138,25 +131,30 @@ export default function DashboardPage() {
       bg: "bg-brand-50 dark:bg-brand-900/30",
       loading: activeProjects === null,
     },
+    {
+      label: "Contracts Expiring Soon",
+      value: expiringContracts === null ? "—" : String(expiringContracts),
+      change: "Within 30 days",
+      icon: AlertCircle,
+      color: "text-red-600 dark:text-red-400",
+      bg: "bg-red-50 dark:bg-red-900/30",
+      loading: expiringContracts === null,
+      href: "/contracts?expiring=30",
+    },
   ];
 
   return (
     <div className="space-y-6">
-      {/* Page heading */}
-      <div>
-        <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Dashboard</h1>
-        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
-          Enterprise architecture overview.
-        </p>
-      </div>
-
       {/* Stats grid */}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
         {stats.map((s) => (
           <div
             key={s.label}
-            className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900"
+            className="relative rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-700 dark:bg-slate-900"
           >
+            {s.href ? (
+              <Link href={s.href} className="absolute inset-0" aria-label={s.label} />
+            ) : null}
             <div className="flex items-center justify-between">
               <p className="text-sm font-medium text-slate-500 dark:text-slate-400">{s.label}</p>
               <div className={`rounded-lg p-2 ${s.bg}`}>

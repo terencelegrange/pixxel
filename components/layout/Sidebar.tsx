@@ -7,6 +7,7 @@ import { LucideProps, Rocket, X } from "lucide-react";
 import { navigationConfig } from "@/config/navigation";
 import { useGetStarted } from "@/context/GetStartedContext";
 import { useFeatureTier } from "@/context/FeatureTierContext";
+import { useBranding } from "@/context/BrandingContext";
 import { NavItem } from "@/types";
 
 // Dynamically resolve icon by name from lucide-react
@@ -29,6 +30,7 @@ function NavLink({ item, onClick }: { item: NavItem; onClick?: () => void }) {
     <Link
       href={isDisabled ? "#" : item.href}
       onClick={isDisabled ? undefined : onClick}
+      data-tour={item.href}
       className={[
         "group flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
         isActive
@@ -97,6 +99,7 @@ function GetStartedNavItem({ onClick }: { onClick?: () => void }) {
 
 export default function Sidebar({ isOpen, onClose }: SidebarProps) {
   const { hasFeature } = useFeatureTier();
+  const { companyName, logoDataUrl } = useBranding();
 
   return (
     <>
@@ -118,17 +121,22 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
       >
         {/* Brand */}
         <div className="flex h-14 items-center justify-between gap-2 border-b border-slate-200 px-5 dark:border-slate-800">
-          <div className="flex items-center gap-2.5">
-            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-brand-600">
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" className="h-4 w-4">
-                <rect x="0"  y="0"  width="9" height="9" rx="2" fill="white" fillOpacity="1"/>
-                <rect x="11" y="0"  width="9" height="9" rx="2" fill="white" fillOpacity="0.65"/>
-                <rect x="0"  y="11" width="9" height="9" rx="2" fill="white" fillOpacity="0.35"/>
-                <rect x="11" y="11" width="9" height="9" rx="2" fill="white" fillOpacity="0.12" stroke="white" strokeOpacity="0.4" strokeWidth="1"/>
-              </svg>
-            </div>
-            <span className="text-base font-bold text-slate-900 tracking-tight dark:text-slate-100">
-              Pixxel
+          <div className="flex items-center gap-2.5 min-w-0">
+            {logoDataUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={logoDataUrl} alt="" className="h-7 w-7 flex-shrink-0 rounded-lg object-contain" />
+            ) : (
+              <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg bg-brand-600">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" className="h-4 w-4">
+                  <rect x="0"  y="0"  width="9" height="9" rx="2" fill="white" fillOpacity="1"/>
+                  <rect x="11" y="0"  width="9" height="9" rx="2" fill="white" fillOpacity="0.65"/>
+                  <rect x="0"  y="11" width="9" height="9" rx="2" fill="white" fillOpacity="0.35"/>
+                  <rect x="11" y="11" width="9" height="9" rx="2" fill="white" fillOpacity="0.12" stroke="white" strokeOpacity="0.4" strokeWidth="1"/>
+                </svg>
+              </div>
+            )}
+            <span className="truncate text-base font-bold text-slate-900 tracking-tight dark:text-slate-100">
+              {companyName || "Pixxel"}
             </span>
           </div>
           {/* Mobile close */}

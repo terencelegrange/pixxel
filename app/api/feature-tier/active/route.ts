@@ -1,10 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import mysql from "mysql2/promise";
-import { getDb, setupDatabase } from "@/lib/db";
+import { getDb, setupDatabase, getDbDialect } from "@/lib/db";
+import { upsertSql } from "@/lib/sql-compat";
+import { requireUser } from "@/lib/require-user";
+import logger from "@/lib/logger";
 
 // GET /api/feature-tier/active — resolves the active tier (falling back to the
 // default tier if app_settings has no explicit assignment yet) and its features.
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const auth = await requireUser(req);
+  if (!auth.ok) return auth.response;
   try {
     await setupDatabase();
     const db = getDb();
@@ -33,13 +38,15 @@ export async function GET() {
       features: featureRows.map((r) => r.feature_key),
     });
   } catch (err) {
-    console.error("[GET /api/feature-tier/active]", err);
+    logger.error({ err, route: "GET /api/feature-tier/active" }, "request failed");
     return NextResponse.json({ error: "Failed to load active feature tier." }, { status: 500 });
   }
 }
 
 // PUT /api/feature-tier/active — switch the whole install to a different tier
 export async function PUT(req: NextRequest) {
+  const auth = await requireUser(req, ["Admin", "Member"]);
+  if (!auth.ok) return auth.response;
   try {
     await setupDatabase();
     const body = await req.json();
@@ -53,13 +60,13 @@ export async function PUT(req: NextRequest) {
     if (!tierRows[0]) return NextResponse.json({ error: "Feature tier not found." }, { status: 404 });
 
     await db.execute(
-      "INSERT INTO app_settings (`key`, `value`) VALUES ('feature_tier_id', ?) ON DUPLICATE KEY UPDATE `value` = VALUES(`value`)",
-      [tierId]
+      upsertSql("app_settings", ["key", "value"], "value", getDbDialect()),
+      ["feature_tier_id", tierId]
     );
 
     return NextResponse.json({ success: true });
   } catch (err) {
-    console.error("[PUT /api/feature-tier/active]", err);
+    logger.error({ err, route: "PUT /api/feature-tier/active" }, "request failed");
     return NextResponse.json({ error: "Failed to switch feature tier." }, { status: 500 });
   }
 }
