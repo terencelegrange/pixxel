@@ -12,6 +12,9 @@ site.config.json
 
 # Dev/docs
 *.md
+# CLAUDE.md is read from disk at runtime by the /docs page — must stay in
+# the build context despite the *.md exclusion above.
+!CLAUDE.md
 docs/
 .superpowers/
 tsconfig.tsbuildinfo

@@ -48,6 +48,15 @@ RUN addgroup --system --gid 1001 nodejs && \
 # Copy static assets
 COPY --from=builder /app/public ./public
 
+# CLAUDE.md and openapi.yaml are read from disk at request time by
+# app/(dashboard)/docs/page.tsx (process.cwd()/CLAUDE.md and
+# process.cwd()/openapi.yaml) — not bundled automatically by Next's
+# standalone output tracing, same reasoning as the migration SQL files
+# below. Without this, the /docs page silently falls back to "Documentation
+# is not available in this environment." in production.
+COPY --from=builder --chown=nextjs:nodejs /app/CLAUDE.md ./CLAUDE.md
+COPY --from=builder --chown=nextjs:nodejs /app/openapi.yaml ./openapi.yaml
+
 # Copy the standalone server bundle (enabled via output: 'standalone' in next.config.js)
 # This includes only the minimal server files — no full node_modules needed
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
