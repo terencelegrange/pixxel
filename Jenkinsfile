@@ -2,10 +2,13 @@ pipeline {
     agent any
 
     environment {
-        REMOTE_HOST = '192.168.100.228'
-        REMOTE_USER = 'terence'
-        DEPLOY_DIR  = '/home/pixxel'
-        APP_PORT    = '3030'
+        REMOTE_HOST  = '192.168.100.228'
+        REMOTE_USER  = 'terence'
+        DEPLOY_DIR   = '/home/pixxel'
+        APP_PORT     = '3030'
+        NPM_REGISTRY = 'http://192.168.100.223:4873'  // Verdaccio pull-through cache;
+                                                        // the Docker build (docker-compose.prod.yml)
+                                                        // already uses this too.
     }
 
     triggers {
@@ -24,7 +27,7 @@ pipeline {
         stage('Verify') {
             steps {
                 sh """
-                    npm ci
+                    npm ci --registry=${NPM_REGISTRY}
                     npx tsc --noEmit
                     npm run lint
                     npm run test:coverage
