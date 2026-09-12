@@ -54,8 +54,8 @@ function MfaStep({ mfaToken, onBack }: { mfaToken: string; onBack: () => void })
         <div className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-50">
           <ShieldCheck className="h-5 w-5 text-brand-600" />
         </div>
-        <h2 className="text-base font-semibold text-slate-800">Two-factor authentication</h2>
-        <p className="text-sm text-slate-500">
+        <h2 className="text-base font-semibold text-slate-800 dark:text-slate-200">Two-factor authentication</h2>
+        <p className="text-sm text-slate-500 dark:text-slate-400">
           {useRecovery
             ? "Enter one of your one-time recovery codes."
             : "Enter the 6-digit code from your authenticator app."}
@@ -63,7 +63,7 @@ function MfaStep({ mfaToken, onBack }: { mfaToken: string; onBack: () => void })
       </div>
 
       {error && (
-        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
+        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600 dark:border-red-900 dark:bg-red-950/50 dark:text-red-400">
           {error}
         </div>
       )}
@@ -87,14 +87,14 @@ function MfaStep({ mfaToken, onBack }: { mfaToken: string; onBack: () => void })
         <button
           type="button"
           onClick={onBack}
-          className="inline-flex items-center gap-1 text-slate-500 hover:text-slate-700"
+          className="inline-flex items-center gap-1 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
         >
           <ArrowLeft className="h-3.5 w-3.5" /> Back
         </button>
         <button
           type="button"
           onClick={() => { setUseRecovery((v) => !v); setValue(""); setError(""); }}
-          className="text-brand-600 hover:underline"
+          className="text-brand-600 hover:underline dark:text-brand-400"
         >
           {useRecovery ? "Use authenticator code instead" : "Use a recovery code instead"}
         </button>
@@ -142,7 +142,7 @@ export default function LoginForm() {
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-5" noValidate>
       {errors.general && (
-        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
+        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600 dark:border-red-900 dark:bg-red-950/50 dark:text-red-400">
           {errors.general}
         </div>
       )}
@@ -159,10 +159,10 @@ export default function LoginForm() {
 
       <div className="flex flex-col gap-1.5">
         <div className="flex items-center justify-between">
-          <label htmlFor="password" className="text-sm font-medium text-slate-700">
+          <label htmlFor="password" className="text-sm font-medium text-slate-700 dark:text-slate-300">
             Password
           </label>
-          <Link href="#" className="text-xs text-brand-600 hover:underline">
+          <Link href="#" className="text-xs text-brand-600 hover:underline dark:text-brand-400">
             Forgot password?
           </Link>
         </div>
@@ -183,15 +183,15 @@ export default function LoginForm() {
         Sign in
       </Button>
 
-      <p className="text-center text-sm text-slate-500">
+      <p className="text-center text-sm text-slate-500 dark:text-slate-400">
         Don&apos;t have an account?{" "}
-        <Link href="/register" className="font-medium text-brand-600 hover:underline">
+        <Link href="/register" className="font-medium text-brand-600 hover:underline dark:text-brand-400">
           Create one free
         </Link>
       </p>
 
       {/* Demo credentials hint */}
-      <p className="rounded-lg bg-slate-50 px-3 py-2 text-center text-xs text-slate-400">
+      <p className="rounded-lg bg-slate-50 px-3 py-2 text-center text-xs text-slate-400 dark:bg-slate-800 dark:text-slate-500">
         Demo: <span className="font-mono">jane@example.com</span> /{" "}
         <span className="font-mono">password123</span>
       </p>

@@ -68,7 +68,7 @@ export default function RegisterForm() {
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-5" noValidate>
       {errors.general && (
-        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
+        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600 dark:border-red-900 dark:bg-red-950/50 dark:text-red-400">
           {errors.general}
         </div>
       )}
@@ -117,9 +117,9 @@ export default function RegisterForm() {
         Create account
       </Button>
 
-      <p className="text-center text-sm text-slate-500">
+      <p className="text-center text-sm text-slate-500 dark:text-slate-400">
         Already have an account?{" "}
-        <Link href="/login" className="font-medium text-brand-600 hover:underline">
+        <Link href="/login" className="font-medium text-brand-600 hover:underline dark:text-brand-400">
           Sign in
         </Link>
       </p>
