@@ -1,4 +1,4 @@
-CREATE TABLE `contracts` (
+CREATE TABLE IF NOT EXISTS `contracts` (
 	`id` char(36) NOT NULL,
 	`vendor_id` char(36),
 	`asset_id` char(36),
@@ -19,5 +19,5 @@ CREATE TABLE `contracts` (
 	CONSTRAINT `contracts_id` PRIMARY KEY(`id`)
 );
 --> statement-breakpoint
-CREATE INDEX `idx_contracts_vendor` ON `contracts` (`vendor_id`);--> statement-breakpoint
-CREATE INDEX `idx_contracts_asset` ON `contracts` (`asset_id`);
+CREATE INDEX IF NOT EXISTS `idx_contracts_vendor` ON `contracts` (`vendor_id`);--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS `idx_contracts_asset` ON `contracts` (`asset_id`);

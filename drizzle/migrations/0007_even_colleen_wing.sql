@@ -1,4 +1,4 @@
-CREATE TABLE `api_keys` (
+CREATE TABLE IF NOT EXISTS `api_keys` (
 	`id` char(36) NOT NULL,
 	`name` varchar(255) NOT NULL,
 	`contact` varchar(255),
@@ -16,5 +16,5 @@ CREATE TABLE `api_keys` (
 	CONSTRAINT `uq_api_keys_key_hash` UNIQUE(`key_hash`)
 );
 --> statement-breakpoint
-CREATE INDEX `idx_api_keys_revoked_at` ON `api_keys` (`revoked_at`);--> statement-breakpoint
-CREATE INDEX `idx_api_keys_created_by` ON `api_keys` (`created_by_id`);
+CREATE INDEX IF NOT EXISTS `idx_api_keys_revoked_at` ON `api_keys` (`revoked_at`);--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS `idx_api_keys_created_by` ON `api_keys` (`created_by_id`);

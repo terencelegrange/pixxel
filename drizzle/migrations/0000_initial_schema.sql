@@ -1,24 +1,24 @@
-CREATE TABLE `app_settings` (
+CREATE TABLE IF NOT EXISTS `app_settings` (
 	`key` varchar(255) NOT NULL,
 	`value` text,
 	`updated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 	CONSTRAINT `app_settings_key` PRIMARY KEY(`key`)
 );
 --> statement-breakpoint
-CREATE TABLE `asset_architects` (
+CREATE TABLE IF NOT EXISTS `asset_architects` (
 	`asset_id` char(36) NOT NULL,
 	`user_id` char(36) NOT NULL,
 	`user_name` varchar(255) NOT NULL,
 	CONSTRAINT `asset_architects_asset_id_user_id_pk` PRIMARY KEY(`asset_id`,`user_id`)
 );
 --> statement-breakpoint
-CREATE TABLE `asset_capabilities` (
+CREATE TABLE IF NOT EXISTS `asset_capabilities` (
 	`asset_id` char(36) NOT NULL,
 	`business_capability_id` char(36) NOT NULL,
 	CONSTRAINT `asset_capabilities_asset_id_business_capability_id_pk` PRIMARY KEY(`asset_id`,`business_capability_id`)
 );
 --> statement-breakpoint
-CREATE TABLE `asset_complexities` (
+CREATE TABLE IF NOT EXISTS `asset_complexities` (
 	`id` char(36) NOT NULL,
 	`name` varchar(255) NOT NULL,
 	`description` text,
@@ -31,13 +31,13 @@ CREATE TABLE `asset_complexities` (
 	CONSTRAINT `uq_asset_complexities_name` UNIQUE(`name`)
 );
 --> statement-breakpoint
-CREATE TABLE `asset_departments` (
+CREATE TABLE IF NOT EXISTS `asset_departments` (
 	`asset_id` char(36) NOT NULL,
 	`department_id` char(36) NOT NULL,
 	CONSTRAINT `asset_departments_asset_id_department_id_pk` PRIMARY KEY(`asset_id`,`department_id`)
 );
 --> statement-breakpoint
-CREATE TABLE `asset_dependencies` (
+CREATE TABLE IF NOT EXISTS `asset_dependencies` (
 	`id` char(36) NOT NULL,
 	`source_asset_id` char(36) NOT NULL,
 	`target_asset_id` char(36) NOT NULL,
@@ -52,7 +52,7 @@ CREATE TABLE `asset_dependencies` (
 	CONSTRAINT `uq_dep_pair` UNIQUE(`source_asset_id`,`target_asset_id`)
 );
 --> statement-breakpoint
-CREATE TABLE `asset_roadmap_phases` (
+CREATE TABLE IF NOT EXISTS `asset_roadmap_phases` (
 	`id` char(36) NOT NULL,
 	`asset_id` char(36) NOT NULL,
 	`classification_id` char(36) NOT NULL,
@@ -66,7 +66,7 @@ CREATE TABLE `asset_roadmap_phases` (
 	CONSTRAINT `asset_roadmap_phases_id` PRIMARY KEY(`id`)
 );
 --> statement-breakpoint
-CREATE TABLE `asset_strategies` (
+CREATE TABLE IF NOT EXISTS `asset_strategies` (
 	`id` char(36) NOT NULL,
 	`name` varchar(255) NOT NULL,
 	`description` text,
@@ -79,7 +79,7 @@ CREATE TABLE `asset_strategies` (
 	CONSTRAINT `uq_asset_strategies_name` UNIQUE(`name`)
 );
 --> statement-breakpoint
-CREATE TABLE `assets` (
+CREATE TABLE IF NOT EXISTS `assets` (
 	`id` char(36) NOT NULL,
 	`name` varchar(255) NOT NULL,
 	`short_code` varchar(50),
@@ -114,7 +114,7 @@ CREATE TABLE `assets` (
 	CONSTRAINT `assets_id` PRIMARY KEY(`id`)
 );
 --> statement-breakpoint
-CREATE TABLE `audit_log` (
+CREATE TABLE IF NOT EXISTS `audit_log` (
 	`id` char(36) NOT NULL,
 	`table_name` varchar(100) NOT NULL,
 	`record_id` char(36) NOT NULL,
@@ -127,7 +127,7 @@ CREATE TABLE `audit_log` (
 	CONSTRAINT `audit_log_id` PRIMARY KEY(`id`)
 );
 --> statement-breakpoint
-CREATE TABLE `business_capabilities` (
+CREATE TABLE IF NOT EXISTS `business_capabilities` (
 	`id` char(36) NOT NULL,
 	`name` varchar(255) NOT NULL,
 	`description` text,
@@ -140,7 +140,7 @@ CREATE TABLE `business_capabilities` (
 	CONSTRAINT `business_capabilities_id` PRIMARY KEY(`id`)
 );
 --> statement-breakpoint
-CREATE TABLE `changelog` (
+CREATE TABLE IF NOT EXISTS `changelog` (
 	`id` char(36) NOT NULL,
 	`version` varchar(50) NOT NULL,
 	`title` varchar(500) NOT NULL,
@@ -154,7 +154,7 @@ CREATE TABLE `changelog` (
 	CONSTRAINT `changelog_id` PRIMARY KEY(`id`)
 );
 --> statement-breakpoint
-CREATE TABLE `departments` (
+CREATE TABLE IF NOT EXISTS `departments` (
 	`id` char(36) NOT NULL,
 	`name` varchar(255) NOT NULL,
 	`description` text,
@@ -167,13 +167,13 @@ CREATE TABLE `departments` (
 	CONSTRAINT `uq_departments_name` UNIQUE(`name`)
 );
 --> statement-breakpoint
-CREATE TABLE `diagram_assets` (
+CREATE TABLE IF NOT EXISTS `diagram_assets` (
 	`diagram_id` char(36) NOT NULL,
 	`asset_id` char(36) NOT NULL,
 	CONSTRAINT `diagram_assets_diagram_id_asset_id_pk` PRIMARY KEY(`diagram_id`,`asset_id`)
 );
 --> statement-breakpoint
-CREATE TABLE `diagram_types` (
+CREATE TABLE IF NOT EXISTS `diagram_types` (
 	`id` char(36) NOT NULL,
 	`name` varchar(100) NOT NULL,
 	`description` text,
@@ -186,7 +186,7 @@ CREATE TABLE `diagram_types` (
 	CONSTRAINT `uq_diagram_type_name` UNIQUE(`name`)
 );
 --> statement-breakpoint
-CREATE TABLE `diagram_versions` (
+CREATE TABLE IF NOT EXISTS `diagram_versions` (
 	`id` char(36) NOT NULL,
 	`diagram_id` char(36) NOT NULL,
 	`version_number` int unsigned NOT NULL,
@@ -198,7 +198,7 @@ CREATE TABLE `diagram_versions` (
 	CONSTRAINT `uq_diagram_version` UNIQUE(`diagram_id`,`version_number`)
 );
 --> statement-breakpoint
-CREATE TABLE `diagrams` (
+CREATE TABLE IF NOT EXISTS `diagrams` (
 	`id` char(36) NOT NULL,
 	`name` varchar(255) NOT NULL,
 	`description` text,
@@ -211,7 +211,7 @@ CREATE TABLE `diagrams` (
 	CONSTRAINT `diagrams_id` PRIMARY KEY(`id`)
 );
 --> statement-breakpoint
-CREATE TABLE `domains` (
+CREATE TABLE IF NOT EXISTS `domains` (
 	`id` char(36) NOT NULL,
 	`name` varchar(255) NOT NULL,
 	`description` text,
@@ -223,7 +223,7 @@ CREATE TABLE `domains` (
 	CONSTRAINT `uq_domains_name` UNIQUE(`name`)
 );
 --> statement-breakpoint
-CREATE TABLE `industry_sectors` (
+CREATE TABLE IF NOT EXISTS `industry_sectors` (
 	`id` char(36) NOT NULL,
 	`name` varchar(255) NOT NULL,
 	`description` text,
@@ -235,7 +235,7 @@ CREATE TABLE `industry_sectors` (
 	CONSTRAINT `uq_industry_sectors_name` UNIQUE(`name`)
 );
 --> statement-breakpoint
-CREATE TABLE `investment_classifications` (
+CREATE TABLE IF NOT EXISTS `investment_classifications` (
 	`id` char(36) NOT NULL,
 	`name` varchar(100) NOT NULL,
 	`color` varchar(20) NOT NULL,
@@ -247,7 +247,7 @@ CREATE TABLE `investment_classifications` (
 	CONSTRAINT `investment_classifications_id` PRIMARY KEY(`id`)
 );
 --> statement-breakpoint
-CREATE TABLE `plantuml_diagram_assets` (
+CREATE TABLE IF NOT EXISTS `plantuml_diagram_assets` (
 	`diagram_id` char(36) NOT NULL,
 	`asset_id` char(36) NOT NULL,
 	`matched_on` varchar(255),
@@ -255,7 +255,7 @@ CREATE TABLE `plantuml_diagram_assets` (
 	CONSTRAINT `plantuml_diagram_assets_diagram_id_asset_id_pk` PRIMARY KEY(`diagram_id`,`asset_id`)
 );
 --> statement-breakpoint
-CREATE TABLE `plantuml_diagrams` (
+CREATE TABLE IF NOT EXISTS `plantuml_diagrams` (
 	`id` char(36) NOT NULL,
 	`name` varchar(255) NOT NULL,
 	`description` text,
@@ -267,7 +267,7 @@ CREATE TABLE `plantuml_diagrams` (
 	CONSTRAINT `plantuml_diagrams_id` PRIMARY KEY(`id`)
 );
 --> statement-breakpoint
-CREATE TABLE `plantuml_versions` (
+CREATE TABLE IF NOT EXISTS `plantuml_versions` (
 	`id` char(36) NOT NULL,
 	`diagram_id` char(36) NOT NULL,
 	`version_number` int unsigned NOT NULL,
@@ -279,7 +279,7 @@ CREATE TABLE `plantuml_versions` (
 	CONSTRAINT `uq_plantuml_version` UNIQUE(`diagram_id`,`version_number`)
 );
 --> statement-breakpoint
-CREATE TABLE `project_assets` (
+CREATE TABLE IF NOT EXISTS `project_assets` (
 	`project_id` char(36) NOT NULL,
 	`asset_id` char(36) NOT NULL,
 	`dependency_type` enum('upstream','downstream') NOT NULL DEFAULT 'downstream',
@@ -287,7 +287,7 @@ CREATE TABLE `project_assets` (
 	CONSTRAINT `project_assets_project_id_asset_id_pk` PRIMARY KEY(`project_id`,`asset_id`)
 );
 --> statement-breakpoint
-CREATE TABLE `projects` (
+CREATE TABLE IF NOT EXISTS `projects` (
 	`id` char(36) NOT NULL,
 	`name` varchar(255) NOT NULL,
 	`description` text,
@@ -301,7 +301,7 @@ CREATE TABLE `projects` (
 	CONSTRAINT `projects_id` PRIMARY KEY(`id`)
 );
 --> statement-breakpoint
-CREATE TABLE `roles` (
+CREATE TABLE IF NOT EXISTS `roles` (
 	`id` char(36) NOT NULL,
 	`name` varchar(255) NOT NULL,
 	`description` text,
@@ -314,7 +314,7 @@ CREATE TABLE `roles` (
 	CONSTRAINT `uq_roles_name` UNIQUE(`name`)
 );
 --> statement-breakpoint
-CREATE TABLE `support_requests` (
+CREATE TABLE IF NOT EXISTS `support_requests` (
 	`id` char(36) NOT NULL,
 	`user_id` char(36) NOT NULL,
 	`user_name` varchar(255) NOT NULL,
@@ -326,7 +326,7 @@ CREATE TABLE `support_requests` (
 	CONSTRAINT `support_requests_id` PRIMARY KEY(`id`)
 );
 --> statement-breakpoint
-CREATE TABLE `tiers` (
+CREATE TABLE IF NOT EXISTS `tiers` (
 	`id` char(36) NOT NULL,
 	`name` varchar(255) NOT NULL,
 	`description` text,
@@ -342,7 +342,7 @@ CREATE TABLE `tiers` (
 	CONSTRAINT `uq_tiers_name` UNIQUE(`name`)
 );
 --> statement-breakpoint
-CREATE TABLE `users` (
+CREATE TABLE IF NOT EXISTS `users` (
 	`id` char(36) NOT NULL,
 	`name` varchar(255) NOT NULL,
 	`email` varchar(255) NOT NULL,
@@ -356,7 +356,7 @@ CREATE TABLE `users` (
 	CONSTRAINT `uq_users_email` UNIQUE(`email`)
 );
 --> statement-breakpoint
-CREATE TABLE `vendors` (
+CREATE TABLE IF NOT EXISTS `vendors` (
 	`id` char(36) NOT NULL,
 	`name` varchar(255) NOT NULL,
 	`website` varchar(500),
@@ -381,21 +381,21 @@ CREATE TABLE `vendors` (
 	CONSTRAINT `uq_vendors_name` UNIQUE(`name`)
 );
 --> statement-breakpoint
-CREATE INDEX `idx_asset_architects_user` ON `asset_architects` (`user_id`);--> statement-breakpoint
-CREATE INDEX `idx_asset_capabilities_cap` ON `asset_capabilities` (`business_capability_id`);--> statement-breakpoint
-CREATE INDEX `idx_asset_departments_dept` ON `asset_departments` (`department_id`);--> statement-breakpoint
-CREATE INDEX `idx_dep_source` ON `asset_dependencies` (`source_asset_id`);--> statement-breakpoint
-CREATE INDEX `idx_dep_target` ON `asset_dependencies` (`target_asset_id`);--> statement-breakpoint
-CREATE INDEX `idx_phases_asset_id` ON `asset_roadmap_phases` (`asset_id`);--> statement-breakpoint
-CREATE INDEX `idx_phases_classification_id` ON `asset_roadmap_phases` (`classification_id`);--> statement-breakpoint
-CREATE INDEX `idx_assets_lifecycle` ON `assets` (`lifecycle_status`);--> statement-breakpoint
-CREATE INDEX `idx_audit_table_record` ON `audit_log` (`table_name`,`record_id`);--> statement-breakpoint
-CREATE INDEX `idx_audit_performed_at` ON `audit_log` (`performed_at`);--> statement-breakpoint
-CREATE INDEX `idx_business_capabilities_industry` ON `business_capabilities` (`industry_sector_id`);--> statement-breakpoint
-CREATE INDEX `idx_changelog_released_at` ON `changelog` (`released_at`);--> statement-breakpoint
-CREATE INDEX `idx_diagram_assets_asset` ON `diagram_assets` (`asset_id`);--> statement-breakpoint
-CREATE INDEX `idx_diagram_versions_diagram` ON `diagram_versions` (`diagram_id`);--> statement-breakpoint
-CREATE INDEX `idx_pda_asset` ON `plantuml_diagram_assets` (`asset_id`);--> statement-breakpoint
-CREATE INDEX `idx_plantuml_versions_diagram` ON `plantuml_versions` (`diagram_id`);--> statement-breakpoint
-CREATE INDEX `idx_project_assets_asset` ON `project_assets` (`asset_id`);--> statement-breakpoint
-CREATE INDEX `idx_support_user` ON `support_requests` (`user_id`);
+CREATE INDEX IF NOT EXISTS `idx_asset_architects_user` ON `asset_architects` (`user_id`);--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS `idx_asset_capabilities_cap` ON `asset_capabilities` (`business_capability_id`);--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS `idx_asset_departments_dept` ON `asset_departments` (`department_id`);--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS `idx_dep_source` ON `asset_dependencies` (`source_asset_id`);--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS `idx_dep_target` ON `asset_dependencies` (`target_asset_id`);--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS `idx_phases_asset_id` ON `asset_roadmap_phases` (`asset_id`);--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS `idx_phases_classification_id` ON `asset_roadmap_phases` (`classification_id`);--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS `idx_assets_lifecycle` ON `assets` (`lifecycle_status`);--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS `idx_audit_table_record` ON `audit_log` (`table_name`,`record_id`);--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS `idx_audit_performed_at` ON `audit_log` (`performed_at`);--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS `idx_business_capabilities_industry` ON `business_capabilities` (`industry_sector_id`);--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS `idx_changelog_released_at` ON `changelog` (`released_at`);--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS `idx_diagram_assets_asset` ON `diagram_assets` (`asset_id`);--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS `idx_diagram_versions_diagram` ON `diagram_versions` (`diagram_id`);--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS `idx_pda_asset` ON `plantuml_diagram_assets` (`asset_id`);--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS `idx_plantuml_versions_diagram` ON `plantuml_versions` (`diagram_id`);--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS `idx_project_assets_asset` ON `project_assets` (`asset_id`);--> statement-breakpoint
+CREATE INDEX IF NOT EXISTS `idx_support_user` ON `support_requests` (`user_id`);

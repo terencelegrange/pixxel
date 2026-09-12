@@ -1,4 +1,4 @@
-CREATE TABLE `asset_risks` (
+CREATE TABLE IF NOT EXISTS `asset_risks` (
 	`id` char(36) NOT NULL,
 	`asset_id` char(36) NOT NULL,
 	`title` varchar(255) NOT NULL,
@@ -15,4 +15,4 @@ CREATE TABLE `asset_risks` (
 	CONSTRAINT `asset_risks_id` PRIMARY KEY(`id`)
 );
 --> statement-breakpoint
-CREATE INDEX `idx_asset_risks_asset` ON `asset_risks` (`asset_id`);
+CREATE INDEX IF NOT EXISTS `idx_asset_risks_asset` ON `asset_risks` (`asset_id`);
