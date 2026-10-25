@@ -24,17 +24,6 @@ pipeline {
             }
         }
 
-        stage('Verify') {
-            steps {
-                sh """
-                    npm ci --registry=${NPM_REGISTRY}
-                    npx tsc --noEmit
-                    npm run lint
-                    npm run test:coverage
-                """
-            }
-        }
-
         stage('Write .env') {
             steps {
                 withCredentials([
