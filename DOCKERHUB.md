@@ -143,22 +143,27 @@ SQLite mode is explicitly a trial/evaluation path, not a production backend: the
 
 ## Architecture
 
-- **Framework:** Next.js 14 (App Router), TypeScript (strict)
+- **Framework:** Next.js 15 (App Router), TypeScript (strict)
 - **Runtime image:** multi-stage Alpine build — deps → build → a minimal `next build --standalone` runtime stage running as a non-root user, no dev dependencies or full `node_modules` shipped
 - **Database access:** no ORM query layer at runtime — routes use `mysql2`/`node:sqlite` directly through a shared `DbClient` interface. Drizzle is used **only** to author and generate schema migrations (`drizzle/schema.ts` → `drizzle/migrations/*.sql`), not as a query builder
-- **Auth:** custom JWT-backed session (bcrypt, cost factor 12), not a third-party auth provider — session state lives in React Context + localStorage on the client, verified server-side per request
+- **Auth:** custom JWT-backed session (bcrypt, cost factor 12) with optional MFA/TOTP two-factor authentication; session state lives in React Context + localStorage on the client, verified server-side per request
 - **Audit trail:** every create/update/delete on a tracked table writes a before/after diff to `audit_log`, including the acting user
-- **Roles:** `Admin` / `Member` / `Viewer`, assigned per user; the notification bell and admin-only views gate on `Admin`
+- **Roles & Security:** `Admin` / `Member` / `Viewer` roles, API key management for programmatic access, and feature tiers
 
 ### Feature surface
 
 - **Asset Registry** — full CRUD for applications: type, lifecycle status, tier, domain, strategy, vendor, department classification
-- **Bulk CSV import** — upload a CSV to create many assets at once; unmatched lookup values (tier, domain, vendor, etc.) surface as per-row warnings rather than failing the whole batch; each row commits in its own transaction
-- **Projects** — link assets as upstream/downstream dependencies; visualise as an interactive ReactFlow diagram
-- **Business Services** — a service catalogue layer above individual assets: group assets into named services (with a URL-friendly slug), classify each member asset's role (Core / Supporting / Dependency), and view the composition as a list or a ReactFlow diagram
-- **Reports** — Asset Strategy matrix (domains × strategies), capability and complexity/cost views
+- **Bulk CSV import** — upload a CSV to create many assets at once; unmatched lookup values surface as per-row warnings rather than failing the whole batch; each row commits in its own transaction
+- **Architecture Diagrams (Excalidraw)** — interactive domain, program, and solution diagramming canvas directly linked and tagged to assets
+- **PlantUML Diagrams** — text-based architecture diagram authoring with automated asset tag association
+- **Dependency Mapping** — project-level and cross-asset dependency mapping visualised via interactive ReactFlow diagrams
+- **Planning & Roadmaps** — project tracking linked to upstream/downstream dependencies, plus platform investment roadmaps over time
+- **Contracts & Cost Tracking** — track vendor contracts, renewals, and expiration countdowns integrated with asset complexity
+- **Risk Register & Security** — risk assessments, risk attributes, and security quadrant reports
+- **Reports** — Asset Strategy matrix (domains × strategies), business capability coverage matrix, complexity vs cost, and security quadrant
+- **API Documentation & Keys** — built-in interactive OpenAPI 3.0 reference rendered via Swagger UI at `/docs`, with programmatic API key management
 - **Audit log** — paginated, filterable, expandable before/after diffs across every entity
-- **Setup wizard** — first-run flow to name the instance, choose a database dialect, and create the initial admin account; automatically detects and safely reuses an existing populated database instead of re-initializing it
+- **Onboarding Tour & Setup Wizard** — first-run wizard to name the instance, pick a dialect (SQLite trial mode or MySQL), and create the initial admin account, followed by a guided interactive tour
 
 ---
 
@@ -170,7 +175,7 @@ The image is built from a codebase with unit, integration, and UI test suites (J
 - **Integration tests** — auth, CRUD, and cross-entity flows against a real database
 - **UI tests** — shared components and context providers (React Testing Library)
 
-At the time of this image's build: **66 test suites / 382 tests**, all passing, with `npx tsc --noEmit` clean. The CI pipeline enforces minimum coverage thresholds (statements 48%, branches 60%, functions 68%, lines 48%) and fails the build on any TypeScript or ESLint error before an image is ever pushed.
+At the time of this image's build: **96 test suites / 594 tests**, all passing, with `npx tsc --noEmit` clean. The CI pipeline enforces minimum coverage thresholds (statements 48%, branches 60%, functions 68%, lines 48%) and fails the build on any TypeScript or ESLint error before an image is ever pushed.
 
 ---
 
